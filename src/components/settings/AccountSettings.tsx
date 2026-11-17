@@ -5,7 +5,10 @@ import { Button } from "@/components/ui/button";
 import {
   acceptInvite,
   accountStatus,
+  canRunLive,
   createOrganization,
+  liveOrganization,
+  setLiveOrganization,
   refreshAccount,
   roleLabel,
   signIn,
@@ -237,6 +240,25 @@ export function AccountSettings() {
             </li>
           ))}
         </ul>
+      )}
+      {status.memberships.filter((m) => canRunLive(m.role)).length > 1 && (
+        <label className="flex items-center justify-between gap-3 text-sm">
+          <span className="text-muted-foreground">Services from this computer go live at</span>
+          <select
+            aria-label="Services go live at"
+            defaultValue={liveOrganization(status)?.orgId}
+            onChange={(e) => setLiveOrganization(e.target.value)}
+            className="h-8 rounded-md border border-border bg-background px-2 text-sm"
+          >
+            {status.memberships
+              .filter((m) => canRunLive(m.role))
+              .map((m) => (
+                <option key={m.orgId} value={m.orgId}>
+                  {m.orgName}
+                </option>
+              ))}
+          </select>
+        </label>
       )}
       <div className="flex flex-wrap gap-1">
         <InlineForm

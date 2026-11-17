@@ -476,7 +476,7 @@ export async function bandInfo(): Promise<BandInfo | null> {
   return invoke<BandInfo | null>("band_info");
 }
 
-export async function bandPublish(kind: "setlist" | "position", payload: unknown): Promise<void> {
+export async function bandPublish(kind: "setlist" | "position" | "hosted", payload: unknown): Promise<void> {
   await invoke<void>("band_publish", { kind, payload });
 }
 

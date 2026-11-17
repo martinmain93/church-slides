@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
 
+import { QrCode } from "@/components/band/QrCode";
 import { Button } from "@/components/ui/button";
 import {
   ASSIGNABLE_ROLES,
+  canManageBandLinks,
   canManageTeam,
+  createBandLink,
   createInvite,
   listMembers,
   removeMember,
@@ -39,6 +42,7 @@ export function OrganizationTeam({
   const [inviteRole, setInviteRole] = useState<Role>("member");
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [bandLink, setBandLink] = useState<{ url: string; leader: boolean } | null>(null);
 
   const fail = (err: unknown) => toast.error(err instanceof Error ? err.message : String(err));
 
@@ -67,6 +71,18 @@ export function OrganizationTeam({
     setBusy(true);
     try {
       setInviteUrl((await createInvite(membership.orgId, inviteRole)).url);
+    } catch (err) {
+      fail(err);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function makeBandLink(leader: boolean) {
+    setBusy(true);
+    try {
+      const link = await createBandLink(membership.orgId, leader ? "Worship leader" : "Band", leader);
+      setBandLink({ url: link.url, leader });
     } catch (err) {
       fail(err);
     } finally {
@@ -196,6 +212,47 @@ export function OrganizationTeam({
               </div>
               <p className="text-xs text-muted-foreground">
                 Anyone with this link can join as {roleLabel(inviteRole).toLowerCase()} for the next 14 days.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {canManageBandLinks(membership.role) && (
+        <div className="space-y-2 border-t border-border pt-3">
+          <p className="text-xs text-muted-foreground">
+            Band devices open a link once and follow every service from then on, from anywhere.
+          </p>
+          <div className="flex gap-2">
+            <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => void makeBandLink(false)}>
+              Band link
+            </Button>
+            <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => void makeBandLink(true)}>
+              Leader link
+            </Button>
+          </div>
+          {bandLink && (
+            <div className="space-y-2">
+              <div className="flex justify-center">
+                <QrCode text={bandLink.url} label={bandLink.leader ? "Worship leader" : "Band"} />
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  readOnly
+                  aria-label={bandLink.leader ? "Leader link" : "Band link"}
+                  value={bandLink.url}
+                  onFocus={(e) => e.currentTarget.select()}
+                  className="h-8 min-w-0 flex-1 rounded-md border border-border bg-background px-2 font-mono text-xs"
+                />
+                <Button type="button" size="sm" onClick={() => void copy(bandLink.url)}>
+                  Copy
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {bandLink.leader
+                  ? "This link also controls the slides. Give it only to whoever leads worship."
+                  : "Anyone with this link sees the lyrics and chords during services."}{" "}
+                It&apos;s shown only now; make a new one any time.
               </p>
             </div>
           )}

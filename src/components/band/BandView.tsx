@@ -16,7 +16,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, Monitor, MonitorOff } from "lucide-react";
 
-import { bandInviteUrl, useBandConnection, type ConnectionStatus } from "@/lib/band/useBandConnection";
+import {
+  bandInviteUrl,
+  hostedLink,
+  useBandConnection,
+  type BandConnection,
+  type ConnectionStatus,
+} from "@/lib/band/useBandConnection";
 import { clampTranspose, type BandSong } from "@/lib/band/protocol";
 import {
   alignSlides,
@@ -153,10 +159,60 @@ function initialPin(): string | null {
 
 // --- view -------------------------------------------------------------------------
 
+/** How long the hosted room can be out of reach before offering the church's network. */
+const FALLBACK_AFTER_MS = 10_000;
+
+/**
+ * Between the hosted room and the slides computer's own band server.
+ *
+ * A page from the website (https) can't open a socket to the slides
+ * computer on the church's network (http): browsers block that. So when the
+ * hosted room is out of reach, offer to *go* to the slides computer's band
+ * page, remembering the way back; that page comes straight back here as soon
+ * as the slides computer says the hosted room is reachable again.
+ */
+function NetworkFallback({ conn, hosted }: { conn: BandConnection; hosted: boolean }) {
+  const [offer, setOffer] = useState(false);
+  const { status, lanUrl, hostedLive } = conn;
+
+  useEffect(() => {
+    if (!hosted || status === "live" || !lanUrl) {
+      setOffer(false);
+      return;
+    }
+    const t = setTimeout(() => setOffer(true), FALLBACK_AFTER_MS);
+    return () => clearTimeout(t);
+  }, [hosted, status, lanUrl]);
+
+  const back = useMemo(() => (hosted ? null : new URLSearchParams(window.location.hash.slice(1)).get("back")), [hosted]);
+  useEffect(() => {
+    if (back && hostedLive && /^https:\/\//.test(back)) window.location.replace(back);
+  }, [back, hostedLive]);
+
+  if (!offer || !lanUrl) return null;
+  return (
+    <div className="flex items-center justify-between gap-3 border-b border-border bg-muted px-4 py-2 text-sm">
+      <span>Can&apos;t reach the internet. On the church&apos;s Wi-Fi?</span>
+      <button
+        type="button"
+        className="shrink-0 rounded-md border border-border px-3 py-1"
+        onClick={() => {
+          window.location.href = `${lanUrl}#back=${encodeURIComponent(window.location.href)}`;
+        }}
+      >
+        Connect directly
+      </button>
+    </div>
+  );
+}
+
 export function BandView() {
-  const role = useMemo(initialRole, []);
-  const [pin, setPin] = useState<string | null>(() => (role === "leader" ? initialPin() : null));
-  const conn = useBandConnection(role, pin);
+  // A hosted band link: the room says whether it's a leader link.
+  const hosted = useMemo(() => hostedLink() !== null, []);
+  const requestedRole = useMemo(initialRole, []);
+  const [pin, setPin] = useState<string | null>(() => (!hosted && requestedRole === "leader" ? initialPin() : null));
+  const conn = useBandConnection(hosted ? "leader" : requestedRole, pin);
+  const role: "band" | "leader" = hosted ? (conn.isLeader ? "leader" : "band") : requestedRole;
   const [prefs, setPrefs] = usePrefs();
   const [showSettings, setShowSettings] = useState(false);
   const [sheet, setSheet] = useState<"set" | "library" | null>(null);
@@ -216,6 +272,7 @@ export function BandView() {
       className="flex h-screen flex-col bg-background text-foreground supports-[height:100dvh]:h-[100dvh]"
       style={{ fontSize: `${16 * prefs.scale}px` }}
     >
+      <NetworkFallback conn={conn} hosted={hosted} />
       <Header
         song={song}
         nextSong={nextSong}

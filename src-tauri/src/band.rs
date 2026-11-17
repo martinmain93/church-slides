@@ -65,6 +65,10 @@ struct Shared {
     pin: String,
     setlist: Mutex<Option<Value>>,
     position: Mutex<Option<Value>>,
+    /// `{"type":"hosted","live":…}`: whether the organization's hosted live
+    /// room is reachable. A device that fell back here from the hosted room
+    /// goes back to it when this says so.
+    hosted: Mutex<Option<Value>>,
     tx: broadcast::Sender<String>,
     clients: AtomicUsize,
     /// Wrong leader PINs per device address (`PinGuard`).
@@ -208,6 +212,7 @@ impl BandServer {
             pin,
             setlist: Mutex::new(None),
             position: Mutex::new(None),
+            hosted: Mutex::new(None),
             tx,
             clients: AtomicUsize::new(0),
             pins: Mutex::new(PinGuard::default()),
@@ -253,6 +258,12 @@ impl BandServer {
         let slot = match kind {
             "setlist" => &shared.setlist,
             "position" => &shared.position,
+            "hosted" => {
+                let msg = json!({ "type": "hosted", "live": payload.get("live").and_then(Value::as_bool).unwrap_or(false) });
+                *shared.hosted.lock().unwrap() = Some(msg.clone());
+                let _ = shared.tx.send(msg.to_string());
+                return Ok(());
+            }
             other => return Err(format!("unknown band snapshot kind {other:?}")),
         };
         let msg = json!({ "type": kind, "data": payload });
@@ -360,7 +371,8 @@ async fn client_session(mut socket: WebSocket, shared: Arc<Shared>, from: IpAddr
     if snapshot.is_empty() {
         ok = socket.send(Message::Text(json!({ "type": "idle" }).to_string())).await.is_ok();
     }
-    for msg in snapshot {
+    let hosted = shared.hosted.lock().unwrap().clone();
+    for msg in snapshot.into_iter().chain(hosted) {
         if !ok {
             break;
         }

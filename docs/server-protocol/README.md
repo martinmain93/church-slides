@@ -18,9 +18,9 @@ covers the rest.
 | [Errors](#errors) | v0 |
 | [Account](#account) | v0 |
 | [Organizations](#organizations) | v0 |
-| [Band devices](#band-devices) | v0 (live set content comes with the live set) |
+| [Band devices](#band-devices) | v0 |
 | Sync of organization libraries | Not yet specified |
-| Live set | Not yet specified (today's [relay messages](../../relay/src/room.ts) are the starting point) |
+| [Live set](#live-set) | v0 |
 | AI assistants (MCP) | Not yet specified |
 
 ## Conventions
@@ -49,7 +49,7 @@ GET {server}/.well-known/church-slides
 {
   "protocol": "0",
   "api": "/v1",
-  "capabilities": ["account", "organizations"],
+  "capabilities": ["account", "organizations", "live"],
   "auth": {
     "issuer": "https://api.churchslides.app",
     "resource": "https://api.churchslides.app/v1",
@@ -62,7 +62,7 @@ GET {server}/.well-known/church-slides
 | --- | --- |
 | `protocol` | Protocol version this server speaks. |
 | `api` | Path of the protected API, relative to the server. |
-| `capabilities` | What this server offers. A server may offer any subset. Values so far: `account`, `organizations`. Planned: `sync`, `live`, `ai`, `mcp`. The app shows only features whose capability is listed. |
+| `capabilities` | What this server offers. A server may offer any subset. Values so far: `account`, `organizations`, `live`. Planned: `sync`, `live`, `ai`, `mcp`. The app shows only features whose capability is listed. |
 | `auth.issuer` | The OAuth authorization server. Its metadata is at `{issuer}/.well-known/oauth-authorization-server` ([RFC 8414]). |
 | `auth.resource` | The resource indicator ([RFC 8707]) to request tokens for. |
 | `auth.scopes` | Scopes the app should request. |
@@ -292,9 +292,12 @@ set. It isn't a person: it has a **device token** instead of a sign-in,
 it can see only its own organization's live set, and it never sees the
 library.
 
-- `POST /orgs/{orgId}/band-devices` with `{ "name": "Keys iPad" }`
-  (operator): `201` with `{ "device": { "id", "name", "createdAt", "lastUsedAt" }, "token": "csb_…" }`.
-  The token is shown only here.
+- `POST /orgs/{orgId}/band-devices` with `{ "name": "Keys iPad", "canLead": false }`
+  (operator): `201` with
+  `{ "device": { "id", "name", "canLead", "createdAt", "lastUsedAt" }, "token": "csb_…", "url": "…" }`.
+  The token is shown only here. `canLead` makes a **leader link**: the
+  worship leader's controls as well as the band screen. `url` is a band
+  page that opens the [live set](#live-set) with this token.
 - `GET /orgs/{orgId}/band-devices` (operator): `{ "devices": [...] }`.
 - `DELETE /orgs/{orgId}/band-devices/{deviceId}` (operator): it stops
   working at once. `204`.
@@ -306,8 +309,83 @@ tokens, and `{api}` doesn't accept device tokens.
 ### `GET /band/v1/me`
 
 ```json
-{ "device": { "id": "…", "name": "Keys iPad" }, "org": { "id": "…", "name": "Grace Chapel" } }
+{ "device": { "id": "…", "name": "Keys iPad", "canLead": false }, "org": { "id": "…", "name": "Grace Chapel" } }
 ```
+
+## Live set
+
+Each organization has one **live room**. The computer running the service
+(the *host*) publishes the setlist and the current slide into it, and band
+devices follow from anywhere. Signed in, the app opens it by itself for
+every service.
+
+### The host
+
+1. `POST {api}/orgs/{orgId}/live/ticket` (operator) returns
+   `{ "url": "wss://…/live/host?org=…&ticket=cst_…" }`. The ticket works
+   once, within two minutes, so the app asks for a new one for every
+   (re)connection.
+2. Open a WebSocket to `url`. One host at a time: a newer connection
+   replaces the older (closed with code `4000`).
+
+`GET {api}/orgs/{orgId}/live` (any member) says whether a service is live:
+`{ "hostConnected": true, "devices": 3 }`.
+
+### Band devices
+
+A band device opens a WebSocket to `{server}/band/v1/live` with its token,
+either as `Authorization: Bearer {token}` or, from a browser (which can't set
+headers on a WebSocket), as the subprotocols `["csb", "{token}"]`; the server
+accepts `csb`.
+
+A band link's `url` is a band page:
+`https://churchslides.app/live/#s={server}&t={token}`. Both go in the fragment,
+which browsers never send to a server.
+
+### Messages
+
+JSON text frames. Either side may send the text `ping`; the server answers
+`pong` (without waking anything).
+
+**Host → room**
+
+| Message | Meaning |
+| --- | --- |
+| `{ "type": "setlist", "data": … }` | The whole set: songs, their slides, charts, keys. Kept and sent to every device. |
+| `{ "type": "position", "data": … }` | The current slide. Kept and sent to every device. |
+| `{ "type": "lan", "data": { "band": "http://…/band", "leader": "http://…/leader?pin=…" } }` | Where devices on the building's network can reach the host directly. Band links get `band`, leader links `leader`. |
+| `{ "type": "idle" }` | The service ended; devices wait for the next. |
+| `{ "type": "close" }` | Forget everything, including `lan`. |
+| `{ "type": "library", "to": "…", "data": [...], "part": 0, "parts": 1 }` | A reply to a leader's `library_request`. |
+
+**Room → host**: `{ "type": "clients", "count": 3 }` (devices connected),
+`{ "type": "command", "command": … }` and
+`{ "type": "library_request", "from": "…" }` from a leader link.
+
+**Room → device**: on connecting, the current `setlist`, `position` and
+`lan` (or `{ "type": "idle" }` if no service is live), then each as it
+changes. `{ "type": "welcome", "role": "band" | "leader" }` answers `hello`.
+`{ "type": "error", "message": "…" }` refuses a command.
+
+**Device → room**: `{ "type": "hello", "role": "leader" }` (a leader link
+gets the leader's controls; any other link stays a band screen),
+`{ "type": "command", "command": … }` and `{ "type": "library_request" }`
+(leader links only).
+
+The setlist, position and command shapes are the app's band protocol
+([`src/lib/band/protocol.ts`](../../src/lib/band/protocol.ts)), the same on the
+local network and the self-hosted relay.
+
+### When the room can't be reached
+
+The host keeps its own band server running on the building's network. A
+band page that loses the room offers to connect there directly, using the
+`lan` address. That page goes back to the room as soon as the host reaches
+it again.
+
+A member removed from the organization, or whose role changes, loses their
+host connection at once (code `4001`). So does a band device whose link is
+removed.
 
 [RFC 6750]: https://www.rfc-editor.org/rfc/rfc6750
 [RFC 7009]: https://www.rfc-editor.org/rfc/rfc7009

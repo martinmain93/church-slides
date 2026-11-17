@@ -17,9 +17,29 @@ import { cn } from "@/lib/utils";
 /** Under the "⋯" menu's "Band screens…" item: how many devices are on band
  * screens once they're on, since there's no top-bar button to say so. */
 export function bandScreensMenuHint(band: BandHostApi): string | undefined {
-  if (!band.info && !band.online?.room) return undefined;
-  const n = band.clients + (band.online?.clients ?? 0);
-  return `On · ${n} device${n === 1 ? "" : "s"} connected`;
+  if (!band.info && !band.online?.room && !band.hosted) return undefined;
+  const n = band.clients + (band.online?.clients ?? 0) + (band.hosted?.clients ?? 0);
+  const devices = `${n} device${n === 1 ? "" : "s"} connected`;
+  if (band.hosted) return `Live at ${band.hosted.org?.orgName ?? "your organization"} · ${devices}`;
+  return `On · ${devices}`;
+}
+
+/** Signed in to an organization: where the service is going, and where band links come from. */
+function HostedRoomNote({ hosted }: { hosted: NonNullable<BandHostApi["hosted"]> }) {
+  const live = hosted.connection === "live";
+  return (
+    <div className="rounded-md border border-border p-3 text-sm" data-testid="hosted-room-note">
+      <p>
+        {live ? "Live at " : "Connecting to "}
+        <span className="font-medium">{hosted.org?.orgName}</span>
+        {live && ` · ${hosted.clients} device${hosted.clients === 1 ? "" : "s"}`}
+      </p>
+      <p className="text-xs text-muted-foreground">
+        Band devices with your organization&rsquo;s band link follow the service from anywhere. Make links in Settings →
+        Account → Team. Devices on this network can also use the codes below.
+      </p>
+    </div>
+  );
 }
 
 export function BandScreensButton({
@@ -197,6 +217,7 @@ export function BandScreensButton({
             </div>
           ) : !info ? (
             <div className="flex flex-col gap-3 text-sm">
+              {band.hosted && <HostedRoomNote hosted={band.hosted} />}
               <p>
                 Show lyrics and chords on the band&rsquo;s own phones and tablets, following the slides. Everything
                 stays on this building&rsquo;s network — no internet needed.
@@ -214,6 +235,7 @@ export function BandScreensButton({
             </div>
           ) : (
             <div className="flex flex-col gap-3 text-sm">
+              {band.hosted && <HostedRoomNote hosted={band.hosted} />}
               <div className="flex justify-around">
                 <QrCode text={`${base}/band`} label="Band" />
                 <QrCode text={`${base}/leader?pin=${info.pin}`} label="Worship leader" />
