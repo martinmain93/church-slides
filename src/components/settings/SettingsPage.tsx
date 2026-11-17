@@ -44,6 +44,7 @@ import { OpenSourceLicencesLink } from "@/components/settings/OpenSourceLicences
 import { ScriptureSettingsPanel } from "@/components/scripture/ScriptureSettingsPanel";
 import { settingsPageInfo, type SettingsPageId } from "@/components/settings/settingsPages";
 import { InfoTip } from "@/components/ui/InfoTip";
+import { AccountSettings } from "@/components/settings/AccountSettings";
 import { FEATURES } from "@/lib/features";
 import { setAiEnabled, useAiEnabled } from "@/lib/aiPrefs";
 import { refreshInstructionModels, useInstructionModels } from "@/lib/instructionModels";
@@ -195,6 +196,11 @@ export function SettingsPage({
                 </Section>
               )}
 
+              {page === "account" && FEATURES.account && (
+                <Section>
+                  <AccountSettings />
+                </Section>
+              )}
               {page === "other" && (
                 <>
                   <Section title="Privacy">
