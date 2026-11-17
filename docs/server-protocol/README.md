@@ -17,6 +17,8 @@ covers the rest.
 | [Signing in](#signing-in) | v0 |
 | [Errors](#errors) | v0 |
 | [Account](#account) | v0 |
+| [Organizations](#organizations) | v0 |
+| [Band devices](#band-devices) | v0 (live set content comes with the live set) |
 | Sync of organization libraries | Not yet specified |
 | Live set | Not yet specified (today's [relay messages](../../relay/src/room.ts) are the starting point) |
 | AI assistants (MCP) | Not yet specified |
@@ -47,7 +49,7 @@ GET {server}/.well-known/church-slides
 {
   "protocol": "0",
   "api": "/v1",
-  "capabilities": ["account"],
+  "capabilities": ["account", "organizations"],
   "auth": {
     "issuer": "https://api.churchslides.app",
     "resource": "https://api.churchslides.app/v1",
@@ -60,7 +62,7 @@ GET {server}/.well-known/church-slides
 | --- | --- |
 | `protocol` | Protocol version this server speaks. |
 | `api` | Path of the protected API, relative to the server. |
-| `capabilities` | What this server offers. A server may offer any subset. Values so far: `account`. Planned: `sync`, `live`, `ai`, `mcp`. The app shows only features whose capability is listed. |
+| `capabilities` | What this server offers. A server may offer any subset. Values so far: `account`, `organizations`. Planned: `sync`, `live`, `ai`, `mcp`. The app shows only features whose capability is listed. |
 | `auth.issuer` | The OAuth authorization server. Its metadata is at `{issuer}/.well-known/oauth-authorization-server` ([RFC 8414]). |
 | `auth.resource` | The resource indicator ([RFC 8707]) to request tokens for. |
 | `auth.scopes` | Scopes the app should request. |
@@ -98,6 +100,11 @@ business; the app only sees the standard flow.
      &state=…&scope=account%20offline_access
      &resource={auth.resource}
    ```
+
+   To sign in through an invite (see [Joining](#joining)), the app adds
+   `&invite={link or code}`. A server may then let a new person in without
+   whatever else it asks of newcomers, and adds them to the organization as
+   they sign in. Servers that don't support invites ignore it.
 
    The server redirects back to the loopback address with `code`, `state`
    and `iss` ([RFC 9207]). The app checks that `state` matches and that
@@ -179,6 +186,127 @@ stop working, and access tokens stop being accepted.
 
 ```json
 { "signedOut": 3 }
+```
+
+## Organizations
+
+A team (a church, a school, a band) is an **organization**. Its content
+belongs to it and is visible only to its members. Everything below is under
+`{server}{api}` with an `account` token.
+
+### Roles
+
+| Role | What it adds |
+| --- | --- |
+| `member` | Sees the organization, its members and their roles |
+| `set_leader` | (Later: edits setlists and leads the live set) |
+| `operator` | Adds and removes band devices. (Later: edits the library and runs the live set) |
+| `admin` | Renames the organization; invites people; changes roles below owner; removes members; sees members' emails |
+| `owner` | Exactly one per organization. Hands ownership to another member; deletes the organization |
+
+A server checks the role on every request. Someone who isn't a member gets
+`404 not_found` for anything under an organization, so an organization's
+existence isn't revealed. A member whose role doesn't allow it gets
+`403 forbidden`.
+
+### `POST /orgs`
+
+Creates an organization; the caller is its owner. `201`.
+
+```json
+{ "name": "Grace Chapel", "timeZone": "America/Halifax" }
+```
+
+```json
+{ "org": { "id": "…", "name": "Grace Chapel", "timeZone": "America/Halifax", "createdAt": 1700000000000 }, "role": "owner" }
+```
+
+`timeZone` is an IANA name and is optional (`UTC`). A server may limit how
+many organizations one person owns (`403 forbidden`).
+
+### `GET /orgs/{orgId}` · `PATCH /orgs/{orgId}` · `DELETE /orgs/{orgId}`
+
+Read it (any member), change `name` or `timeZone` (admin), or delete it
+with everything in it (owner, `204`).
+
+### `POST /orgs/{orgId}/transfer`
+
+`{ "userId": "…" }`: the owner hands the organization to another member,
+and becomes an admin. `204`.
+
+### Members
+
+- `GET /orgs/{orgId}/members` (any member):
+  ```json
+  { "members": [{ "userId": "…", "displayName": "Ada", "email": "ada@example.org", "role": "operator", "joinedAt": 1700000000000 }] }
+  ```
+  `email` is included only for owners and admins, and for the caller's own entry.
+- `PATCH /orgs/{orgId}/members/{userId}` with `{ "role": "operator" }`
+  (admin): any role but `owner`; the owner's own role can't be changed. `204`.
+- `DELETE /orgs/{orgId}/members/{userId}` (admin), or your own `userId` to
+  leave (anyone but the owner). `204`.
+
+### Invites
+
+An admin makes an invite link; anyone who has it can join with its role
+until it expires, runs out or is withdrawn.
+
+- `POST /orgs/{orgId}/invites` (admin):
+  ```json
+  { "role": "member", "expiresInDays": 14, "maxUses": null }
+  ```
+  All optional (these are the defaults; `expiresInDays` 1–30, `maxUses` 1–1000
+  or `null` for no limit). `role` can't be `owner`. `201`:
+  ```json
+  {
+    "invite": { "id": "…", "role": "member", "createdAt": 1700000000000, "expiresAt": 1701209600000, "maxUses": null, "uses": 0 },
+    "code": "csi_…",
+    "url": "https://api.churchslides.app/join/csi_…"
+  }
+  ```
+  The code is shown only here; servers store a hash of it.
+- `GET /orgs/{orgId}/invites` (admin): `{ "invites": [...] }`, the ones that still work.
+- `DELETE /orgs/{orgId}/invites/{inviteId}` (admin): withdraw it. `204`.
+
+#### Joining
+
+The `url` is a page a person can open in a browser: it names the
+organization and says how to join from the app. The app accepts the link
+or the bare code:
+
+- Signed out, it [signs in](#signing-in) with `invite=` on the authorize URL.
+- Signed in, it calls `POST /invites/accept` with `{ "invite": "{link or code}" }`:
+  ```json
+  { "membership": { "orgId": "…", "orgName": "Grace Chapel", "role": "operator" }, "joined": true }
+  ```
+  Someone already in the organization keeps their role (`joined: false`);
+  an invite never changes it. An invite that can't be used is
+  `404 not_found`.
+- `POST /invites/preview` with the same body says what an invite is for,
+  without joining: `{ "orgName": "…", "role": "operator", "currentRole": null }`.
+
+## Band devices
+
+A band device is a phone or tablet on a band stand that follows the live
+set. It isn't a person: it has a **device token** instead of a sign-in,
+it can see only its own organization's live set, and it never sees the
+library.
+
+- `POST /orgs/{orgId}/band-devices` with `{ "name": "Keys iPad" }`
+  (operator): `201` with `{ "device": { "id", "name", "createdAt", "lastUsedAt" }, "token": "csb_…" }`.
+  The token is shown only here.
+- `GET /orgs/{orgId}/band-devices` (operator): `{ "devices": [...] }`.
+- `DELETE /orgs/{orgId}/band-devices/{deviceId}` (operator): it stops
+  working at once. `204`.
+
+The device calls the band API at `{server}/band/v1` with
+`Authorization: Bearer {token}`. That API doesn't accept people's access
+tokens, and `{api}` doesn't accept device tokens.
+
+### `GET /band/v1/me`
+
+```json
+{ "device": { "id": "…", "name": "Keys iPad" }, "org": { "id": "…", "name": "Grace Chapel" } }
 ```
 
 [RFC 6750]: https://www.rfc-editor.org/rfc/rfc6750

@@ -512,6 +512,7 @@ pub fn run() {
             commands::account_refresh,
             commands::account_sign_in,
             commands::account_sign_out,
+            commands::account_api,
             commands::account_sign_out_everywhere,
             commands::cloud_relay_status,
             commands::cloud_relay_setup_token,

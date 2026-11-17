@@ -405,14 +405,25 @@ pub async fn account_refresh(app: tauri::AppHandle) -> Result<crate::account::Ac
 }
 
 #[tauri::command]
-pub async fn account_sign_in(app: tauri::AppHandle) -> Result<crate::account::AccountStatus, String> {
+pub async fn account_sign_in(app: tauri::AppHandle, invite: Option<String>) -> Result<crate::account::AccountStatus, String> {
     use tauri_plugin_shell::ShellExt;
     let shell = app.shell();
     // Same opener as the Cloudflare sign-in; moving both to tauri-plugin-opener is separate work.
     #[allow(deprecated)]
-    crate::account::sign_in(&app_data(&app)?, |url| shell.open(url, None).map_err(|e| anyhow::anyhow!("{e}")))
+    crate::account::sign_in(&app_data(&app)?, invite.as_deref(), |url| shell.open(url, None).map_err(|e| anyhow::anyhow!("{e}")))
         .await
         .map_err(|e| format!("{e:#}"))
+}
+
+/// A call to the signed-in API (organizations, members, invites).
+#[tauri::command]
+pub async fn account_api(
+    app: tauri::AppHandle,
+    method: String,
+    path: String,
+    body: Option<serde_json::Value>,
+) -> Result<serde_json::Value, String> {
+    crate::account::api(&app_data(&app)?, &method, &path, body).await.map_err(|e| format!("{e:#}"))
 }
 
 #[tauri::command]
