@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
 
 import pytest
@@ -21,9 +22,9 @@ from auto_presenter.eval.types import GroundTruthEvent, Recording
 
 def test_record_decision_stamps_relative_to_t0() -> None:
     sink = InMemorySink()
-    logger = ShadowLogger(sink, t0=100.0)
-    # Force a specific monotonic-ish stamp by patching time below; easier:
-    # the entries' t_seconds are >= 0 because t0 was set in the past.
+    # A t0 a little in the past on the same clock: a fixed number (100 s)
+    # is in the future on a machine booted less than 100 s ago (CI runners).
+    logger = ShadowLogger(sink, t0=time.monotonic() - 1.0)
     entry = logger.record_decision(item_idx=2, slide_idx=4, confidence=0.7)
     assert entry.source == "ai"
     assert entry.item_idx == 2

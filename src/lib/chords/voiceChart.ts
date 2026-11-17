@@ -459,6 +459,10 @@ file header, and Whisper rejects it.
 export async function startVoiceRecording(handlers: {
   onUtterance: (blob: Blob, final: boolean) => Promise<"applied" | "incomplete" | "error">;
 }): Promise<{ stop: () => Promise<void> }> {
+  // macOS 10.15's web view (Safari 14.0) has no MediaRecorder: say so before
+  // opening the mic. The caller shows "Microphone isn't available". Every
+  // browser with MediaRecorder also has OfflineAudioContext (joinClips).
+  if (typeof MediaRecorder === "undefined") throw new Error("recording isn't supported here");
   const stream = warmStream ?? (await (warmPromise ?? navigator.mediaDevices.getUserMedia({ audio: true })));
   warmStream = stream;
   warmPromise = null;

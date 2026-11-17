@@ -97,11 +97,16 @@ jobs:
       - name: Install the chord model (bundled into the engine; MIT)
         run: uv run --project sidecar python scripts/setup_chord_model.py
 
+      - name: Install the next-line model (bundled into the Apple-silicon engine; MIT)
+        if: matrix.arch == 'aarch64' && runner.os == 'macOS'
+        run: uv run --project sidecar python scripts/setup_next_line_model.py
+
       - name: Freeze and verify the AI engine
         run: uv run --project sidecar python scripts/build_sidecar.py --arch ${{ matrix.arch }}
 
       - name: Build the app with the engine
-        run: pnpm tauri build --target ${{ matrix.rust_target }} --config src-tauri/tauri.sidecar.conf.json
+        # Linux: the .deb proves the bundle; the AppImage step fills the runner's disk.
+        run: pnpm tauri build --target ${{ matrix.rust_target }} --config src-tauri/tauri.sidecar.conf.json ${{ runner.os == 'Linux' && '--bundles deb' || '' }}
 
       - uses: actions/upload-artifact@v4
         with:
@@ -125,14 +130,20 @@ jobs:
         with:
           node-version: 22
       - name: Browser-API compatibility (eslint-plugin-compat)
-        # AudioContext is listed as polyfilled in the config: both uses fall
-        # back to webkitAudioContext, which the rule can't see. ESLint 8
-        # would otherwise find the repo's flat eslint.config.js and refuse
-        # the eslintrc-style options below.
+        # Listed as polyfilled in the config, because the rule can't see the
+        # guards: AudioContext (both uses fall back to webkitAudioContext),
+        # MediaRecorder and OfflineAudioContext (voice charting checks for
+        # MediaRecorder before recording; see startVoiceRecording).
+        # ESLint 8 runs from its own folder: in the repo it would find the
+        # flat eslint.config.js, and an eslintrc config resolves its parser
+        # from the config's folder, where npx's packages aren't.
         env:
           ESLINT_USE_FLAT_CONFIG: "false"
-        run: >
-          npx --yes -p eslint@8 -p eslint-plugin-compat@6
-          -p @typescript-eslint/parser@7 -p typescript@5.7
-          eslint --no-eslintrc --no-inline-config -c scripts/compat.eslintrc.json
-          --ext .ts,.tsx --ignore-pattern "__tests__" src
+        run: |
+          E="$RUNNER_TEMP/eslint8"
+          mkdir -p "$E" && npm install --prefix "$E" --no-audit --no-fund --no-save \
+            eslint@8 eslint-plugin-compat@6 @typescript-eslint/parser@7 typescript@5.7
+          "$E/node_modules/.bin/eslint" --no-eslintrc --no-inline-config \
+            -c scripts/compat.eslintrc.json --resolve-plugins-relative-to "$E" \
+            --parser "$E/node_modules/@typescript-eslint/parser/dist/index.js" \
+            --ext .ts,.tsx --ignore-pattern "__tests__" src
