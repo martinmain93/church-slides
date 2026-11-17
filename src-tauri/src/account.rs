@@ -105,7 +105,14 @@ pub fn status(app_data: &Path) -> AccountStatus {
             server: cfg.server.clone(),
             server_is_default: cfg.server == DEFAULT_SERVER,
         },
-        _ => AccountStatus { signed_in: false, email: None, display_name: None, memberships: vec![], server, server_is_default },
+        _ => AccountStatus {
+            signed_in: false,
+            email: None,
+            display_name: None,
+            memberships: vec![],
+            server,
+            server_is_default,
+        },
     }
 }
 
@@ -149,13 +156,17 @@ impl SecretStore for Keychain {
     fn delete(&self) -> Result<()> {
         match keyring::Entry::new(KEYCHAIN_SERVICE, KEYCHAIN_USER)?.delete_credential() {
             Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
-            Err(e) => Err(anyhow!("Couldn't remove the sign-in from the keychain: {e}")),
+            Err(e) => Err(anyhow!(
+                "Couldn't remove the sign-in from the keychain: {e}"
+            )),
         }
     }
 }
 
 #[cfg(test)]
 static TEST_SECRET: Mutex<Option<String>> = Mutex::new(None);
+#[cfg(test)]
+static TEST_READS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 
 #[cfg(test)]
 struct MemoryStore;
@@ -163,6 +174,7 @@ struct MemoryStore;
 #[cfg(test)]
 impl SecretStore for MemoryStore {
     fn get(&self) -> Result<Option<String>> {
+        TEST_READS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         Ok(TEST_SECRET.lock().unwrap().clone())
     }
     fn set(&self, secret: &str) -> Result<()> {
@@ -175,11 +187,48 @@ impl SecretStore for MemoryStore {
     }
 }
 
-fn secrets() -> Box<dyn SecretStore> {
+fn backend() -> Box<dyn SecretStore> {
     #[cfg(test)]
     return Box::new(MemoryStore);
     #[cfg(not(test))]
     Box::new(Keychain)
+}
+
+/// The refresh token as last read from or written to the keychain: `None`
+/// until the first read. macOS can ask the person before each keychain
+/// access, so the keychain is read once per launch and touched again only
+/// when the token changes or is removed.
+static REFRESH: Mutex<Option<Option<String>>> = Mutex::new(None);
+
+struct Cached;
+
+impl SecretStore for Cached {
+    fn get(&self) -> Result<Option<String>> {
+        let mut cache = REFRESH.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(known) = cache.as_ref() {
+            return Ok(known.clone());
+        }
+        let read = backend().get()?;
+        *cache = Some(read.clone());
+        Ok(read)
+    }
+    fn set(&self, secret: &str) -> Result<()> {
+        let mut cache = REFRESH.lock().unwrap_or_else(|e| e.into_inner());
+        backend().set(secret)?;
+        *cache = Some(Some(secret.to_string()));
+        Ok(())
+    }
+    fn delete(&self) -> Result<()> {
+        let mut cache = REFRESH.lock().unwrap_or_else(|e| e.into_inner());
+        // Forget it in memory even if the keychain refuses, so the app shows
+        // signed out either way.
+        *cache = Some(None);
+        backend().delete()
+    }
+}
+
+fn secrets() -> Cached {
+    Cached
 }
 
 /// The access token, in memory only: (token, valid until).
@@ -188,7 +237,9 @@ static ACCESS: Mutex<Option<(String, Instant)>> = Mutex::new(None);
 // --- Talking to the server --------------------------------------------------------
 
 fn client() -> Result<reqwest::Client> {
-    Ok(reqwest::Client::builder().timeout(Duration::from_secs(20)).build()?)
+    Ok(reqwest::Client::builder()
+        .timeout(Duration::from_secs(20))
+        .build()?)
 }
 
 fn b64url(bytes: &[u8]) -> String {
@@ -229,13 +280,19 @@ async fn discover(server: &str) -> Result<ServerInfo> {
         .context("This server doesn't speak the Church Slides protocol")?
         .json()
         .await?;
-    let auth = disc.get("auth").ok_or_else(|| anyhow!("This server has no sign-in"))?;
+    let auth = disc
+        .get("auth")
+        .ok_or_else(|| anyhow!("This server has no sign-in"))?;
     let issuer = str_field(auth, "issuer").ok_or_else(|| anyhow!("Discovery has no issuer"))?;
-    let resource = str_field(auth, "resource").ok_or_else(|| anyhow!("Discovery has no resource"))?;
+    let resource =
+        str_field(auth, "resource").ok_or_else(|| anyhow!("Discovery has no resource"))?;
     let api = str_field(&disc, "api").unwrap_or_else(|| "/v1".into());
 
     let meta: Value = http
-        .get(format!("{}/.well-known/oauth-authorization-server", issuer.trim_end_matches('/')))
+        .get(format!(
+            "{}/.well-known/oauth-authorization-server",
+            issuer.trim_end_matches('/')
+        ))
         .send()
         .await?
         .error_for_status()?
@@ -244,11 +301,17 @@ async fn discover(server: &str) -> Result<ServerInfo> {
     if str_field(&meta, "issuer").as_deref() != Some(issuer.as_str()) {
         bail!("The sign-in server's metadata names a different issuer");
     }
-    let authorization_endpoint = str_field(&meta, "authorization_endpoint").ok_or_else(|| anyhow!("No authorization endpoint"))?;
-    let token_endpoint = str_field(&meta, "token_endpoint").ok_or_else(|| anyhow!("No token endpoint"))?;
+    let authorization_endpoint = str_field(&meta, "authorization_endpoint")
+        .ok_or_else(|| anyhow!("No authorization endpoint"))?;
+    let token_endpoint =
+        str_field(&meta, "token_endpoint").ok_or_else(|| anyhow!("No token endpoint"))?;
     let revocation_endpoint = str_field(&meta, "revocation_endpoint");
 
-    let client_id = if meta.get("client_id_metadata_document_supported").and_then(Value::as_bool) == Some(true) {
+    let client_id = if meta
+        .get("client_id_metadata_document_supported")
+        .and_then(Value::as_bool)
+        == Some(true)
+    {
         DESKTOP_CLIENT_ID.to_string()
     } else if let Some(reg) = str_field(&meta, "registration_endpoint") {
         let resp: Value = http
@@ -267,12 +330,21 @@ async fn discover(server: &str) -> Result<ServerInfo> {
             .context("The server refused to register this app")?
             .json()
             .await?;
-        str_field(&resp, "client_id").ok_or_else(|| anyhow!("Registration returned no client id"))?
+        str_field(&resp, "client_id")
+            .ok_or_else(|| anyhow!("Registration returned no client id"))?
     } else {
         bail!("This server can't sign in this app (no client metadata documents or registration)");
     };
 
-    Ok(ServerInfo { api, issuer, resource, authorization_endpoint, token_endpoint, revocation_endpoint, client_id })
+    Ok(ServerInfo {
+        api,
+        issuer,
+        resource,
+        authorization_endpoint,
+        token_endpoint,
+        revocation_endpoint,
+        client_id,
+    })
 }
 
 const DONE_PAGE: &str = "Signed in. You can close this tab and go back to Church Slides.";
@@ -280,7 +352,11 @@ const FAILED_PAGE: &str = "Sign-in didn't complete. Go back to Church Slides and
 
 /// Wait for the browser's one request to the loopback address; return the
 /// authorization code once `state` (and `iss`, when sent) check out.
-async fn await_code(listener: tokio::net::TcpListener, state: &str, issuer: &str) -> Result<String> {
+async fn await_code(
+    listener: tokio::net::TcpListener,
+    state: &str,
+    issuer: &str,
+) -> Result<String> {
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     loop {
         let (mut sock, _) = listener.accept().await?;
@@ -290,14 +366,25 @@ async fn await_code(listener: tokio::net::TcpListener, state: &str, issuer: &str
         let path = request.split_whitespace().nth(1).unwrap_or("/");
         let parsed = url::Url::parse(&format!("http://127.0.0.1{path}"))?;
         if parsed.path() != "/callback" {
-            sock.write_all(b"HTTP/1.1 404 Not Found\r\ncontent-length: 0\r\n\r\n").await.ok();
+            sock.write_all(b"HTTP/1.1 404 Not Found\r\ncontent-length: 0\r\n\r\n")
+                .await
+                .ok();
             continue;
         }
-        let get = |k: &str| parsed.query_pairs().find(|(q, _)| q == k).map(|(_, v)| v.into_owned());
+        let get = |k: &str| {
+            parsed
+                .query_pairs()
+                .find(|(q, _)| q == k)
+                .map(|(_, v)| v.into_owned())
+        };
         let state_ok = get("state").as_deref() == Some(state);
         let iss_ok = get("iss").map_or(true, |i| i == issuer);
         let code = get("code").filter(|_| state_ok && iss_ok);
-        let page = if code.is_some() { DONE_PAGE } else { FAILED_PAGE };
+        let page = if code.is_some() {
+            DONE_PAGE
+        } else {
+            FAILED_PAGE
+        };
         let body = format!(
             "<!doctype html><meta charset=utf-8><title>Church Slides</title><p style=\"font:16px system-ui;margin:3em\">{page}</p>"
         );
@@ -323,8 +410,12 @@ async fn await_code(listener: tokio::net::TcpListener, state: &str, issuer: &str
 }
 
 fn remember_access(resp: &Value) -> Result<String> {
-    let access = str_field(resp, "access_token").ok_or_else(|| anyhow!("The server didn't return a token"))?;
-    let ttl = resp.get("expires_in").and_then(Value::as_u64).unwrap_or(300);
+    let access = str_field(resp, "access_token")
+        .ok_or_else(|| anyhow!("The server didn't return a token"))?;
+    let ttl = resp
+        .get("expires_in")
+        .and_then(Value::as_u64)
+        .unwrap_or(300);
     // Refresh a little early rather than send a token that expires in flight.
     let until = Instant::now() + Duration::from_secs(ttl.saturating_sub(30).max(1));
     *ACCESS.lock().unwrap_or_else(|e| e.into_inner()) = Some((access.clone(), until));
@@ -333,15 +424,23 @@ fn remember_access(resp: &Value) -> Result<String> {
 
 /// Sign in through the browser. `open_browser` opens the authorization URL
 /// (the system browser in the app; a scripted client in tests).
-pub async fn sign_in(app_data: &Path, open_browser: impl FnOnce(&str) -> Result<()>) -> Result<AccountStatus> {
+pub async fn sign_in(
+    app_data: &Path,
+    open_browser: impl FnOnce(&str) -> Result<()>,
+) -> Result<AccountStatus> {
     let server = server_url();
     let info = discover(&server).await?;
 
     let verifier = random_b64(32);
     let challenge = b64url(&Sha256::digest(verifier.as_bytes()));
     let state = random_b64(16);
-    let listener = tokio::net::TcpListener::bind(("127.0.0.1", 0)).await.context("Couldn't listen for the sign-in reply")?;
-    let redirect = format!("http://127.0.0.1:{}/callback", listener.local_addr()?.port());
+    let listener = tokio::net::TcpListener::bind(("127.0.0.1", 0))
+        .await
+        .context("Couldn't listen for the sign-in reply")?;
+    let redirect = format!(
+        "http://127.0.0.1:{}/callback",
+        listener.local_addr()?.port()
+    );
 
     let mut url = url::Url::parse(&info.authorization_endpoint)?;
     url.query_pairs_mut()
@@ -355,9 +454,12 @@ pub async fn sign_in(app_data: &Path, open_browser: impl FnOnce(&str) -> Result<
         .append_pair("resource", &info.resource);
     open_browser(url.as_str())?;
 
-    let code = tokio::time::timeout(Duration::from_secs(300), await_code(listener, &state, &info.issuer))
-        .await
-        .map_err(|_| anyhow!("Sign-in timed out"))??;
+    let code = tokio::time::timeout(
+        Duration::from_secs(300),
+        await_code(listener, &state, &info.issuer),
+    )
+    .await
+    .map_err(|_| anyhow!("Sign-in timed out"))??;
 
     let resp = client()?
         .post(&info.token_endpoint)
@@ -372,11 +474,20 @@ pub async fn sign_in(app_data: &Path, open_browser: impl FnOnce(&str) -> Result<
         .send()
         .await?;
     let status = resp.status();
-    let tokens: Value = resp.json().await.with_context(|| format!("The server replied {status}"))?;
+    let tokens: Value = resp
+        .json()
+        .await
+        .with_context(|| format!("The server replied {status}"))?;
     if !status.is_success() {
-        bail!("The server refused the sign-in: {}", str_field(&tokens, "error_description").or(str_field(&tokens, "error")).unwrap_or_default());
+        bail!(
+            "The server refused the sign-in: {}",
+            str_field(&tokens, "error_description")
+                .or(str_field(&tokens, "error"))
+                .unwrap_or_default()
+        );
     }
-    let refresh = str_field(&tokens, "refresh_token").ok_or_else(|| anyhow!("The server didn't return a refresh token"))?;
+    let refresh = str_field(&tokens, "refresh_token")
+        .ok_or_else(|| anyhow!("The server didn't return a refresh token"))?;
     let access = remember_access(&tokens)?;
     secrets().set(&refresh)?;
 
@@ -411,7 +522,11 @@ fn status_of(cfg: &AccountConfig) -> AccountStatus {
 }
 
 async fn fetch_me(cfg: &AccountConfig, access: &str) -> Result<Value> {
-    let resp = client()?.get(format!("{}{}/me", cfg.server, cfg.api)).bearer_auth(access).send().await?;
+    let resp = client()?
+        .get(format!("{}{}/me", cfg.server, cfg.api))
+        .bearer_auth(access)
+        .send()
+        .await?;
     if resp.status() == reqwest::StatusCode::UNAUTHORIZED {
         return Err(SignedOut.into());
     }
@@ -419,11 +534,18 @@ async fn fetch_me(cfg: &AccountConfig, access: &str) -> Result<Value> {
 }
 
 fn apply_me(cfg: &mut AccountConfig, me: &Value) -> Result<()> {
-    let user = me.get("user").ok_or_else(|| anyhow!("The server didn't say who signed in"))?;
+    let user = me
+        .get("user")
+        .ok_or_else(|| anyhow!("The server didn't say who signed in"))?;
     cfg.user_id = str_field(user, "id").unwrap_or_default();
     cfg.email = str_field(user, "email").unwrap_or_default();
     cfg.display_name = str_field(user, "displayName");
-    cfg.memberships = serde_json::from_value(me.get("memberships").cloned().unwrap_or(Value::Array(vec![]))).unwrap_or_default();
+    cfg.memberships = serde_json::from_value(
+        me.get("memberships")
+            .cloned()
+            .unwrap_or(Value::Array(vec![])),
+    )
+    .unwrap_or_default();
     Ok(())
 }
 
@@ -475,7 +597,9 @@ async fn access_token(app_data: &Path, cfg: &AccountConfig) -> Result<String> {
 /// Check the sign-in with the server and pick up name and organization
 /// changes. Offline, it leaves things as they are.
 pub async fn refresh_status(app_data: &Path) -> Result<AccountStatus> {
-    let Some(mut cfg) = load(app_data) else { return Ok(status(app_data)) };
+    let Some(mut cfg) = load(app_data) else {
+        return Ok(status(app_data));
+    };
     let result = async {
         let access = access_token(app_data, &cfg).await?;
         fetch_me(&cfg, &access).await
@@ -503,7 +627,11 @@ pub async fn sign_out(app_data: &Path) -> Result<AccountStatus> {
             let _ = client()?
                 .post(endpoint)
                 .timeout(Duration::from_secs(5))
-                .form(&[("token", refresh.as_str()), ("token_type_hint", "refresh_token"), ("client_id", cfg.client_id.as_str())])
+                .form(&[
+                    ("token", refresh.as_str()),
+                    ("token_type_hint", "refresh_token"),
+                    ("client_id", cfg.client_id.as_str()),
+                ])
                 .send()
                 .await;
         }
@@ -560,7 +688,11 @@ mod tests {
     async fn fake_server(cimd: bool) -> (String, S) {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let base = format!("http://127.0.0.1:{}", listener.local_addr().unwrap().port());
-        let state: S = Arc::new(StdMutex::new(Fake { base: base.clone(), cimd, ..Default::default() }));
+        let state: S = Arc::new(StdMutex::new(Fake {
+            base: base.clone(),
+            cimd,
+            ..Default::default()
+        }));
         let app = Router::new()
             .route(
                 "/.well-known/church-slides",
@@ -658,7 +790,10 @@ mod tests {
     fn browser(url: &str) -> Result<()> {
         let url = url.to_string();
         tokio::spawn(async move {
-            let c = reqwest::Client::builder().redirect(reqwest::redirect::Policy::limited(3)).build().unwrap();
+            let c = reqwest::Client::builder()
+                .redirect(reqwest::redirect::Policy::limited(3))
+                .build()
+                .unwrap();
             let _ = c.get(url).send().await;
         });
         Ok(())
@@ -666,6 +801,7 @@ mod tests {
 
     fn reset() {
         *TEST_SECRET.lock().unwrap() = None;
+        *REFRESH.lock().unwrap() = None;
         *ACCESS.lock().unwrap() = None;
     }
 
@@ -683,14 +819,27 @@ mod tests {
         assert_eq!(st.email.as_deref(), Some("ada@example.org"));
         assert_eq!(st.memberships[0].org_name, "Grace Chapel");
         assert!(!st.server_is_default);
-        assert!(fake.lock().unwrap().registered.is_empty(), "no registration when the server reads metadata documents");
+        assert!(
+            fake.lock().unwrap().registered.is_empty(),
+            "no registration when the server reads metadata documents"
+        );
 
         // "Restart": the access token in memory is gone; the keychain and
         // account.json remain, and a refresh brings the session back.
         *ACCESS.lock().unwrap() = None;
+        *REFRESH.lock().unwrap() = None;
+        let reads = TEST_READS.load(std::sync::atomic::Ordering::SeqCst);
         assert!(status(dir.path()).signed_in);
         let st = refresh_status(dir.path()).await.unwrap();
         assert!(st.signed_in);
+        *ACCESS.lock().unwrap() = None;
+        refresh_status(dir.path()).await.unwrap();
+        assert!(status(dir.path()).signed_in);
+        // macOS may prompt on each keychain access: one read per launch.
+        assert_eq!(
+            TEST_READS.load(std::sync::atomic::Ordering::SeqCst) - reads,
+            1
+        );
 
         let st = sign_out(dir.path()).await.unwrap();
         assert!(!st.signed_in);
@@ -768,15 +917,28 @@ mod tests {
         rt.block_on(async {
             let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
             let port = listener.local_addr().unwrap().port();
-            let wait = tokio::spawn(async move { await_code(listener, "right-state", "https://issuer").await });
-            let _ = reqwest::get(format!("http://127.0.0.1:{port}/callback?code=c&state=wrong-state")).await;
+            let wait =
+                tokio::spawn(
+                    async move { await_code(listener, "right-state", "https://issuer").await },
+                );
+            let _ = reqwest::get(format!(
+                "http://127.0.0.1:{port}/callback?code=c&state=wrong-state"
+            ))
+            .await;
             assert!(wait.await.unwrap().is_err());
 
             let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
             let port = listener.local_addr().unwrap().port();
-            let wait = tokio::spawn(async move { await_code(listener, "s", "https://issuer").await });
-            let _ = reqwest::get(format!("http://127.0.0.1:{port}/callback?code=c&state=s&iss=https://evil")).await;
-            assert!(wait.await.unwrap().is_err(), "a reply from another issuer is refused (mix-up attack)");
+            let wait =
+                tokio::spawn(async move { await_code(listener, "s", "https://issuer").await });
+            let _ = reqwest::get(format!(
+                "http://127.0.0.1:{port}/callback?code=c&state=s&iss=https://evil"
+            ))
+            .await;
+            assert!(
+                wait.await.unwrap().is_err(),
+                "a reply from another issuer is refused (mix-up attack)"
+            );
         });
     }
 }
