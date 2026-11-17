@@ -2,7 +2,7 @@
 
 Kept separate from the verse store because refusing a malformed reference is
 the safety property of this whole feature, and it should be testable without a
-database. `Plan/BIBLE_INTEGRATION.md` §4: a suggestion that cannot be resolved
+database. `docs/done/BIBLE_INTEGRATION.md` §4: a suggestion that cannot be resolved
 is a hallucination with a citation, which is worse on a screen in front of a
 congregation than showing nothing at all.
 

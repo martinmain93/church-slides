@@ -18,7 +18,7 @@ Who calls what:
 
 The current song's follower is the only one fed or read: which song is
 playing is still the production matcher's call (music could not tell songs
-apart reliably from the mix — see Plan/MUSIC_ONLY_MATCHING.md).
+apart reliably from the mix — see docs/research/MUSIC_ONLY_MATCHING.md).
 
 **Key.** Bands rarely play a lead sheet in its printed key. Each song's key is
 estimated from the chords heard since it became current (trailing 60 s,

@@ -2,7 +2,7 @@
  * "Let's go back to verse one" as a slide change, via a local model.
  *
  * Off by default and unmeasured on real utterances — see
- * `Plan/SPOKEN_INSTRUCTIONS.md`. The toggle lives here rather than gated
+ * `docs/done/SPOKEN_INSTRUCTIONS.md`. The toggle lives here rather than gated
  * behind an active matcher (the belief-state tab's placement, before this
  * tab existed) so it can be turned on before a session starts, not only
  * once one is already running.

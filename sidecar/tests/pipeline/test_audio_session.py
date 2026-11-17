@@ -277,7 +277,7 @@ def test_ending_a_session_releases_cached_gpu_buffers(event_loop_in_thread, monk
 
     Releasing it only in the server's stop handler missed sessions that end
     on their own (an injected file running out): the sidecar kept ~1 GB of
-    GPU buffers it no longer needed. See Plan/PERF_AUDIT_2026-09-26.md.
+    GPU buffers it no longer needed. See docs/done/PERF_AUDIT_2026-09-26.md.
     """
     import auto_presenter.pipeline.audio_session as audio_session
 

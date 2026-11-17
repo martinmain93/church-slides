@@ -1,7 +1,7 @@
 # Beat, downbeat and chord models: what to use, as of 2026-09
 
 Literature review requested 2026-09-08, after the chord-chart spike found the
-detector — not the idea — to be the blocker (`Plan/CHORD_DOWNBEAT.md`). The
+detector — not the idea — to be the blocker (`docs/research/CHORD_DOWNBEAT.md`). The
 question is narrow: **what should replace the hand-rolled numpy front end**,
 given this app's constraints.
 
@@ -133,7 +133,7 @@ Build order, cheapest and highest-value first:
 
 1. **Swap the chord front end for BTC.** MIT, 3 M parameters, MajMin 79.3
    against a template matcher that over-segments 7x. This is the blocker
-   identified in `Plan/CHORD_DOWNBEAT.md` and the smallest model in the review.
+   identified in `docs/research/CHORD_DOWNBEAT.md` and the smallest model in the review.
    Re-run the cross-match control — it is already written and is the pass/fail.
 2. **Check the 16 kHz question** before any further beat work. One resampling
    experiment, and a comparison against any recording captured at a higher rate.

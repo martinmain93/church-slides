@@ -7,7 +7,7 @@ nobody at the controls — the input AI-assisted mode sees.
 In Assist the engine runs free (operator clicks are not fed back), exactly as
 in Auto mode with nobody touching anything. So a tape of that run *is* what
 the assist layer gets, and `research/eval/eval_assist.py` can replay it with any
-number of simulated operators in seconds. See `Plan/AI_ASSISTED_MODE.md`.
+number of simulated operators in seconds. See `docs/done/AI_ASSISTED_MODE.md`.
 
 Re-record after an engine upgrade; the assist layer itself doesn't change.
 

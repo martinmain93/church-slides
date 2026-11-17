@@ -10,7 +10,7 @@ audio context per chunk — it is not causal, chunking is architectural,
 not a speed problem — which roughly triples end-to-end latency. Shelved
 on that alone. Causal alternatives exist in the literature at ~92 ms
 (Band-SCNet, Interspeech 2025) but none has released weights. Full
-write-up: `Plan/MUSIC_LITERATURE.md`.
+write-up: `docs/research/MUSIC_LITERATURE.md`.
 
 > **Provenance of the WER figures.** They came from a throwaway script run
 > against a locally downloaded ONNX export; neither the script nor the model

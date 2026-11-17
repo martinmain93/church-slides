@@ -1,5 +1,5 @@
 /**
- * The learning look-back in the Model inspector (Plan/LEARNED_REFERENCES.md).
+ * The learning look-back in the Model inspector (docs/done/LEARNED_REFERENCES.md).
  *
  * The look-back is what the app learns from: after the fact, with the words
  * that came later as well as before, it works out which line the band was on

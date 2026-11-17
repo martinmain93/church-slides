@@ -4,7 +4,7 @@
  * Diagnostic only — nothing in the decision path consumes it. Measured on the
  * approved goldens, adding this chord feature to the word matcher is worth
  * about +1% and sits right at the break-even point for detector accuracy
- * (Plan/CHORD_DOWNBEAT.md). So the panel exists to answer, on live input, the
+ * (docs/research/CHORD_DOWNBEAT.md). So the panel exists to answer, on live input, the
  * question the recordings cannot: what is it actually hearing?
  *
  * The sidecar sends only the audio *since the last tick*, about ten times a

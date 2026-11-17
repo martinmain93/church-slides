@@ -16,7 +16,7 @@
  * Before the service (`onAdd` given) the same box prepares instead: Enter
  * adds the passage to the service, and pasting the pastor's message ("Sermon:
  * John 3:1-21, also Rom 5:8") offers every passage in it at once. One box,
- * whose action follows Prep vs Live (Plan/SERVICE_ITEMS.md).
+ * whose action follows Prep vs Live (docs/done/SERVICE_ITEMS.md).
  */
 
 import { useCallback, useEffect, useState } from "react";

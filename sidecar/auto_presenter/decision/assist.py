@@ -3,7 +3,7 @@
 The operator drives the slides; the engine runs free alongside, exactly as it
 would in Auto mode with nobody at the controls. This module compares where the
 engine would have put the screen with where the operator has it, and decides
-when that disagreement is worth a suggestion. See `Plan/AI_ASSISTED_MODE.md`.
+when that disagreement is worth a suggestion. See `docs/done/AI_ASSISTED_MODE.md`.
 
 It is deliberately a thin layer. Its only required input is the engine-move
 stream (`Director.on_decision`), which every engine produces; ranked

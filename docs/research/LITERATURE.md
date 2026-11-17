@@ -179,7 +179,7 @@ Three long-standing problems dissolve rather than being solved:
 **Not shipped, and two honest caveats.** The tuning swept ~20 configurations
 against all four recordings — the entire dataset — so some of the 0.294 is fit
 to it. And rec213617 remains the worst recording under either tracker (0.544
-against 0.505), so the failure diagnosed in Plan/AUDIO_EMISSION.md is not
+against 0.505), so the failure diagnosed in docs/research/AUDIO_EMISSION.md is not
 addressed by this either; it is not a relocalization problem.
 
 Next: drive it from `ParticleFilterEngine`'s seat behind a flag, so the
@@ -194,7 +194,7 @@ dwell *is* the tempo model, so nothing estimates a rate. What was missing is
 that a geometric self-loop has **no memory**: a word already sung for five
 observations is exactly as likely to continue as one just entered. That is what
 let a wrong state absorb evidence indefinitely without ever being tested
-against the next word (Plan/AUDIO_EMISSION.md, the chorus held through a verse
+against the next word (docs/research/AUDIO_EMISSION.md, the chorus held through a verse
 because "are" scores 0.90 against "you're").
 
 Cont's Antescofo and Duan & Pardo both carry explicit duration for this reason.
@@ -267,7 +267,7 @@ dense jump transitions do inside the recursion.
 **Still not shipped**, and the same two caveats stand: the transition
 parameters were swept against all four recordings, so a fifth golden is the
 real test; and rec213617 remains the one recording where the particle filter
-wins, so the failure diagnosed in Plan/AUDIO_EMISSION.md is untouched by any of
+wins, so the failure diagnosed in docs/research/AUDIO_EMISSION.md is untouched by any of
 this.
 
 ### The held-out test (2026-08-29)

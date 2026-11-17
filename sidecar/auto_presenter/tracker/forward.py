@@ -12,7 +12,7 @@ being engineered:
   - **Parallel hypotheses are free.** Every position always carries mass, so a
     band jumping to a chorus finds a hypothesis already tracking it. Scouting
     landings with particles measured worse than not bothering precisely because
-    each hypothesis cost samples from a fixed budget (Plan/LITERATURE.md); here
+    each hypothesis cost samples from a fixed budget (docs/research/LITERATURE.md); here
     there is no budget to spend.
   - **Jumps are transitions.** Evaluated every step at no extra cost, which is
     what JumpDTW and Nakamura et al. do and what `RelocalizeController`'s
@@ -103,10 +103,10 @@ class ForwardConfig:
     #: is what let a wrong state absorb evidence indefinitely without ever being
     #: tested against the *next* word — traced on King of My Heart, where the
     #: filter sat at position 0.02-0.14 of the chorus for ten observations
-    #: while the band sang a verse (Plan/AUDIO_EMISSION.md).
+    #: while the band sang a verse (docs/research/AUDIO_EMISSION.md).
     #:
     #: Cont's Antescofo and Duan & Pardo both carry explicit duration rather
-    #: than a self-loop for this reason (Plan/LITERATURE.md). 1.0 restores the
+    #: than a self-loop for this reason (docs/research/LITERATURE.md). 1.0 restores the
     #: geometric dwell.
     #: Swept 1.0 down to 0.0 on all four goldens: 0.294, 0.291, 0.290, 0.289,
     #: 0.287, 0.286, **0.285**. Monotonic, improving every recording, and 0.0

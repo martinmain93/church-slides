@@ -103,7 +103,7 @@ they are not the same kind of failure:
 
 The user recorded and bootstrapped a genuinely hard multi-song session ("The
 Blood" / "Nothing But The Blood", real cross-song jumps, garbled ASR — see
-`Plan/ROADMAP.md`'s cross-setlist section) and approved a hand-corrected
+`docs/done/ROADMAP_2026-09.md`'s cross-setlist section) and approved a hand-corrected
 golden. First real (if messy) utterances this feature had ever seen.
 
 **Found a real bug testing against it, before the model was even involved.**

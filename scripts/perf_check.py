@@ -78,7 +78,7 @@ from auto_presenter.index.library import build_index  # noqa: E402
 from auto_presenter.pipeline.perf import PerfMonitor, _rss_mb  # noqa: E402
 from auto_presenter.protocol import ParticleFilterTunables  # noqa: E402
 
-BASELINE = Path(__file__).resolve().parent.parent / "Plan" / "PERF_BASELINE.json"
+BASELINE = Path(__file__).resolve().parent / "perf_baseline.json"
 DEFAULT_RECORDINGS = Path.home() / (
     "Library/Application Support/com.churchslides.app/recordings"
 )

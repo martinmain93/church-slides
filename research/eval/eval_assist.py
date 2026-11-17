@@ -21,7 +21,7 @@ suggestion is correct when it names the place the golden had at any time in
 the 4 s before it was raised or the 1 s after (the engine hears late).
 
 What a tape can't show: a dismissal re-anchors the engine live, but the tape's
-engine ran free, so here a dismissal only mutes. See Plan/AI_ASSISTED_MODE.md.
+engine ran free, so here a dismissal only mutes. See docs/done/AI_ASSISTED_MODE.md.
 """
 
 from __future__ import annotations

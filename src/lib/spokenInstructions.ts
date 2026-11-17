@@ -8,7 +8,7 @@
  * *is* measured, on synthetic typed utterances against the shipped model
  * (llama3.2:3b via a local ollama): 10/10 correctly silent on ordinary
  * between-songs talk, 7/10 correct on genuine commands. See
- * `Plan/SPOKEN_INSTRUCTIONS.md` and `decision.instructions`'s module
+ * `docs/done/SPOKEN_INSTRUCTIONS.md` and `decision.instructions`'s module
  * docstring for the full write-up, including the finding that an explicit
  * "do nothing" tool is not optional — without one, the same model called a
  * tool on 10 of 10 sentences that weren't requests at all.
@@ -96,7 +96,7 @@ export function resetSpokenInstructions(): void {
 /**
  * Let a local model act on things said between songs. Off by default: it
  * needs an ollama server running locally with a model already pulled (see
- * `Plan/SPOKEN_INSTRUCTIONS.md`), and it moves the slide on its own
+ * `docs/done/SPOKEN_INSTRUCTIONS.md`), and it moves the slide on its own
  * judgement — the same authority as an operator override.
  */
 export async function setSpokenInstructions(enabled: boolean): Promise<void> {

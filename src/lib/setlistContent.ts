@@ -20,7 +20,7 @@ export function buildSetlistContent(
   const items = setlist.items.map((item, idx): SetlistItemContent => {
     // A Bible passage: its words as they are read aloud, marked `spoken` so
     // the engine times it as speech and never jumps into it on its own
-    // (Plan/SERVICE_ITEMS.md phase 2). The engine's `follow_readings` kill
+    // (docs/done/SERVICE_ITEMS.md phase 2). The engine's `follow_readings` kill
     // switch silences it there, keeping the slides in place.
     if (readAlong && item.song && itemKind(item) === "scripture") {
       const slides = resolveSlideSequence(

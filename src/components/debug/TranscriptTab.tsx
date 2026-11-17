@@ -218,7 +218,7 @@ export function TranscriptTab() {
           Needs a network connection at service time and counts against Groq's
           free-tier request quota — measured 2026-09-03 at roughly one request
           per second of live audio, which can approach the daily limit over a
-          single service. See Plan/SPOKEN_INSTRUCTIONS.md.
+          single service. See docs/done/SPOKEN_INSTRUCTIONS.md.
         </div>
       )}
       {stream.error && (

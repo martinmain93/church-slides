@@ -26,7 +26,7 @@ from auto_presenter.config import app_data_dir  # noqa: E402
 
 #: 20M parameters, ~142 MB unpacked, Apache-2.0. Chosen for latency rather than
 #: accuracy: it delivers a word about 0.4 s after it is sung against Whisper's
-#: 2-3 s, and transcribes sung audio far worse. See Plan/FAST_CHANNEL.md.
+#: 2-3 s, and transcribes sung audio far worse. See docs/research/FAST_CHANNEL.md.
 MODEL_NAME = "sherpa-onnx-streaming-zipformer-en-20M-2023-02-17"
 MODEL_URL = (
     "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/"

@@ -47,7 +47,7 @@ pub struct ScriptureSettings {
     /// directly matches the human change rate and flashes once, while an 8s
     /// floor removes that flash and costs 2.2 points of accuracy. Kept because
     /// the freeze and lost-mode episodes it was designed for are absent from
-    /// the goldens that were measured. See Plan/BIBLE_INTEGRATION.md §3.
+    /// the goldens that were measured. See docs/done/BIBLE_INTEGRATION.md §3.
     #[serde(default)]
     pub dwell_floor_seconds: f32,
 }

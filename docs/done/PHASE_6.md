@@ -6,7 +6,7 @@ Replace the naive matcher with a probabilistic state-space tracker. Achieve targ
 
 ## Prerequisites
 
-- Phases 0–5 complete; baseline numbers in `Plan/BASELINE_NUMBERS.md`
+- Phases 0–5 complete; baseline numbers in `docs/done/BASELINE_NUMBERS.md`
 
 ## Scope
 
@@ -147,7 +147,7 @@ This UI is critical for the next 1–2 weeks of tuning. Spend time making it use
 `research/dead_ends/particle_filter/sweep_pf.py`:
 - Grid over `n_particles ∈ {200, 500, 1000}`, `lead_time ∈ {300, 500, 700}ms`, `rate_noise_std ∈ {0.05, 0.1, 0.2}`
 - Run on the full eval set; output table of metrics per config
-- Pick best config; commit to `Plan/BASELINE_NUMBERS.md` as the new "Phase 6" row
+- Pick best config; commit to `docs/done/BASELINE_NUMBERS.md` as the new "Phase 6" row
 
 ## Files to create
 

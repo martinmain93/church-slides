@@ -1,7 +1,7 @@
 """References are the gate. What it refuses matters as much as what it parses.
 
 Every case below is either a real string a model produced during
-`Plan/BIBLE_INTEGRATION.md`'s measurements, or the malformed shape that would
+`docs/done/BIBLE_INTEGRATION.md`'s measurements, or the malformed shape that would
 put the wrong thing on a screen if it slipped through.
 """
 

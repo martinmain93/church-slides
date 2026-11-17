@@ -36,7 +36,7 @@ export interface ScriptureSettings {
    * directly matches the human change rate and flashes once, while an 8s floor
    * removes that flash and costs 2.2 points of accuracy. Kept as a knob
    * because the freeze and lost-mode episodes it was designed for are absent
-   * from the goldens that were measured. See `Plan/BIBLE_INTEGRATION.md` §3.
+   * from the goldens that were measured. See `docs/done/BIBLE_INTEGRATION.md` §3.
    *
    * No longer read or shown (removed from Settings 2026-10-17); kept in the
    * type so settings saved before then still load.

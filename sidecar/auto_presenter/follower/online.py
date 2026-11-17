@@ -114,7 +114,7 @@ HOLD_HEARD_LINE_S = 8.0
 #: been heard, or the next slide's opening has. The 2 s lookahead and a tempo
 #: estimate that runs fast left slides whose last line had not started ("I am
 #: unfulfilled without full communion": 13 s on the wrong slide). Measured on
-#: 751 recorded moves (Plan/ERROR_HUNT_2026-11-12.md): held 76% of the steps
+#: 751 recorded moves (docs/roadmap/ERROR_HUNT_2026-11-12.md): held 76% of the steps
 #: made before a slide's last words, and 8% of good steps. Real-time gate run:
 #: early exits 20 -> 7, sung line hidden 0.23 -> 0.19, wrong-slide unchanged.
 #: AUTO_PRESENTER_LAST_LINE=0 turns it off for comparison runs.

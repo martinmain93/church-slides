@@ -197,7 +197,7 @@ already has in `research/dead_ends/acoustic/export_whisper_onnx.py`.
 
 ## 6. MEASURED 2026-09-08: the position signal does not pay off
 
-With BTC benchmarked in (`Plan/MUSIC_MODELS_2026.md`), the design could finally
+With BTC benchmarked in (`docs/research/MUSIC_MODELS_2026.md`), the design could finally
 be tested end to end. Scripts in `research/spikes/chord_bench/`.
 
 ### Ground truth, at last
@@ -411,7 +411,7 @@ Deliberate choices worth knowing:
 
 `scripts/setup_chord_model.py` installs the learned recogniser; the numpy
 template matcher remains the always-available fallback and the panel says which
-is running. Export and verification detail in Plan/MUSIC_MODELS_2026.md.
+is running. Export and verification detail in docs/research/MUSIC_MODELS_2026.md.
 
 The over-segmentation this whole line of work was blocked on is largely gone:
 

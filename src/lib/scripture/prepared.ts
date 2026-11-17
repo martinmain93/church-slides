@@ -1,5 +1,5 @@
 /**
- * Passages prepared in a service (`Plan/SERVICE_ITEMS.md`): filling in their
+ * Passages prepared in a service (`docs/done/SERVICE_ITEMS.md`): filling in their
  * text, and finding one when someone asks for it live.
  */
 

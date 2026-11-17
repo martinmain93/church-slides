@@ -8,7 +8,7 @@ position of that word in the sheet). Positions between anchors are linear in
 time; a cue with no matched word has no position, only a slide.
 
 Whisper's word starts are stitched to the previous word's end, so they run
-early by roughly 0.25-0.75 s (Plan/CHORD_DOWNBEAT.md, audit). Anchors are
+early by roughly 0.25-0.75 s (docs/research/CHORD_DOWNBEAT.md, audit). Anchors are
 therefore approximate to about half a second, which is why everything that
 scores against this uses windows rather than instants.
 """

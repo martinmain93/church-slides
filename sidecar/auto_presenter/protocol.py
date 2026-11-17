@@ -319,7 +319,7 @@ class SetMusicAnalysisRequest(_Base):
     Off by default and purely diagnostic: nothing in the decision path consumes
     it. Measured on the approved goldens, adding this chord feature to the word
     matcher is worth about +1% and sits at the break-even point for detector
-    quality — see Plan/CHORD_DOWNBEAT.md section 7. It is here to be watched.
+    quality — see docs/research/CHORD_DOWNBEAT.md section 7. It is here to be watched.
     """
 
     kind: Literal["set_music_analysis"] = "set_music_analysis"
@@ -529,7 +529,7 @@ class SetlistItemContent(BaseModel):
     slides: list[list[str]]
     slide_sections: list[str] = []
     title: str = ""
-    #: A Bible passage read aloud rather than a song sung (Plan/SERVICE_ITEMS.md
+    #: A Bible passage read aloud rather than a song sung (docs/done/SERVICE_ITEMS.md
     #: phase 2): its own timing (`spoken_margin_ms`), no score follower, and
     #: never a place the matcher jumps into on its own — the operator puts a
     #: reading up, and the matcher follows it from there.
@@ -658,7 +658,7 @@ class AssistSuggestionMessage(_Base):
     Sent when a suggestion is raised, and again with the same id when it
     follows the band forward. `tier` "next" is the next slide being due
     (highlight only); "place" is anywhere else (highlight, and a
-    notification when the tile isn't in view). See Plan/AI_ASSISTED_MODE.md.
+    notification when the tile isn't in view). See docs/done/AI_ASSISTED_MODE.md.
     """
 
     kind: Literal["assist_suggestion"] = "assist_suggestion"
@@ -727,7 +727,7 @@ class ParticleFilterTunables(BaseModel):
     #: Follow a song with no lead sheet by its library slides alone
     #: (`follower.spec.library_spec`) instead of leaving it to the matcher.
     #: Real time, 4 held-out recordings: 0.243 wrong-slide vs production
-    #: 0.373, better on all 4 (Plan/LEARNED_REFERENCES.md, round 6). Kill
+    #: 0.373, better on all 4 (docs/done/LEARNED_REFERENCES.md, round 6). Kill
     #: switch; not shown in the Tunables panel.
     score_follower_without_sheet: bool = True
     #: Run the score follower without Apple silicon's speech engine (an Intel
@@ -778,7 +778,7 @@ class ParticleFilterTunables(BaseModel):
     #: same metre. Needs Beat This (dev installs only: not in the frozen app,
     #: weights licence unchecked). Real time, library follower: hymns gain
     #: (I Surrender All 0.294 -> 0.232, Since Your Love 0.261 -> 0.123), a
-    #: medley's tag vamp loses (0.220 -> 0.269); see Plan/LEARNED_REFERENCES.md
+    #: medley's tag vamp loses (0.220 -> 0.269); see docs/done/LEARNED_REFERENCES.md
     #: round 7. Not shown in the Tunables panel.
     in_service_learning: bool = False
     #: Counted loops in the score follower's reference (`follower.reference.
@@ -792,9 +792,9 @@ class ParticleFilterTunables(BaseModel):
     #: small phone model, instead of waiting ~3 s for the words. MLX small.en
     #: only. Replayed on 53 held-out public recordings: changes more than 2 s
     #: late or missed 315 -> 126, wrong-slide seconds -31%
-    #: (Plan/NEXT_LINE_CHECK.md). Kill switch; not shown.
+    #: (docs/done/NEXT_LINE_CHECK.md). Kill switch; not shown.
     next_line_check: bool = True
-    #: Follow a Bible passage as it is read aloud (Plan/SERVICE_ITEMS.md
+    #: Follow a Bible passage as it is read aloud (docs/done/SERVICE_ITEMS.md
     #: phase 2). LibriVox KJV readings, real time (MLX small.en): 0.07
     #: wrong-slide clean, 0.27 with simulated asides. On by default since
     #: 2026-10-29. The kill switch, not a setting; not shown. Off, a passage's

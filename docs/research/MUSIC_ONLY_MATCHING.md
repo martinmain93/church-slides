@@ -13,7 +13,7 @@ the approved golden `rec_20260818-214759_057` (the user's own recording, 450 s,
 
 ## Why this is not a re-run of the fingerprinting spike
 
-`Plan/MUSIC_FINGERPRINTING.md` closed one door firmly: audio-to-audio chroma
+`docs/research/MUSIC_FINGERPRINTING.md` closed one door firmly: audio-to-audio chroma
 fingerprints (CENS + 2DFTM) cannot tell a song's own sections apart at a live
 window — 53% forced choice against the next section at 4 s. Three things are
 different now, and each attacks a stated cause of that failure:

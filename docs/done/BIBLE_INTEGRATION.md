@@ -384,7 +384,7 @@ an unresolvable one produces nothing at all — the same way a hallucinated
 
 Two things to say plainly before building it:
 
-**It contradicts a measured decision.** `Plan/SPOKEN_INSTRUCTIONS.md` collapsed
+**It contradicts a measured decision.** `docs/done/SPOKEN_INSTRUCTIONS.md` collapsed
 to a single tool *specifically* to remove tool-selection from a 3B model's job,
 and then found that even the abstention case needed its own named tool to work
 at all. Adding a third tool re-opens exactly that. It is not a reason not to

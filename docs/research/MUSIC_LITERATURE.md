@@ -1,6 +1,6 @@
 # Musical feature literature, filtered through our constraints
 
-Researched 2026-09-01, after the spike in Plan/MUSIC_FINGERPRINTING.md measured
+Researched 2026-09-01, after the spike in docs/research/MUSIC_FINGERPRINTING.md measured
 where a harmonic stream helps and where it breaks.
 
 ## The constraints that actually filter the field
@@ -17,7 +17,7 @@ accuracy is even discussed.
    separation (+0.216 -> +0.115), because every wrong section also gets twelve
    chances to match.
 3. **No PyTorch at runtime.** The shipped PyInstaller binary carries
-   `onnxruntime` and numpy only (see Plan/ASR_ENGINE.md). This rules out most
+   `onnxruntime` and numpy only (see docs/research/ASR_ENGINE.md). This rules out most
    recent neural work unless it exports cleanly to ONNX.
 4. **Licensing.** This ships. A CC BY-NC-SA model is not usable.
 
@@ -374,7 +374,7 @@ had learned one reader. Four more public-domain LibriVox sermons fixed it.
 
 ## Vocal separation, measured and shelved (2026-09-03)
 
-Phase 9 (`Plan/PHASE_9.md`) named Demucs as the model and PyTorch as the
+Phase 9 (`docs/research/VOCAL_SEPARATION.md`) named Demucs as the model and PyTorch as the
 blocker. Both parts of that have changed enough to re-check.
 
 **The PyTorch blocker is gone.** `StemSplitio/htdemucs-ft-vocals-onnx` on

@@ -535,7 +535,7 @@ Two specific warnings from that review land directly on this experiment:
   removed.
 
 So the window work is at a dead end that further tuning cannot open. See
-`Plan/ASR_ENGINE.md` and the review summary for where the effort should go.
+`docs/research/ASR_ENGINE.md` and the review summary for where the effort should go.
 
 ---
 
@@ -617,7 +617,7 @@ report "no single slide clearly ahead", and only 12% of them had the right
 slide on top, against 59% on Reckless Love.
 
 That is the thing to attack, and it is the case the literature's parallel-
-hypothesis designs address directly (Plan/LITERATURE.md, items 2 and 6) — not
+hypothesis designs address directly (docs/research/LITERATURE.md, items 2 and 6) — not
 a threshold anywhere in the current decision path.
 
 ---
@@ -697,6 +697,6 @@ it is very nearly self-cancelling.
 
 That does not make the measurement useless — it rules out a whole family of
 "improve the phonetic representation" ideas, including the G2P-plus-confusion-
-matrix direction left open in Plan/ASR_ENGINE.md. If half the vocabulary is
+matrix direction left open in docs/research/ASR_ENGINE.md. If half the vocabulary is
 non-discriminative and fixing that changes nothing, the representation is not
 what is limiting us.

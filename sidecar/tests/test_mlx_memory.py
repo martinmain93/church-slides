@@ -3,7 +3,7 @@
 Uncapped, MLX kept every freed Metal buffer: the sidecar's GPU memory grew
 through a service (cache 2.2 GB after 300 passes, ~4 GB live after twenty
 minutes) while the model's own memory stayed flat. See
-Plan/PERF_AUDIT_2026-09-26.md.
+docs/done/PERF_AUDIT_2026-09-26.md.
 """
 
 from __future__ import annotations

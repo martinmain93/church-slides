@@ -2,7 +2,7 @@
 
 A second, low-latency speech listener (sherpa-onnx streaming zipformer, ~1 s
 behind the singing against Whisper's ~3 s), meant to let slide switches land
-on time instead of catching up. Write-up: `Plan/FAST_CHANNEL.md`.
+on time instead of catching up. Write-up: `docs/research/FAST_CHANNEL.md`.
 
 **Status: parked, not rejected.** Taken out of the app on 2026-10-19: its
 runtime was never in the release build (sherpa-onnx is excluded from the

@@ -2,7 +2,7 @@
 
 With the AI off, a presentation session used to
 run Whisper and the matcher for the whole service anyway — the same cost as
-the AI being on (Plan/PERF_AUDIT_2026-09-26.md, finding 5).
+the AI being on (docs/done/PERF_AUDIT_2026-09-26.md, finding 5).
 """
 
 from __future__ import annotations

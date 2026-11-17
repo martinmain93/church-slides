@@ -9,12 +9,12 @@ One SQLite file per translation, in `<app data>/scripture/`, alongside
   `ensure_translation`.
 - **A church's own file** (`install_imported`): whatever Bible the church
   already has, in any format `scripture.importers` reads. Built on this
-  machine and never sent anywhere — see `Plan/BIBLE_INTEGRATION.md`,
+  machine and never sent anywhere — see `docs/done/BIBLE_INTEGRATION.md`,
   "Importing a church's own Bible".
 
 **The catalogue is public domain only.** That is the licence, not a limitation
 of the implementation: these texts can be redistributed, and NIV/ESV/NLT
-cannot be at any price this project would pay (`Plan/BIBLE_INTEGRATION.md`
+cannot be at any price this project would pay (`docs/done/BIBLE_INTEGRATION.md`
 §1). A church that holds rights to one of those imports its own copy, and the
 credit line it gives is shown with every passage.
 
@@ -625,7 +625,7 @@ class VerseStore:
         This is the editor's "where is this line from?" box, not the
         suggester — measured on the user's library, it lands the verse at rank
         1 when a song quotes it nearly verbatim and misses entirely when the
-        song merely alludes. See `Plan/BIBLE_INTEGRATION.md` §4.
+        song merely alludes. See `docs/done/BIBLE_INTEGRATION.md` §4.
         """
         words = [w.replace('"', "") for w in _WORD_RE.findall(text.lower())]
         terms: dict[str, None] = {}

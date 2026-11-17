@@ -3,7 +3,7 @@
 Positions are compared as *music*, not as slide ids: a predicted position
 counts as the same as any other played position with identical music (a
 repeat of the same bar, at the same beat). So chorus 1 and chorus 3 are one
-answer, as Plan/MUSIC_ONLY_MATCHING.md agreed.
+answer, as docs/research/MUSIC_ONLY_MATCHING.md agreed.
 
 * `pos_err`: beats between the prediction and the truth, taking the nearest
   musically identical copy of the predicted position.

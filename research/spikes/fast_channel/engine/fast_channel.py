@@ -8,7 +8,7 @@ a word in about 0.4 s for a fifteenth of the compute.
 transcribes sung worship audio far worse than Whisper (word error 0.85 against
 0.22) and tracking on it alone is markedly worse (wrong-slide 0.748 against
 0.484), so wiring it into the matcher would make the app worse. See
-Plan/FAST_CHANNEL.md.
+docs/research/FAST_CHANNEL.md.
 
 It is here because those measurements are all full-mix band recordings, and live
 input may be vocals-forward, a different mic, a different room. Broadcasting what

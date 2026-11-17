@@ -2,7 +2,7 @@
 
 Split out of `server.py` as a self-contained optional listener that never
 reaches a decision. See
-Plan/CHORD_DOWNBEAT.md for what it is measured to be worth; the short version
+docs/research/CHORD_DOWNBEAT.md for what it is measured to be worth; the short version
 is that the chord feature is worth about +1% to the matcher at this detector's
 accuracy, which is why it is a diagnostic you can watch rather than something
 wired into the decision path.

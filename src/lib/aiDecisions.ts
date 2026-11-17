@@ -53,7 +53,7 @@ export interface AiDecision {
  * including for voice) so the rule has one tested definition instead of
  * two copies that can drift — that drift is exactly how a spoken command
  * ended up silently doing nothing in shadow mode. See
- * `Plan/SPOKEN_INSTRUCTIONS.md`'s 2026-09-03 entry.
+ * `docs/done/SPOKEN_INSTRUCTIONS.md`'s 2026-09-03 entry.
  */
 export function shouldApplyDecision(
   decision: Pick<AiDecision, "source">,

@@ -14,7 +14,7 @@ Two pieces, in dependency order:
 (Passages attached to songs, with their line anchors and model-suggested
 verses, were removed on 2026-10-19: research/dead_ends/song_scripture.)
 
-`Plan/BIBLE_INTEGRATION.md` is the design and the measurements behind it.
+`docs/done/BIBLE_INTEGRATION.md` is the design and the measurements behind it.
 """
 
 from auto_presenter.scripture.references import (

@@ -6,7 +6,7 @@
  * mirrors it. `assist_suggestion` raises one or moves it forward (same id),
  * `assist_clear` takes it down. One at a time — a new id replaces the old.
  *
- * See Plan/AI_ASSISTED_MODE.md.
+ * See docs/done/AI_ASSISTED_MODE.md.
  */
 
 import { useEffect, useState } from "react";

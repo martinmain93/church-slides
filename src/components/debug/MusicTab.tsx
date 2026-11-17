@@ -3,7 +3,7 @@
  *
  * The measurements behind this feature are equivocal — the chord stream is
  * worth about +1% to the matcher at this detector's accuracy, which is the
- * break-even point (Plan/CHORD_DOWNBEAT.md). Numbers that close cannot settle
+ * break-even point (docs/research/CHORD_DOWNBEAT.md). Numbers that close cannot settle
  * whether the detector is nearly right or badly wrong, and the recordings
  * cannot show *why*. So this panel is deliberately literal: the waveform, the
  * chord over it, the beats on it, and the three candidates being chosen

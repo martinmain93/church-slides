@@ -216,7 +216,7 @@ def wrong_slide_rate(
     them.
 
     Keep the off switch. If musical features ever learn to *predict* an
-    unexpected transition — the open idea in `Plan/MUSIC_LITERATURE.md` — then
+    unexpected transition — the open idea in `docs/research/MUSIC_LITERATURE.md` — then
     the jumps excused here are precisely the events such a model would be
     demonstrating skill on, and a scorer that always excused them could not
     show the difference. Forgiving by default measures today's system fairly;

@@ -1,6 +1,6 @@
 # A fast side channel: sherpa-onnx streaming zipformer
 
-Spiked 2026-09-01. Goal from Plan/LIVE_LATENCY.md: the word tracker identifies
+Spiked 2026-09-01. Goal from docs/research/LIVE_LATENCY.md: the word tracker identifies
 slides well but Whisper delivers a word 2-3 s after it is sung, so the app
 catches up instead of anticipating. A second engine earns its place by being
 **fast**, not by being right.
@@ -70,7 +70,7 @@ Two things follow:
 2. **The remaining candidate is a model trained for singing**, not a smaller or
    larger speech model. Singing voice detection in polyphonic music is its own
    MIR field precisely because speech models fail here — see
-   Plan/MUSIC_LITERATURE.md. Nothing suitable was found pre-exported to ONNX.
+   docs/research/MUSIC_LITERATURE.md. Nothing suitable was found pre-exported to ONNX.
 
 ## Watching it live
 

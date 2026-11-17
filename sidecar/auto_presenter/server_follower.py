@@ -205,7 +205,7 @@ def build_session_followers(content: SetlistContent, backend: object) -> LiveFol
     identical = identical_slide_groups(content.items)
     # A passage read aloud is left to the matcher: the follower's reference
     # is built for singing (a word a beat), and the matcher is what was
-    # measured on readings (Plan/SERVICE_ITEMS.md phase 2).
+    # measured on readings (docs/done/SERVICE_ITEMS.md phase 2).
     items = [
         (i.item_idx, [list(s) for s in i.slides], list(i.slide_sections), sheets.get(i.song_id))
         for i in content.items

@@ -10,7 +10,7 @@ could look forward; a live analyser cannot, and that difference is not
 cosmetic — online downbeat tracking scores 46.8 F1 in the literature against
 78.3 offline. Read what this emits with that in mind.
 
-Honest limits, measured (Plan/CHORD_DOWNBEAT.md):
+Honest limits, measured (docs/research/CHORD_DOWNBEAT.md):
 
 * Chords come from template matching over plain-FFT chroma. Against chord
   charts on the approved goldens that lands near the break-even point at which

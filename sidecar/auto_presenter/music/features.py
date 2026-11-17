@@ -8,7 +8,7 @@ the ASR pass without competing for the cores that keep it inside budget.
 What this is **not**: accurate. Measured against chord charts on the approved
 goldens, template matching over plain-FFT chroma sits near the break-even
 point where a chord feature starts helping the matcher rather than hurting it
-(see Plan/CHORD_DOWNBEAT.md section 7). A learned recogniser — BTC is 3 M
+(see docs/research/CHORD_DOWNBEAT.md section 7). A learned recogniser — BTC is 3 M
 parameters and MIT — is roughly twice as accurate and is the intended
 replacement; `music/analyser.py` keeps the seam for it.
 """

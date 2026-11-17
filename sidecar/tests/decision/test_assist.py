@@ -1,4 +1,4 @@
-"""The assist interpreter's rules, one test each (see Plan/AI_ASSISTED_MODE.md)."""
+"""The assist interpreter's rules, one test each (see docs/done/AI_ASSISTED_MODE.md)."""
 
 from auto_presenter.decision.assist import AssistConfig, AssistInterpreter
 from auto_presenter.index.library import build_index

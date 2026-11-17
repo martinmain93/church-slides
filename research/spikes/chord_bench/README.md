@@ -1,6 +1,6 @@
 # Model benchmarks (2026-09-08)
 
-Spike benchmarks for `Plan/MUSIC_MODELS_2026.md`. These need an isolated venv
+Spike benchmarks for `docs/research/MUSIC_MODELS_2026.md`. These need an isolated venv
 with PyTorch — deliberately **not** the sidecar, which stays onnxruntime-only.
 
 ```bash

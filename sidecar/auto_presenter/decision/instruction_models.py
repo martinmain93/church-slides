@@ -5,7 +5,7 @@ Two kinds, both behind the same `GenericLLMBackend` (see
 OpenAI-compatibility layer all speak the same `/chat/completions` shape:
 
 - **local** — downloaded once via ollama, runs on-device, no network at
-  service time. The three measured 2026-09-03 (`Plan/SPOKEN_INSTRUCTIONS.md`):
+  service time. The three measured 2026-09-03 (`docs/done/SPOKEN_INSTRUCTIONS.md`):
   a 3B/3B/7B spread trading latency for accuracy.
 - **hosted** — a provider's API, needs a key, needs a network. Now the
   shipped default, *paired with a local fallback* — see `DEFAULT_MODEL_ID`
@@ -113,7 +113,7 @@ CATALOG: tuple[InstructionModelSpec, ...] = (
         # completed. The free tier's real throughput is tighter than its
         # documented 15 req/min — half the non-command calls hit 429s even
         # paced at one request per 4.5s; needs a bigger safety margin than
-        # the docs suggest. See `Plan/SPOKEN_INSTRUCTIONS.md`.
+        # the docs suggest. See `docs/done/SPOKEN_INSTRUCTIONS.md`.
         note="Free tier: 15 req/min, 1M tokens/day (measured: leave more headroom "
              "than that — 429s showed up well under the documented limit). Needs a "
              "network connection at service time and a Gemini API key. The most "

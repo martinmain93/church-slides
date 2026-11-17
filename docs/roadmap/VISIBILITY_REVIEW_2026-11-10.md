@@ -169,7 +169,7 @@ engine.
 
 ### 10. Old scoreboards and four tests that never run
 
-`Plan/REALTIME_EVAL.md` (1 September) and `Plan/BASELINE_NUMBERS.md` (August)
+`docs/done/REALTIME_EVAL.md` (1 September) and `docs/done/BASELINE_NUMBERS.md` (August)
 describe engines that no longer exist. `run_realtime_eval.py` still stamps
 decisions when the words were sung, not when the engine could act, which was
 measured to understate lateness badly. The four files in `tests/integration/`

@@ -86,7 +86,7 @@ class WhisperBackend:
         #:
         #: The saving compounds: `SlidingWindowWrapper` paces passes off measured
         #: pass time, so a millisecond of pass time costs about 1.75 ms of
-        #: end-to-end lag. See Plan/ENCODER_ALIGNMENT.md.
+        #: end-to-end lag. See docs/research/ENCODER_ALIGNMENT.md.
         beam_size: int = 1,
         vad_filter: bool = False,
         #: One decode attempt, not up to six.

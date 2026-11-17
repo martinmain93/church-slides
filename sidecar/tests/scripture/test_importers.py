@@ -4,7 +4,7 @@ Each fixture carries the markup that a real file of that format has and that
 must never reach a screen — footnotes, cross-references, section headings,
 Strong's numbers — next to the verse text that must. The real-file check (the
 full eBible.org, open-bibles and OpenSong Bibles these were developed against)
-is in `Plan/BIBLE_INTEGRATION.md`; these keep the behaviour pinned without a
+is in `docs/done/BIBLE_INTEGRATION.md`; these keep the behaviour pinned without a
 40 MB download.
 """
 

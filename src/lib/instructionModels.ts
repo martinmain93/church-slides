@@ -2,7 +2,7 @@
  * The catalog of models spoken instructions can run on — local (downloaded
  * via ollama) and hosted (an API key away). See
  * `decision.instruction_models` for the catalog itself and
- * `Plan/SPOKEN_INSTRUCTIONS.md` for what's actually measured vs. just
+ * `docs/done/SPOKEN_INSTRUCTIONS.md` for what's actually measured vs. just
  * listed.
  *
  * Two concerns, two stores: the catalog + install/key status is

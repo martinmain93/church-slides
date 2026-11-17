@@ -14,7 +14,7 @@
  *    reaching hand. It catches up when the pointer leaves;
  *  - pointing at a candidate lights its tile, when that tile is in view.
  *
- * See Plan/AI_ASSISTED_MODE.md.
+ * See docs/done/AI_ASSISTED_MODE.md.
  */
 
 import { useEffect, useState, type RefObject } from "react";

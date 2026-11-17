@@ -1,4 +1,4 @@
-"""Learning how this church plays its songs (Plan/LEARNED_REFERENCES.md).
+"""Learning how this church plays its songs (docs/done/LEARNED_REFERENCES.md).
 
 An observer beside the live engine, never inside it:
 

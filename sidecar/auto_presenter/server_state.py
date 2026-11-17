@@ -92,7 +92,7 @@ class _ServerState:
         #: `TunablesUpdatedMessage` on change.
         self.tunables: ParticleFilterTunables = ParticleFilterTunables()
         #: Live chord/beat analysis — diagnostic only, off by default. See
-        #: `server_music` and Plan/CHORD_DOWNBEAT.md.
+        #: `server_music` and docs/research/CHORD_DOWNBEAT.md.
         self.music_analyser: MusicAnalyser | None = None
         self.music_chords: bool = False
         self.music_beats: bool = False
@@ -178,7 +178,7 @@ class _ServerState:
         #: utterances spoken close together can have overlapping in-flight
         #: calls that finish in a different order than they started (a
         #: hosted backend's latency varies call to call — see
-        #: `Plan/SPOKEN_INSTRUCTIONS.md`'s Groq/Gemini measurements). Bumped
+        #: `docs/done/SPOKEN_INSTRUCTIONS.md`'s Groq/Gemini measurements). Bumped
         #: at dispatch time in `_observe_spoken_instructions`; a call whose
         #: sequence number no longer matches when it returns has been
         #: superseded by a newer utterance and its result is dropped,

@@ -4,7 +4,7 @@
 BTC is 3 M parameters and MIT-licensed, and its pretrained weights ship in the
 upstream repository. Measured against chord charts on the approved goldens it
 is roughly twice as accurate as the numpy template matcher the sidecar falls
-back to — see Plan/CHORD_DOWNBEAT.md.
+back to — see docs/research/CHORD_DOWNBEAT.md.
 
 PyTorch is needed only for the export and must never reach the shipped
 sidecar; the runtime needs onnxruntime and numpy alone.

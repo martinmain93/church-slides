@@ -1,7 +1,7 @@
 """Find the Bible passages in a message the pastor sent.
 
 "Sermon: John 3:1-21, also Rom 5:8 and Eph 2:8-9" pasted into the Scripture
-tab becomes three passages to add to the service (`Plan/SERVICE_ITEMS.md`).
+tab becomes three passages to add to the service (`docs/done/SERVICE_ITEMS.md`).
 
 The model writes the references when one is available; our side only checks
 them against the verse store, which is the same split as `show_scripture` and
@@ -154,7 +154,7 @@ def ask_model(
         ],
         "tools": [EXTRACT_TOOL],
         # Never forced: forcing a tool makes "none here" unsayable for some
-        # providers (Plan/BIBLE_INTEGRATION.md §4).
+        # providers (docs/done/BIBLE_INTEGRATION.md §4).
         "tool_choice": "auto",
         "stream": False,
         "temperature": 0.0,

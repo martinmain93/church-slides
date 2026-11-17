@@ -7,7 +7,7 @@ sixteenths as three different rows.
 
 Worship songs reuse the same chords in the verse and the chorus, which is why
 mix-level chroma could not tell those sections apart at a window a live system
-can afford (53% forced-choice at 4 s; Plan/MUSIC_FINGERPRINTING.md). The
+can afford (53% forced-choice at 4 s; docs/research/MUSIC_FINGERPRINTING.md). The
 arrangement usually still changes: a kick enters, a guitar starts a pattern, a
 shaker doubles. This spike measures that change as a pulse *inside a frequency
 band*, not as pitch content of the whole mix.
@@ -40,7 +40,7 @@ HOP = 512  # 32 ms, 31.25 frames/s
 FPS = SR / HOP
 
 # Nyquist at 16 kHz is 8 kHz. Hats above that are already gone in these
-# recordings (Plan/MUSIC_MODELS_2026.md); "air" is the band we still have.
+# recordings (docs/research/MUSIC_MODELS_2026.md); "air" is the band we still have.
 BANDS = (
     ("kick", 30.0, 90.0),
     ("bass", 90.0, 250.0),

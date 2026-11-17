@@ -34,7 +34,7 @@ OPERATOR_SOURCES = ("manual", "override", "voice")
 #: the operator showed, but nobody moved to it.
 START = "start"
 
-#: Performance weights (Plan/LEARNED_REFERENCES.md, "Label sources and trust").
+#: Performance weights (docs/done/LEARNED_REFERENCES.md, "Label sources and trust").
 W_OPERATOR = 1.0
 W_OPERATOR_DISAGREES = 0.3
 W_MIXED = 0.6

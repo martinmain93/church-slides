@@ -1,6 +1,6 @@
 """The lead sheet as a performance: unrolled form, words, and slide spans.
 
-Stage 1 of Plan/MUSIC_ONLY_MATCHING.md. Reads a `score.json` written by
+Stage 1 of docs/research/MUSIC_ONLY_MATCHING.md. Reads a `score.json` written by
 `research/spikes/spike_leadsheet_omr.py` and
 
 * unrolls repeats, numbered endings, D.S. and To Coda into the order the

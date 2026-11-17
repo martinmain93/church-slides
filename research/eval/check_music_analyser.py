@@ -4,7 +4,7 @@ The unit tests feed it synthetic triads and click tracks, which prove it is
 wired correctly and prove nothing about whether it works on a band. This drives
 `MusicAnalyser` exactly as the live capture path does — one 100 ms frame at a
 time, causally — over the approved goldens, and scores its chords against the
-chart-derived ground truth described in Plan/CHORD_DOWNBEAT.md.
+chart-derived ground truth described in docs/research/CHORD_DOWNBEAT.md.
 
     uv run --project sidecar python research/eval/check_music_analyser.py
 

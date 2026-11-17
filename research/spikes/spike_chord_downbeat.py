@@ -3,7 +3,7 @@
 Spike, 2026-09-08. Nothing here is wired into the sidecar; it imports from
 `auto_presenter` read-only. numpy only — no new dependency, no licence question.
 
-The question, in the project's own terms (see Plan/MUSIC_FINGERPRINTING.md and
+The question, in the project's own terms (see docs/research/MUSIC_FINGERPRINTING.md and
 the goal note "the side channel is for SPEED, not identity"): harmony already
 failed to *identify* sections. But a metrical grid is the one signal in this
 project that is **causally ahead of the audio** — once tempo and phase are
@@ -620,7 +620,7 @@ def cmd_quantized(ids: list[str]) -> None:
     sections are 8-16 bars apart, so a comb search over 0.8-6.0 s has many
     spurious periods that explain a dozen events as well as the real one. The
     negative it reports on our goldens is therefore not evidence of absence.
-    See `power` in Plan/CHORD_DOWNBEAT.md. Kept so the trap is not re-set.
+    See `power` in docs/research/CHORD_DOWNBEAT.md. Kept so the trap is not re-set.
     """
     print("RETRACTED: this test fails its own control — see the docstring.")
     print()

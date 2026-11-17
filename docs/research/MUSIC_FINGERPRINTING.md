@@ -18,7 +18,7 @@ The ASR path has a floor that today's work established and could not move:
 - Anticipation from lyrics does not work. Believed position is *anti-correlated*
   with an imminent transition (median 0.31 before a move against 0.56
   mid-slide), and a tail-word detector runs at 41% recall for ~1.1 spurious
-  advances per minute. See Plan/LIVE_LATENCY.md.
+  advances per minute. See docs/research/LIVE_LATENCY.md.
 
 So the interesting question is not "make ASR faster" but "is there a second
 signal whose errors are uncorrelated". Harmony is a good candidate because it is

@@ -28,7 +28,7 @@
  * Clicking the pill switches the AI off, or back on (Active, or Shadow if a
  * developer chose it in the debug panel). In the operator view (`operator`)
  * it opens a menu instead: Assist (the operator drives, the AI points out
- * where the band went — Plan/AI_ASSISTED_MODE.md), Auto, or off. This is the
+ * where the band went — docs/done/AI_ASSISTED_MODE.md), Auto, or off. This is the
  * only on/off switch. The switch
  * goes to the sidecar live; the pill then redraws from the status the
  * sidecar broadcasts back, so it never claims a mode the AI isn't in.

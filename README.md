@@ -16,6 +16,8 @@ from this free app.
 
 [Download](https://church-slides.netlify.app) ·
 [What's new](https://church-slides.netlify.app/changelog.html) ·
+[Features](docs/FEATURES.md) ·
+[Roadmap](docs/roadmap/) ·
 [Contributing](CONTRIBUTING.md)
 
 ## Supported computers
@@ -45,6 +47,50 @@ person to confirm.
 - **Usage statistics:** opt-in, received by a small Worker (`stats/`).
 - **Shared types:** Pydantic models in `sidecar/auto_presenter/` are the
   source of truth. `pnpm codegen` mirrors them into `src/types/generated.ts`.
+
+## Documentation
+
+| | |
+| --- | --- |
+| [Architecture](docs/ARCHITECTURE.md) | How the app, the AI engine and the band screens fit together |
+| [Features](docs/FEATURES.md) | What the app does, with links to each feature's design |
+| [Roadmap](docs/roadmap/) | What's next, and the open work |
+| [Product principles](docs/PRODUCT_PRINCIPLES.md) | Simple first: how every design is judged |
+| [Research](docs/research/) | Ideas that were measured and parked or rejected, and why |
+| [Done](docs/done/) | Designs and reviews for work that has shipped |
+
+## Built with AI
+
+Church Slides is developed mostly with AI coding agents (Claude Code). Most
+of the code, tests and design documents were written by an agent, then
+directed, measured and reviewed by a person. Contributions made the same
+way are welcome. The bar is the same for every change, however it was
+written.
+
+To work this way:
+
+- **Point your agent at [AGENTS.md](AGENTS.md).** Claude Code loads it
+  through `CLAUDE.md`, and Codex, Cursor and most others read it directly.
+  It has the commands, the rules that aren't obvious from the code, and
+  which documents to read first.
+- **Start from the design docs, not a blank prompt.** Before an engine
+  change, give the agent the relevant write-up from
+  [docs/research/](docs/research/) or [docs/done/](docs/done/). Many
+  plausible ideas have already been measured and rejected.
+- **Get the user story approved before the agent writes code**
+  ([CONTRIBUTING.md](CONTRIBUTING.md#process)). An agent will happily build
+  more than was asked for.
+- **Make it prove the change.** Have it run the tests, and for engine
+  changes the real-time eval, and check the result in the running app.
+  `.mcp.json` gives agents tools to play a recording into the live engine
+  and to drive the app's windows. Put the numbers in the pull request.
+- **You own every line.** Read the diff before you open the pull request,
+  and be ready to explain any of it in review. Keep pull requests small
+  enough to read.
+- **Watch for what agents get wrong here.** Copyrighted lyrics in test data
+  (use public-domain hymns or invented lines), new settings and buttons
+  where a better default would do, and claiming a fix works because the
+  unit test passed.
 
 ## Development
 

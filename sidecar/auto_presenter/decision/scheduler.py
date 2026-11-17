@@ -818,7 +818,7 @@ class LeadTimeScheduler:
             # since yanking a congregation backwards is worse than being late.
             #
             # A duration-gated exception for *persistent* one-slide
-            # disagreements was tried and measured worse — see Plan/PHASE_7.md
+            # disagreements was tried and measured worse — see docs/done/PHASE_7.md
             # ("Tried and reverted: correcting an off-by-one").
             gap = displayed - target
             if gap < self.config.backward_min_slides:

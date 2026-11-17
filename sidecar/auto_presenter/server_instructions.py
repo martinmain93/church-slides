@@ -379,7 +379,7 @@ async def _handle_set_spoken_instructions(
 #: 10/10 correctly silent, and it resolves the one case prompt-engineering
 #: could not fix on llama3.2:3b ("let's do the second verse one more time"
 #: -> verse:2, not a confidently-wrong verse:1). Still only synthetic, typed
-#: utterances — see `Plan/SPOKEN_INSTRUCTIONS.md`.
+#: utterances — see `docs/done/SPOKEN_INSTRUCTIONS.md`.
 def _build_instruction_backend(model_id: str) -> InstructionBackend | None:
     """Turn a catalog id into a callable backend, or `None` with a logged
     reason if it can't be built right now (unknown id, hosted model with no

@@ -21,7 +21,7 @@ restarted the wait, so with short slides it could never run out.)
 Everything here runs on the event loop thread: engine moves can arrive from
 other threads, so `engine_move_threadsafe` hops onto the loop first.
 
-See Plan/AI_ASSISTED_MODE.md.
+See docs/done/AI_ASSISTED_MODE.md.
 """
 
 from __future__ import annotations

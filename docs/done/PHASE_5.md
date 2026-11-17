@@ -17,7 +17,7 @@ End-to-end working AI loop with a deliberately simple matcher. This establishes 
 - Override flow: when the operator presses an arrow key during an AI-controlled session, the UI fires the existing `RecordSlideChangeNotification` (with `source="override"`) so the sidecar fans it out to the matcher and the recording sink; the matcher transitions to `following_human` and resumes tracking after a cooldown
 - AI status pill in UI (idle / tracking / following human) — basic version
 - Debug panel "Belief state" tab populated with naive matcher's per-slide score
-- Baseline metric run on the eval set; numbers committed to `Plan/BASELINE_NUMBERS.md`
+- Baseline metric run on the eval set; numbers committed to `docs/done/BASELINE_NUMBERS.md`
 
 **Out:**
 - Particle filter (Phase 6)
@@ -149,7 +149,7 @@ The "Start service" button from Phase 2 already starts a session. Now extend:
 - Runs naive matcher on each via the shared `research/eval/eval_pipeline.py`
   entrypoint (already shipped from Phase 3 work)
 - Computes all four metrics
-- Writes `Plan/BASELINE_NUMBERS.md` — committed to repo. **Phase 6 must
+- Writes `docs/done/BASELINE_NUMBERS.md` — committed to repo. **Phase 6 must
   strictly beat these numbers.**
 
 ### 8. Shadow mode by default
@@ -172,7 +172,7 @@ For the next 2 phases, default AI mode to **shadow** (decisions logged, slides n
 | `src/components/debug/BeliefStateTab.tsx` | Per-slide score chart |
 | `src/components/settings/AISettings.tsx` | Mode toggle (off/shadow/active) |
 | `research/dead_ends/naive_matcher/run_baseline.py` | Baseline measurement |
-| `Plan/BASELINE_NUMBERS.md` | Committed baseline metrics |
+| `docs/done/BASELINE_NUMBERS.md` | Committed baseline metrics |
 | `tests/sidecar/matcher/test_naive.py` | Unit tests on fixture transcripts |
 | `tests/sidecar/decision/test_director.py` | AI/human interleave behavior |
 | `tests/integration/test_ai_pipeline_e2e.py` | End-to-end |
@@ -182,7 +182,7 @@ For the next 2 phases, default AI mode to **shadow** (decisions logged, slides n
 - [ ] Pipeline runs end-to-end: live mic → ASR → naive matcher → director → `SlideChangeMessage` broadcast → React `PresentationView.jumpTo()` updates the display
 - [ ] AI status pill correctly cycles: idle → tracking → following human → tracking
 - [ ] Override during AI session: AI follows human, resumes tracking after 5 s
-- [ ] **Baseline metrics committed** in `Plan/BASELINE_NUMBERS.md`:
+- [ ] **Baseline metrics committed** in `docs/done/BASELINE_NUMBERS.md`:
   - Wrong-slide rate (expected ~30%)
   - Anticipation error (expected positive median, late by 2–3 s)
   - Override rate

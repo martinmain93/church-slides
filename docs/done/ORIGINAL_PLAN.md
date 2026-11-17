@@ -1,5 +1,7 @@
 # Church Slides — Architecture & Approach
 
+> **Historical.** The plan written before any code. Much of it changed in the building; for how the app works today see [ARCHITECTURE.md](../ARCHITECTURE.md).
+
 > _(Internal codename in the repo: "auto-presenter". Repo dir name: `Auto-Presenter-2`. User-facing product name: **Church Slides**.)_
 
 ## Context
@@ -233,7 +235,7 @@ around it.
 Prerequisite: needs Phase 8's evaluation data to size the win before building.
 Dependency-wise, chroma is cheap (librosa/Essentia); the cost risk is running it
 concurrently with ASR on the same core budget, so measure against
-`Plan/PERF_BASELINE.json` before committing.
+`scripts/perf_baseline.json` before committing.
 
 ### G2. Non-vocal passages — gating the expensive path — *raised 2026-08-21*
 

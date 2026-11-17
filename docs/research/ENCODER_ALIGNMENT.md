@@ -1,7 +1,7 @@
 # Encoder-alignment emission: what the project actually is
 
 Mapped 2026-08-29, after the production-harness correction in
-`Plan/LITERATURE.md` reopened the question.
+`docs/research/LITERATURE.md` reopened the question.
 
 ## The idea in one paragraph
 
@@ -194,7 +194,7 @@ independent of everything above. It should not wait for this project.
 
 It is an improvement and it was free, but **the size is the finding**: a 38%
 relative cut in WER (0.357 -> 0.220) bought a 3.6% relative cut in wrong-slide.
-That is evidence *against* the reframing in `Plan/LITERATURE.md` that word
+That is evidence *against* the reframing in `docs/research/LITERATURE.md` that word
 quality is the binding constraint. Three follow-ups pinned down why.
 
 **It is not lateness.** Shifting every decision earlier by a fixed amount and

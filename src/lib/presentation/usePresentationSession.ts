@@ -115,7 +115,7 @@ export function usePresentationSession(
     displayPref = "slide", slidesFor, screen = "single", itemKinds: shownKinds = NO_KINDS,
   } = opts;
   // A passage is followed like a song as it is read aloud; a text item still
-  // has the AI wait on the next song (Plan/SERVICE_ITEMS.md phase 2).
+  // has the AI wait on the next song (docs/done/SERVICE_ITEMS.md phase 2).
   const itemKinds = useMemo(() => aiKinds(shownKinds, true), [shownKinds]);
   const itemKindsRef = useRef(itemKinds);
   itemKindsRef.current = itemKinds;

@@ -1,6 +1,6 @@
 """Export Whisper's encoder and a batched span scorer to ONNX, for ONNX Runtime.
 
-Builds on two earlier findings (see Plan/ASR_ENGINE.md, "ONNX + shared
+Builds on two earlier findings (see docs/research/ASR_ENGINE.md, "ONNX + shared
 cross-attention K/V"): the August spike (`export_whisper_onnx.py`,
 `spike_onnx_scorer.py`) found CTranslate2's `align` recomputes the
 cross-attention keys/values once per candidate, and shared them through

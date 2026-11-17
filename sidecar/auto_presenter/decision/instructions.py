@@ -212,7 +212,7 @@ HIDE_SCRIPTURE_TOOL_SPEC: dict = {
 #: tool-calling has no strong way to abstain when a single tool is on offer;
 #: giving the model an explicit, named way to choose "nothing" fixed it
 #: outright — the same 10 sentences dropped to **0 of 10** false fires.
-#: See `Plan/SPOKEN_INSTRUCTIONS.md` for the full measurement.
+#: See `docs/done/SPOKEN_INSTRUCTIONS.md` for the full measurement.
 NO_ACTION_TOOL_SPEC: dict = {
     "type": "function",
     "function": {
@@ -671,7 +671,7 @@ class GenericLLMBackend:
     against ollama's `/v1/chat/completions` (2026-09-03); Groq and Gemini
     are implemented to the same documented contract but not yet verified
     end-to-end — see `decision.instruction_models` for provider entries and
-    `Plan/SPOKEN_INSTRUCTIONS.md` for what's confirmed vs. assumed.
+    `docs/done/SPOKEN_INSTRUCTIONS.md` for what's confirmed vs. assumed.
 
     Never raises: connection failure, timeout, auth failure, or a response
     that doesn't parse as the tool schema all return `None`. A missed

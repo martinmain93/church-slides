@@ -1,6 +1,6 @@
 /**
  * What the app is learning about how this church plays its songs — the only
- * place it shows (Plan/LEARNED_REFERENCES.md).
+ * place it shows (docs/done/LEARNED_REFERENCES.md).
  *
  * Per setlist song: the look-back of this service (where the band was, in
  * hindsight, from the words), what the operator showed, the past services

@@ -4,7 +4,7 @@ The fixtures are cut-down copies of the shapes real Open Hymnal files have:
 the melody's `w:` lines interleaved verse by verse under each line of music,
 a harmony voice whose own `w:` lines are echoes (and must be ignored), a
 refrain written under verse 1 only, extra verses as `W:` lines. The converter
-was checked against all 351 Open Hymnal files — see `Plan/HYMNS.md`.
+was checked against all 351 Open Hymnal files — see `docs/done/HYMNS.md`.
 """
 
 # ruff: noqa: E501 — fixtures keep the real files' long lines intact.

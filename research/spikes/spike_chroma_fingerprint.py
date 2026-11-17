@@ -1,7 +1,7 @@
 """Harmonic section fingerprints: chroma -> CENS -> 2D Fourier magnitude.
 
 Spike, 2026-09-01. Not wired into the sidecar. Reproduces the measurements in
-Plan/MUSIC_FINGERPRINTING.md; run it with `--verify` to re-check that each stage
+docs/research/MUSIC_FINGERPRINTING.md; run it with `--verify` to re-check that each stage
 does what its source claims before trusting any accuracy number from it.
 
     uv run --project sidecar python research/spikes/spike_chroma_fingerprint.py --verify

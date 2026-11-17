@@ -100,7 +100,7 @@ pull request directly. Link the issue if there is one.
 Pull requests for unapproved changes that users can see are closed, with a link
 back to this page.
 
-AI-written code is welcome. You must have run it, and you must be able to
+AI-written code is welcome (see [Built with AI](README.md#built-with-ai)). You must have run it, and you must be able to
 explain every line in review.
 
 Sign off each commit (`git commit -s`). That certifies you have the right to
@@ -122,5 +122,5 @@ the change is built. Put the before and after numbers in the pull request.
 
 ## Setup
 
-See [README.md](README.md#setup). In `sidecar/`, use `uv run` rather than a
+See [README.md](README.md#development). In `sidecar/`, use `uv run` rather than a
 bare `uv sync`: `uv sync` removes the optional extras the AI needs.

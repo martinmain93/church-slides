@@ -13,7 +13,7 @@ This is "run the eval with the AI slide switching" on real audio.
     uv run --project sidecar python research/eval/run_realtime_eval.py \\
         --recordings ~/Library/Application\\ Support/com.churchslides.app/recordings \\
         --model tiny.en \\
-        --output Plan/REALTIME_EVAL.md
+        --output docs/done/REALTIME_EVAL.md
 
 The Whisper model is loaded once and reused across recordings, and the
 transcript is computed once per recording and cached, so re-scoring after a
@@ -404,7 +404,7 @@ def build_argparser() -> argparse.ArgumentParser:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument("--recordings", required=True)
-    parser.add_argument("--output", default=str(REPO_ROOT / "Plan" / "REALTIME_EVAL.md"))
+    parser.add_argument("--output", default=str(REPO_ROOT / "docs" / "done" / "REALTIME_EVAL.md"))
     parser.add_argument("--json", default=None)
     parser.add_argument("--model", default="tiny.en", help="Whisper model size.")
     parser.add_argument("--device", default="auto")

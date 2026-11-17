@@ -1,5 +1,5 @@
 /**
- * Scripture and text items in a service (`Plan/SERVICE_ITEMS.md`).
+ * Scripture and text items in a service (`docs/done/SERVICE_ITEMS.md`).
  *
  * A setlist item is a song, a passage, or one-off text. Everything that shows
  * a service — the workspace grid, the operator view, the projector, the band
@@ -253,7 +253,7 @@ function ownTextSlides(content: ScriptureContent, budget: number): string[] {
   return slides;
 }
 
-// --- Read-along (Plan/SERVICE_ITEMS.md phase 2) ------------------------------
+// --- Read-along (docs/done/SERVICE_ITEMS.md phase 2) ------------------------------
 
 /** Item kinds as the AI should treat them: with read-along on, a passage is
  * followed like a song; text items still aren't. */

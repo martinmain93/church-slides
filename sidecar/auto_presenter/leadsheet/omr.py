@@ -1,7 +1,7 @@
 """Read melody, chords and lyrics out of a SongSelect lead-sheet PDF.
 
 The importer's lead-sheet reader (see `auto_presenter.leadsheet`), grown
-out of the Plan/MUSIC_ONLY_MATCHING.md spike. SongSelect lead sheets are
+out of the docs/research/MUSIC_ONLY_MATCHING.md spike. SongSelect lead sheets are
 rendered by Verovio, so nothing is scanned:
 the staff lines, noteheads, stems, beams, flags, rests and dots are vector
 paths at exact positions, and the lyrics, chord symbols and section labels are

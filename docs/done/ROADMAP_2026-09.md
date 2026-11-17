@@ -1,5 +1,7 @@
 # Roadmap — September 2026
 
+> **Historical.** Superseded by the current [roadmap](../roadmap/README.md); kept for how each original phase ended up.
+
 Where the app is, and what is queued. Supersedes the phase numbering in
 `Plan/PHASE_*.md` for anything still open; those documents remain accurate about
 what was built and why.
@@ -35,7 +37,7 @@ the remaining error is concentrated in songs whose verses open alike.
 | 6 — Particle filter | done, then **replaced** |
 | 7 — Deviation handling | **half** — within-song yes, across-setlist never built |
 | 8 — Production: library recovery, LLM, telemetry, installer | **LLM built** (unmeasured on real speech), rest **not started** |
-| 9 — Vocal separation (optional) | **measured, shelved on latency** — see Plan/PHASE_9.md |
+| 9 — Vocal separation (optional) | **measured, shelved on latency** — see docs/research/VOCAL_SEPARATION.md |
 | 10 — Musical priors (optional) | spiked, **rejected on evidence** |
 
 Three of those need explaining, because "done" and "not done" both understate
@@ -139,7 +141,7 @@ wrong-slide on the goldens is unchanged at 0.443.
 The limit appeared to be *event granularity* rather than signal: a frame-level
 acoustic feature has no transcript events, so a two-second utterance is not a
 special case for it. Measured on 2026-09-02, pitch does not survive a room mic;
-see the next section and Plan/MUSIC_LITERATURE.md.
+see the next section and docs/research/MUSIC_LITERATURE.md.
 
 **The two consumers want opposite things.** Blanking the screen should be
 reluctant — a false alarm is a black screen mid-song. Waking a language model to
@@ -193,7 +195,7 @@ chorus is the failure people see. The spoken-instructions work wants the eager
 threshold anyway, per the note above about the two consumers.
 
 **Pitch was measured and rejected.** The section below and
-Plan/MUSIC_LITERATURE.md said a frame-level pitch feature was where this would
+docs/research/MUSIC_LITERATURE.md said a frame-level pitch feature was where this would
 genuinely win, because the limit looked like event granularity. It was tried and
 it does not work on a room mic: AUC **0.313** absolute and **0.448** normalised,
 against 0.811 within a single recording. The autocorrelation F0 follows the band
@@ -211,7 +213,7 @@ needs 7.8 s of context per chunk (architectural, not a speed problem), which
 would roughly triple total emission latency — a straight regression on the
 lag work earlier in this project. A causal alternative exists on paper
 (Band-SCNet, 92 ms latency) but nothing in that class has released weights.
-Full detail in Plan/PHASE_9.md and Plan/MUSIC_LITERATURE.md.
+Full detail in docs/research/VOCAL_SEPARATION.md and docs/research/MUSIC_LITERATURE.md.
 
 ### 2. Musical features — NOT WIRED, AND SHOULD NOT BE
 
@@ -228,7 +230,7 @@ short enough to act on) the answer was **53%, against 50% for a coin**.
 Fusing it was measured too: for every moment it could rescue, it would threaten
 **7.2 it would break**.
 
-See `Plan/MUSIC_FINGERPRINTING.md`. The door is not closed — a representation
+See `docs/research/MUSIC_FINGERPRINTING.md`. The door is not closed — a representation
 that discriminates *within* a song at short horizons would change it, and that
 is what neural cover-song embeddings are built for — but nothing here should be
 wired up on the current evidence.
@@ -250,7 +252,7 @@ design: the looser 0.5 bar was measured to buy only noise, and the smoothed
 score it originally read is a 3-event rolling mean, which caps a two-event
 command at 0.667 — under any bar, however clearly it was spoken. Off by default. Full write-up,
 including the model comparison and every measured failure:
-`Plan/SPOKEN_INSTRUCTIONS.md`.
+`docs/done/SPOKEN_INSTRUCTIONS.md`.
 
 **The finding that mattered most:** an explicit `no_action` tool is not
 optional. Offered only `go_to_slide`, the shipped model called it on 10 of

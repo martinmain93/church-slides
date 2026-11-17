@@ -14,7 +14,7 @@ this app can't ship) and the encrypted formats of commercial presentation
 software (ProPresenter, EasyWorship), whose licences don't transfer anyway.
 
 Licensing is the church's responsibility, and the import screen says so; this
-package only reads. See `Plan/BIBLE_INTEGRATION.md`, "Importing a church's own
+package only reads. See `docs/done/BIBLE_INTEGRATION.md`, "Importing a church's own
 Bible".
 """
 

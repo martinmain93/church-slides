@@ -1,7 +1,7 @@
 """The lead sheet as a performance: unrolled form, words, and slide spans.
 
 Ported from the music-only spike (research/spikes/music_only/score.py, stage 1
-of Plan/MUSIC_ONLY_MATCHING.md). Reads the score the lead-sheet reader
+of docs/research/MUSIC_ONLY_MATCHING.md). Reads the score the lead-sheet reader
 stored on the song (`auto_presenter.leadsheet`, `song_references.data_json`)
 and
 

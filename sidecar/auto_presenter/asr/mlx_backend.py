@@ -23,7 +23,7 @@ So ~0.38 s off the pass and ~0.57 s off the step quantisation, against a
 measured median cue delay of 1.4 s.
 
 Apple silicon only. That is deliberate and allowed: the roadmap's hardware floor
-was relaxed on 2026-09-05 (see `Plan/ROADMAP.md`, "Shipping is a constraint"),
+was relaxed on 2026-09-05 (see `docs/done/ROADMAP_2026-09.md`, "Shipping is a constraint"),
 because the old "volunteer's Windows/Intel laptop" target was ruling out the
 whole class of fix that the evidence — 89% of cues correct but ~1.4 s late —
 points at. This is an *optional* backend; `WhisperBackend` remains the portable
@@ -96,7 +96,7 @@ _REPO_FOR_SIZE = {
 #: after 300 passes (five minutes of audio) and the sidecar ~4 GB live after
 #: twenty. 1 GiB covers a pass's transient buffers (~0.7 GB) with room to
 #: spare; measured +4% pass time against no limit, versus +9% at 256 MB.
-#: See Plan/PERF_AUDIT_2026-09-26.md.
+#: See docs/done/PERF_AUDIT_2026-09-26.md.
 MLX_CACHE_LIMIT_BYTES = 1 << 30
 
 _memory_configured = False

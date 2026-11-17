@@ -66,7 +66,7 @@ export function showLiveScripture(
   display: LiveScriptureDisplay,
   source: LiveScripture["source"] = "operator",
 ): void {
-  // Prepared in the service (Plan/SERVICE_ITEMS.md): go to the slides the
+  // Prepared in the service (docs/done/SERVICE_ITEMS.md): go to the slides the
   // team made — their translation, their edits — instead of laying a second
   // copy over the lyrics.
   if (goToPrepared?.(passage)) return;

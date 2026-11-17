@@ -18,7 +18,7 @@ looks behind it. Builders:
   beat, no music. Any song can be followed with it. Replayed over the 8 live
   traces it read 0.290 tuning / 0.358 held-out, against roughly 0.38 / 0.455
   for the production engine and 0.168 / 0.252 for a lead sheet
-  (Plan/LEARNED_REFERENCES.md).
+  (docs/done/LEARNED_REFERENCES.md).
 * learned from past services: later (`auto_presenter.learning`).
 """
 

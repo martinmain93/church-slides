@@ -21,7 +21,7 @@ blank). `NextLineCheck` reads those phones against the song's lines:
   on the line by `MARGIN` and the runner-up by `RUNNER_UP_MARGIN` moves the
   screen, and a share of the follower's belief jumps to its opening.
 
-Replayed with the follower on real-time traces (Plan/NEXT_LINE_CHECK.md
+Replayed with the follower on real-time traces (docs/done/NEXT_LINE_CHECK.md
 steps 3-5): on the 53 held-out public recordings, changes more than 2 s late
 or missed without it 315 -> 126, wrong-slide seconds -31%; church
 recordings 328 -> 237 s. Live cost (step 6, M1 on mains): about 70 ms a

@@ -9,7 +9,7 @@
  * The licence question is the church's, not the app's. The checkbox is
  * required, and the copy says plainly what it means: the text stays on this
  * computer, and whether the church may use it is between the church and the
- * publisher. See `Plan/BIBLE_INTEGRATION.md`, "Importing a church's own Bible".
+ * publisher. See `docs/done/BIBLE_INTEGRATION.md`, "Importing a church's own Bible".
  */
 
 import { useCallback, useState } from "react";
