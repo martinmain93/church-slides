@@ -267,6 +267,15 @@ export function BandView() {
     document.title = song ? `${song.title} — Band` : "Band screen";
   }, [song]);
 
+  if (conn.linkRemoved) {
+    return (
+      <div className="flex h-screen flex-col items-center justify-center gap-2 bg-background p-6 text-center text-foreground supports-[height:100dvh]:h-[100dvh]">
+        <p className="text-lg font-medium">This band link no longer works</p>
+        <p className="text-sm text-muted-foreground">Ask whoever runs the slides for a new one.</p>
+      </div>
+    );
+  }
+
   return (
     <div
       className="flex h-screen flex-col bg-background text-foreground supports-[height:100dvh]:h-[100dvh]"

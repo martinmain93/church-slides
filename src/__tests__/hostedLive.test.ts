@@ -13,7 +13,7 @@ class FakeSocket {
   sent: string[] = [];
   onopen: (() => void) | null = null;
   onmessage: ((e: { data: string }) => void) | null = null;
-  onclose: (() => void) | null = null;
+  onclose: ((e: { code: number }) => void) | null = null;
   onerror: (() => void) | null = null;
   constructor(
     public url: string,
@@ -24,9 +24,9 @@ class FakeSocket {
   send(s: string) {
     this.sent.push(s);
   }
-  close() {
+  close(code = 1006) {
     this.readyState = 3;
-    this.onclose?.();
+    this.onclose?.({ code });
   }
   open() {
     this.readyState = 1;
@@ -75,6 +75,33 @@ describe("the band page in a hosted room", () => {
 
     act(() => sock.deliver({ type: "lan", url: "http://192.168.1.5:7777/band" }));
     expect(result.current.lanUrl).toBe("http://192.168.1.5:7777/band");
+  });
+
+  it("stops and says so when its link was removed", async () => {
+    const fetchMock = vi.fn(async () => new Response("{}", { status: 401 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const { result } = renderHook(() => useBandConnection("leader", null));
+    const sock = FakeSocket.all[0]!;
+    act(() => sock.open());
+    await act(async () => sock.close(4001));
+    expect(fetchMock).toHaveBeenCalledWith("https://api.example.org/band/v1/me", { headers: { Authorization: "Bearer csb_secret" } });
+    expect(result.current.linkRemoved).toBe(true);
+    await act(async () => new Promise((r) => setTimeout(r, 500)));
+    expect(FakeSocket.all).toHaveLength(1);
+  });
+
+  it("keeps retrying when the server can't be asked (offline isn't removed)", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.stubGlobal("fetch", vi.fn(async () => Promise.reject(new TypeError("offline"))));
+      const { result } = renderHook(() => useBandConnection("leader", null));
+      await act(async () => FakeSocket.all[0]!.close());
+      await act(async () => vi.advanceTimersByTimeAsync(1000));
+      expect(result.current.linkRemoved).toBe(false);
+      expect(FakeSocket.all.length).toBeGreaterThan(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

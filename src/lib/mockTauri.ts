@@ -256,6 +256,14 @@ export const mockTauri = {
     if (what === "invites" && method === "POST") {
       return { url: "https://api.churchslides.app/join/csi_mockInviteCode0123456789", code: "csi_mockInviteCode0123456789" };
     }
+    if (what === "band-devices" && method === "POST") {
+      const token = `csb_mock${body?.canLead ? "Leader" : "Band"}${Date.now()}`;
+      return { device: { id: `d${Date.now()}`, name: body?.name, canLead: Boolean(body?.canLead) }, token, url: `https://churchslides.app/live/#s=https%3A%2F%2Fapi.churchslides.app&t=${token}` };
+    }
+    if (what === "live" && id === "ticket" && method === "POST") {
+      // No hosted room in the browser preview: the socket fails and retries.
+      return { url: "ws://127.0.0.1:9/live/host?ticket=cst_mock" };
+    }
     throw new Error(`mock: ${method} ${path} isn't mocked`);
   },
   async get_sidecar_port(): Promise<number> {

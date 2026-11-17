@@ -21,6 +21,7 @@ import { BandScreensButton } from "@/components/band/BandScreensButton";
 import { onlineRoom, resetOnlineRoomForTests } from "@/lib/band/onlineRoom";
 import { useOnlineRoom } from "@/lib/band/useOnlineRoom";
 import type { BandHostApi } from "@/lib/band/useBandHost";
+import { ToastProvider } from "@/lib/toast";
 
 class FakeSocket {
   static OPEN = 1;
@@ -124,6 +125,30 @@ describe("band screens panel: the online room page", () => {
     act(() => screen.getByTestId("band-screens-button").click());
     act(() => screen.getByTestId("band-screens-button").click());
     expect(screen.getByTestId("online-panel")).toBeInTheDocument();
+  });
+
+  it("signed in to an organization: offers its band links, not the church's own relay", async () => {
+    function HostedPanel() {
+      const online = useOnlineRoom({ getPin: async () => "2468" });
+      const band: BandHostApi = {
+        info: null, clients: 0, start: async () => undefined, error: null, online,
+        hosted: { org: { orgId: "o1", orgName: "Grace Chapel" }, connection: "live", clients: 2 },
+      };
+      return <BandScreensButton band={band} />;
+    }
+    render(
+      <ToastProvider>
+        <HostedPanel />
+      </ToastProvider>,
+    );
+    await act(async () => undefined); // relay status loads: set up, but not used
+    act(() => screen.getByTestId("band-screens-button").click());
+    expect(screen.queryByTestId("online-panel")).toBeNull();
+    expect(screen.queryByTestId("online-entry")).toBeNull();
+    expect(screen.getByTestId("hosted-room-note").textContent).toContain("Live at Grace Chapel · 2 devices");
+    expect(screen.getByRole("button", { name: "Band link" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Leader link" })).toBeInTheDocument();
+    expect(sockets.all).toHaveLength(0); // and no relay room was opened
   });
 
   it("opens on the local network page while the online room isn't set up", async () => {

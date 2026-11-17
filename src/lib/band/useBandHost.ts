@@ -242,7 +242,8 @@ export function useBandHost(opts: BandHostOptions): BandHostApi {
   // opens on its own, with the local band server alongside as the fallback.
   const [liveOrg, setLiveOrg] = useState<Membership | null>(null);
   useEffect(() => {
-    if (!FEATURES.account || !isInTauri()) return;
+    // Outside the app (browser preview) this is the mock account.
+    if (!FEATURES.account) return;
     let live = true;
     accountStatus().then(
       (s) => live && setLiveOrg(liveOrganization(s)),

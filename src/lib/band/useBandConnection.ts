@@ -32,6 +32,8 @@ export interface BandConnection {
   lanUrl: string | null;
   /** Local band server: the hosted room is reachable again. */
   hostedLive: boolean;
+  /** Hosted room: this band link was removed (or never worked); retrying won't help. */
+  linkRemoved: boolean;
   setlist: BandSetlist | null;
   position: BandPosition | null;
   /** Server says no service is running. */
@@ -50,6 +52,17 @@ export interface BandConnection {
 }
 
 const SILENCE_LIMIT_MS = 12_000;
+
+/** Whether the server refuses this band link (removed, or its organization
+ * deleted). `false` when it can't be asked: offline isn't removed. */
+export async function bandLinkRefused(link: { server: string; token: string }): Promise<boolean> {
+  try {
+    const res = await fetch(`${link.server}/band/v1/me`, { headers: { Authorization: `Bearer ${link.token}` } });
+    return res.status === 401;
+  } catch {
+    return false;
+  }
+}
 const PING_EVERY_MS = 10_000;
 
 /**
@@ -107,6 +120,7 @@ export function useBandConnection(role: "band" | "leader", pin: string | null): 
   const [library, setLibrary] = useState<LibrarySong[] | null>(null);
   const [lanUrl, setLanUrl] = useState<string | null>(null);
   const [hostedLive, setHostedLive] = useState(false);
+  const [linkRemoved, setLinkRemoved] = useState(false);
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectNow = useRef<() => void>(() => undefined);
 
@@ -154,8 +168,10 @@ export function useBandConnection(role: "band" | "leader", pin: string | null): 
       socketRef.current = sock;
       armWatchdog(sock);
 
+      let opened = false;
       sock.onopen = () => {
         if (socketRef.current !== sock) return;
+        opened = true;
         attempt = 0;
         setStatus("live");
         clearInterval(pinger);
@@ -223,16 +239,26 @@ export function useBandConnection(role: "band" | "leader", pin: string | null): 
           }
         }
       };
-      sock.onclose = () => {
+      sock.onclose = (ev) => {
         // Only the current socket's death means "reconnect".
         if (socketRef.current !== sock) return;
         clearTimeout(watchdog);
         clearInterval(pinger);
         socketRef.current = null;
-        if (!disposed) {
-          setStatus("reconnecting");
-          scheduleRetry();
+        if (disposed) return;
+        setStatus("reconnecting");
+        // A hosted room drops a removed link (4001) and refuses it at the
+        // door after that. Ask once, then stop rather than retry forever.
+        const hosted = hostedLink();
+        if (hosted && (ev.code === 4001 || !opened)) {
+          void bandLinkRefused(hosted).then((refused) => {
+            if (disposed) return;
+            if (refused) setLinkRemoved(true);
+            else scheduleRetry();
+          });
+          return;
         }
+        scheduleRetry();
       };
       // Close once: closing a socket that never opened can fire `error` again
       // straight away in some engines, recursing.
@@ -298,6 +324,7 @@ export function useBandConnection(role: "band" | "leader", pin: string | null): 
     status,
     lanUrl,
     hostedLive,
+    linkRemoved,
     setlist,
     position,
     idle,
