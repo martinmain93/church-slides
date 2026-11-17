@@ -391,6 +391,40 @@ fn app_data(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
     app.path().app_data_dir().map_err(|e| e.to_string())
 }
 
+// --- Account (optional sign-in to a Church Slides server) ----------------------
+
+#[tauri::command]
+pub fn account_status(app: tauri::AppHandle) -> Result<crate::account::AccountStatus, String> {
+    Ok(crate::account::status(&app_data(&app)?))
+}
+
+/// Check the sign-in with the server; offline, returns what's known.
+#[tauri::command]
+pub async fn account_refresh(app: tauri::AppHandle) -> Result<crate::account::AccountStatus, String> {
+    crate::account::refresh_status(&app_data(&app)?).await.map_err(|e| format!("{e:#}"))
+}
+
+#[tauri::command]
+pub async fn account_sign_in(app: tauri::AppHandle) -> Result<crate::account::AccountStatus, String> {
+    use tauri_plugin_shell::ShellExt;
+    let shell = app.shell();
+    // Same opener as the Cloudflare sign-in; moving both to tauri-plugin-opener is separate work.
+    #[allow(deprecated)]
+    crate::account::sign_in(&app_data(&app)?, |url| shell.open(url, None).map_err(|e| anyhow::anyhow!("{e}")))
+        .await
+        .map_err(|e| format!("{e:#}"))
+}
+
+#[tauri::command]
+pub async fn account_sign_out(app: tauri::AppHandle) -> Result<crate::account::AccountStatus, String> {
+    crate::account::sign_out(&app_data(&app)?).await.map_err(|e| format!("{e:#}"))
+}
+
+#[tauri::command]
+pub async fn account_sign_out_everywhere(app: tauri::AppHandle) -> Result<crate::account::AccountStatus, String> {
+    crate::account::sign_out_everywhere(&app_data(&app)?).await.map_err(|e| format!("{e:#}"))
+}
+
 #[tauri::command]
 pub fn cloud_relay_status(app: tauri::AppHandle) -> Result<crate::cloud::CloudStatus, String> {
     Ok(crate::cloud::status(&app_data(&app)?))

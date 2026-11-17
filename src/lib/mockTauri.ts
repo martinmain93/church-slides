@@ -163,7 +163,47 @@ function sorted(rows: SongRow[], sort: SortKey): SongRow[] {
   return [...rows].sort(alphabetical);
 }
 
+// Account sign-in, faked: "signs in" instantly as a member of one organization.
+const signedOutAccount = {
+  signedIn: false,
+  email: null,
+  displayName: null,
+  memberships: [],
+  server: "https://api.churchslides.app",
+  serverIsDefault: true,
+};
+let mockAccount: typeof signedOutAccount | {
+  signedIn: boolean; email: string; displayName: string;
+  memberships: { orgId: string; orgName: string; role: string }[];
+  server: string; serverIsDefault: boolean;
+} = signedOutAccount;
+
 export const mockTauri = {
+  async account_status() {
+    return mockAccount;
+  },
+  async account_refresh() {
+    return mockAccount;
+  },
+  async account_sign_in() {
+    mockAccount = {
+      signedIn: true,
+      email: "ada@example.org",
+      displayName: "Ada",
+      memberships: [{ orgId: "o1", orgName: "Grace Chapel", role: "operator" }],
+      server: "https://api.churchslides.app",
+      serverIsDefault: true,
+    };
+    return mockAccount;
+  },
+  async account_sign_out() {
+    mockAccount = signedOutAccount;
+    return mockAccount;
+  },
+  async account_sign_out_everywhere() {
+    mockAccount = signedOutAccount;
+    return mockAccount;
+  },
   async get_sidecar_port(): Promise<number> {
     // No sidecar in browser dev mode — surface as connection failure so
     // the AI status badge correctly shows "offline". To exercise engine

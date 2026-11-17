@@ -1,3 +1,4 @@
+mod account;
 mod assistant_link;
 mod band;
 mod charts;
@@ -507,6 +508,11 @@ pub fn run() {
             commands::band_publish,
             commands::band_clear,
             commands::band_library_index,
+            commands::account_status,
+            commands::account_refresh,
+            commands::account_sign_in,
+            commands::account_sign_out,
+            commands::account_sign_out_everywhere,
             commands::cloud_relay_status,
             commands::cloud_relay_setup_token,
             commands::cloud_relay_setup_oauth,

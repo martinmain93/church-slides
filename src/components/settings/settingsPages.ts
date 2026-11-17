@@ -10,7 +10,7 @@
 
 import { FEATURES } from "@/lib/features";
 
-export type SettingsPageId = "audio" | "ai" | "display" | "scripture" | "other";
+export type SettingsPageId = "audio" | "ai" | "display" | "scripture" | "account" | "other";
 
 export interface SettingsPageInfo {
   id: SettingsPageId;
@@ -24,11 +24,14 @@ const ALL: SettingsPageInfo[] = [
   { id: "ai", label: "AI", description: "Following the songs, and AI assistants." },
   { id: "display", label: "Display", description: "How lyrics look on the projector." },
   { id: "scripture", label: "Scripture", description: "Bible translations and how passages look." },
+  { id: "account", label: "Account", description: "Sign in to work with your team." },
   { id: "other", label: "Other", description: "Privacy, updates and developer tools." },
 ];
 
 export function settingsPages(): SettingsPageInfo[] {
-  return ALL.filter((p) => p.id !== "scripture" || FEATURES.liveScripture);
+  return ALL.filter(
+    (p) => (p.id !== "scripture" || FEATURES.liveScripture) && (p.id !== "account" || FEATURES.account),
+  );
 }
 
 export const DEFAULT_SETTINGS_PAGE: SettingsPageId = "audio";

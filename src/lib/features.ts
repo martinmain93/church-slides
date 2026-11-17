@@ -25,4 +25,8 @@ export const FEATURES = {
    * it answered 7/28 and only 1 of 8 placements was right — worse than
    * copying an identical earlier line. The local Suggest rules ship. */
   chordModelSuggestions: import.meta.env.DEV,
+  /** Settings → Account: sign in to a Church Slides server
+   * (docs/server-protocol/). Hidden in releases while the server is a
+   * private pilot: a sign-in most people can't complete is clutter. */
+  account: import.meta.env.DEV,
 } as const;
