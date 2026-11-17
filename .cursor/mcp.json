@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "tauri": {
+      "command": "npx",
+      "args": ["-y", "@hypothesi/tauri-mcp-server"]
+    },
+    "auto-presenter-dev": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--project",
+        "${workspaceFolder}/sidecar",
+        "python",
+        "-m",
+        "auto_presenter.dev.mcp"
+      ]
+    }
+  }
+}

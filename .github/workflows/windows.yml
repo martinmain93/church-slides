@@ -1,0 +1,126 @@
+name: windows
+
+# The Windows installer (experimental). Runs only when started by hand —
+# `scripts/release.sh --windows` starts it for a release tag, waits, then
+# signs the installer for the in-app updater on the Mac (the update key never
+# leaves it) and attaches it to the GitHub release. Everything else about
+# releasing stays local; see site/README.md.
+#
+# PyInstaller can't cross-compile, so the AI engine has to be frozen on
+# Windows itself, which is why this one build runs in the cloud.
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Release tag (or any commit) to build
+        required: true
+
+jobs:
+  # The app's own tests on Windows, beside the installer build (not blocking
+  # it): the interface tests see Windows paths and CRLF checkouts, and the
+  # Rust tests are the only build of its `cfg(windows)` code before a PC runs
+  # it. The engine's tests run in the installer job, before it's frozen.
+  app-tests:
+    runs-on: windows-2022
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: windows-x64-tests
+      - run: pnpm install --frozen-lockfile
+      - name: Interface tests
+        run: pnpm test
+      # generate_context! embeds the built frontend (dist/) and the relay.
+      - name: Build the frontend
+        run: pnpm build
+      - name: Rust tests
+        working-directory: src-tauri
+        run: cargo test
+
+  installer:
+    runs-on: windows-2022
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: windows-x64
+      - uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Engine tests
+        working-directory: sidecar
+        # UTF-8 mode, as the frozen engine runs (sidecar.spec).
+        env:
+          PYTHONUTF8: "1"
+        run: uv run pytest -q
+
+      - name: Install the chord model (bundled into the engine; MIT)
+        run: uv run --project sidecar python scripts/setup_chord_model.py
+
+      - name: Freeze and verify the AI engine
+        run: uv run --project sidecar python scripts/build_sidecar.py --arch x86_64
+
+      # The same engine performance run the Mac builds do (scripts/perf_report.py):
+      # the fixture service through the frozen engine, sampled from outside.
+      # Reported on the run's summary page and in the artifact; only an extreme
+      # outlier or a crash fails it.
+      - name: Engine performance
+        run: uv run --project sidecar python scripts/perf_report.py --engine src-tauri/resources/sidecar/auto-presenter-sidecar.exe --label windows-x64-ci --out out
+
+      - name: Build the installer
+        # Official builds only: repository variables (Settings -> Secrets and
+        # variables -> Actions -> Variables). Unset, the build sends nothing.
+        env:
+          CHURCH_SLIDES_SENTRY_DSN: ${{ vars.CHURCH_SLIDES_SENTRY_DSN }}
+          VITE_CHURCH_SLIDES_STATS_URL: ${{ vars.CHURCH_SLIDES_STATS_URL }}
+        shell: bash
+        run: |
+          [[ -n "$CHURCH_SLIDES_SENTRY_DSN" ]] || unset CHURCH_SLIDES_SENTRY_DSN
+          pnpm tauri build --target x86_64-pc-windows-msvc --bundles nsis --config src-tauri/tauri.sidecar.conf.json
+
+      - name: Name it like the Mac installers
+        shell: bash
+        run: |
+          version=$(node -p 'require("./src-tauri/tauri.conf.json").version')
+          setup=$(ls src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*_"$version"_x64-setup.exe)
+          mkdir -p out
+          cp "$setup" out/Church-Slides-windows-setup.exe
+          echo "$version" > out/VERSION
+          ls -l out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: church-slides-windows
+          path: out/
+          if-no-files-found: error
+          retention-days: 14

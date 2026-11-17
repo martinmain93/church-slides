@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Changelog · Church Slides</title>
+  <meta name="description" content="What's new in each version of Church Slides, and downloads for older versions.">
+  <meta name="robots" content="noindex">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon.png">
+  <link rel="apple-touch-icon" href="icon.png">
+  <link rel="preload" href="fonts/fraunces-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <style>
+    /* Same look as index.html (no build step, so the styles are repeated). */
+    @font-face {
+      font-family: "Fraunces";
+      font-weight: 600;
+      font-style: normal;
+      font-display: swap;
+      src: url("fonts/fraunces-latin-600-normal.woff2") format("woff2");
+    }
+    :root {
+      color-scheme: dark;
+      --bg: #140e15;
+      --surface: #1e1620;
+      --text: #f1ebe4;
+      --muted: #a89c9f;
+      --border: #33283a;
+      --accent: #f6c453;
+      --accent-text: #221322;
+      --link: #f6c453;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    main { max-width: 720px; margin: 0 auto; padding: 56px 16px 80px; }
+    header { display: flex; gap: 20px; align-items: center; margin-bottom: 20px; }
+    header img { width: auto; height: 64px; flex-shrink: 0; }
+    header a { color: inherit; text-decoration: none; }
+    h1 { font-family: "Fraunces", Georgia, serif; font-weight: 600; letter-spacing: -0.01em; font-size: 2.25rem; line-height: 1.1; margin: 0; }
+    .tagline { color: var(--muted); margin: 4px 0 0; font-size: 1.05rem; }
+    .lede { margin: 0 0 32px; }
+    .release { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px 20px; margin-bottom: 16px; }
+    .release-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px; }
+    .release h2 { font-size: 1.25rem; margin: 0; }
+    .date { color: var(--muted); font-size: 0.9rem; }
+    .badge { display: inline-block; margin-left: 8px; padding: 1px 8px; border-radius: 999px; background: var(--accent); color: var(--accent-text); font-size: 0.75rem; font-weight: 600; vertical-align: middle; }
+    ul { padding-left: 20px; margin: 12px 0; }
+    li { margin-bottom: 6px; }
+    code { font-size: 0.9em; }
+    .downloads { margin: 0; font-size: 0.9rem; color: var(--muted); }
+    .dl { margin-left: 8px; }
+    .perf { margin: 0 0 12px; font-size: 0.9rem; }
+    .perf summary { cursor: pointer; color: var(--muted); }
+    .perf table { width: 100%; border-collapse: collapse; margin: 8px 0 4px; font-variant-numeric: tabular-nums; }
+    .perf th, .perf td { text-align: right; padding: 4px 6px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    .perf th:first-child { text-align: left; white-space: normal; }
+    .perf tr:first-child th { color: var(--muted); font-weight: 500; font-size: 0.8rem; }
+    .perf .machine { display: block; color: var(--muted); font-weight: 400; font-size: 0.75rem; }
+    .perf .warn { color: var(--accent); font-size: 0.75rem; font-weight: 600; margin-left: 4px; }
+    .perf-note { color: var(--muted); font-size: 0.8rem; margin: 4px 0 0; }
+    @media (max-width: 560px) { .perf { overflow-x: auto; } }
+    .exp { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--accent); margin-left: 4px; }
+    footer { margin-top: 48px; color: var(--muted); font-size: 0.9rem; }
+    footer a { color: inherit; }
+    a { color: var(--link); }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <a href="./"><img src="logo.svg" alt="" width="44" height="64"></a>
+    <div>
+      <h1><a href="./">Church Slides</a></h1>
+      <p class="tagline">Changelog and older versions</p>
+    </div>
+  </header>
+
+  <p class="lede">
+    What changed in each version. The app offers new versions itself when it opens, so most
+    people never need this page. If a new version gives you trouble before a service, download
+    the one you had before and drag it into Applications over the new one.
+  </p>
+
+  <!-- Filled from CHANGELOG.md by scripts/changelog.py when the site is built. -->
+  <div id="releases">
+    <!-- releases:start -->
+    <section class="release" id="v0.0.3">
+      <div class="release-head"><h2>0.0.3 <span class="badge">Latest</span></h2><span class="date">30 September 2026</span></div>
+      <ul>
+        <li>Send a setlist from one operator's laptop to another's over the local network.</li>
+      </ul>
+      <p class="downloads">Download 0.0.3: <a class="dl" href="https://github.com/martinmain93/church-slides-releases/releases/download/v0.0.3/Church-Slides-apple-silicon.dmg">Apple silicon</a> <a class="dl" href="https://github.com/martinmain93/church-slides-releases/releases/download/v0.0.3/Church-Slides-intel.dmg">Intel</a></p>
+    </section>
+    <section class="release" id="v0.0.2">
+      <div class="release-head"><h2>0.0.2</h2><span class="date">30 September 2026</span></div>
+      <ul>
+        <li>Each song's key is shown in its own colour on the leader sheets.</li>
+        <li>Features that aren't ready yet (scripture and spoken requests) are hidden.</li>
+      </ul>
+      <p class="downloads">Download 0.0.2: <a class="dl" href="https://github.com/martinmain93/church-slides-releases/releases/download/v0.0.2/Church-Slides-apple-silicon.dmg">Apple silicon</a> <a class="dl" href="https://github.com/martinmain93/church-slides-releases/releases/download/v0.0.2/Church-Slides-intel.dmg">Intel</a></p>
+    </section>
+    <section class="release" id="v0.0.1">
+      <div class="release-head"><h2>0.0.1</h2><span class="date">30 September 2026</span></div>
+      <ul>
+        <li>First preview release: slides that follow the band, a song library and setlists, operator and projector screens, band screens with chord charts, and display looks including a scrolling overhead-projector mode.</li>
+      </ul>
+      <p class="downloads">Download 0.0.1: <a class="dl" href="https://github.com/martinmain93/church-slides-releases/releases/download/v0.0.1/Church-Slides-apple-silicon.dmg">Apple silicon</a> <a class="dl" href="https://github.com/martinmain93/church-slides-releases/releases/download/v0.0.1/Church-Slides-intel.dmg">Intel</a></p>
+    </section>
+    <!-- releases:end -->
+  </div>
+
+  <footer><a href="./">Church Slides</a> · <a href="https://github.com/martinmain93/church-slides-releases/releases">All releases on GitHub</a> · <a href="privacy.html">Privacy</a> · <a href="terms.html">Terms of use</a></footer>
+</main>
+</body>
+</html>

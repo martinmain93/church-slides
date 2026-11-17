@@ -1,0 +1,9 @@
+{
+  "recording": "rec_20260818-213104_293",
+  "updates": 299,
+  "matcher_ms_mean": 2.498,
+  "matcher_ms_p95": 2.101,
+  "peak_live_states": 226,
+  "rss_mb": 168.2,
+  "wall_seconds": 0.91
+}

@@ -1,0 +1,158 @@
+{
+  "_comment": [
+    "Shared fixture for scripture anchor matching. Python resolves anchors when",
+    "it verifies a model's suggestions (auto_presenter/scripture/anchors.py);",
+    "TypeScript resolves them again at display time to build the track",
+    "(src/lib/scripture/anchor.ts). The two must agree, or a suggestion that",
+    "verified on save silently fails to appear on screen.",
+    "Asserted by sidecar/tests/scripture/test_anchor_parity.py and",
+    "src/__tests__/scriptureAnchor.test.ts."
+  ],
+  "normalize": [
+    {
+      "name": "plain",
+      "input": "Bless the Lord O my soul",
+      "expected": "bless the lord o my soul"
+    },
+    {
+      "name": "smart apostrophe folds to ascii",
+      "input": "And the river won’t take what I have",
+      "expected": "and the river won't take what i have"
+    },
+    {
+      "name": "straight apostrophe is unchanged",
+      "input": "And the river won't take what I have",
+      "expected": "and the river won't take what i have"
+    },
+    {
+      "name": "smart double quotes",
+      "input": "“Holy” is the cry",
+      "expected": "holy is the cry"
+    },
+    {
+      "name": "slash is a line break",
+      "input": "I will set my hope / On steady ground",
+      "expected": "i will set my hope on steady ground"
+    },
+    {
+      "name": "newline is a line break",
+      "input": "I will set my hope\nOn steady ground",
+      "expected": "i will set my hope on steady ground"
+    },
+    {
+      "name": "punctuation is dropped",
+      "input": "Death, where is your sting?!",
+      "expected": "death where is your sting"
+    },
+    {
+      "name": "runs of whitespace collapse",
+      "input": "  Morning   light upon\t the hills  ",
+      "expected": "morning light upon the hills"
+    },
+    {
+      "name": "digits survive",
+      "input": "10,000 reasons",
+      "expected": "10 000 reasons"
+    },
+    {
+      "name": "em dash is dropped",
+      "input": "Jesus — the name above",
+      "expected": "jesus the name above"
+    },
+    {
+      "name": "empty stays empty",
+      "input": "",
+      "expected": ""
+    },
+    {
+      "name": "punctuation only collapses to empty",
+      "input": "!!! ... ???",
+      "expected": ""
+    }
+  ],
+  "slides": [
+    { "slide_idx": 0, "lyrics": "", "section_key": "other:0" },
+    {
+      "slide_idx": 1,
+      "lyrics": "Morning light upon the hills\nwe wake and sing",
+      "section_key": "verse:1"
+    },
+    {
+      "slide_idx": 2,
+      "lyrics": "I will set my hope\nOn steady ground",
+      "section_key": "chorus:1"
+    },
+    {
+      "slide_idx": 3,
+      "lyrics": "And the river won’t take what I have",
+      "section_key": "verse:2"
+    },
+    {
+      "slide_idx": 4,
+      "lyrics": "I will set my hope\nOn steady ground",
+      "section_key": "chorus:1"
+    }
+  ],
+  "resolve": [
+    {
+      "name": "line in two places hits both",
+      "anchor": { "lyric": "I will set my hope" },
+      "expected": [2, 4]
+    },
+    {
+      "name": "every_repeat false takes the first only",
+      "anchor": { "lyric": "I will set my hope", "every_repeat": false },
+      "expected": [2]
+    },
+    {
+      "name": "straight apostrophe matches curly slide text",
+      "anchor": { "lyric": "And the river won't take what I have" },
+      "expected": [3]
+    },
+    {
+      "name": "curly apostrophe matches curly slide text",
+      "anchor": { "lyric": "And the river won’t take what I have" },
+      "expected": [3]
+    },
+    {
+      "name": "slash joined lines still anchor",
+      "anchor": { "lyric": "I will set my hope / On steady ground" },
+      "expected": [2, 4]
+    },
+    {
+      "name": "section key narrows nothing when the line is only there",
+      "anchor": { "lyric": "Morning light upon the hills", "section_key": "verse:1" },
+      "expected": [1]
+    },
+    {
+      "name": "stale section key widens rather than losing the anchor",
+      "anchor": { "lyric": "Morning light upon the hills", "section_key": "bridge:9" },
+      "expected": [1]
+    },
+    {
+      "name": "unmatched line resolves to nothing not slide zero",
+      "anchor": { "lyric": "a line from a different song entirely" },
+      "expected": []
+    },
+    {
+      "name": "section wide anchor covers the section",
+      "anchor": { "section_key": "chorus:1" },
+      "expected": [2, 4]
+    },
+    {
+      "name": "song wide anchor covers everything",
+      "anchor": {},
+      "expected": [0, 1, 2, 3, 4]
+    },
+    {
+      "name": "partial line matches the slide containing it",
+      "anchor": { "lyric": "Upon Your love" },
+      "expected": [2, 4]
+    },
+    {
+      "name": "empty lyric with unknown section matches nothing",
+      "anchor": { "section_key": "bridge:9" },
+      "expected": []
+    }
+  ]
+}

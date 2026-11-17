@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<set name="Sunday Hymns">
+  <slide_groups>
+  <slide_group name="Amazing Grace" type="song" presentation="V1 V2 V4" path="/"/>
+  <slide_group name="Welcome" type="custom"><slides><slide><body>Welcome</body></slide></slides></slide_group>
+  <slide_group name="Be Thou My Vision" type="song" presentation="" path="Favorites/"/>
+  <slide_group name="A Mighty Fortress is Our God" type="song" presentation="" path=""/>
+</slide_groups></set>

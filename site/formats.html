@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Import formats · Church Slides</title>
+  <meta name="description" content="The song files and presentation apps Church Slides can import from.">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon.png">
+  <link rel="apple-touch-icon" href="icon.png">
+  <!-- Keep in step with what the importers read: src/lib/chords/import/
+       and src/lib/otherApps/. -->
+  <style>
+    @font-face {
+      font-family: "Fraunces";
+      font-weight: 600;
+      font-style: normal;
+      font-display: swap;
+      src: url("fonts/fraunces-latin-600-normal.woff2") format("woff2");
+    }
+    :root {
+      color-scheme: dark;
+      --bg: #140e15;
+      --surface: #1e1620;
+      --text: #f1ebe4;
+      --muted: #a89c9f;
+      --border: #33283a;
+      --link: #f6c453;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    main { max-width: 720px; margin: 0 auto; padding: 56px 16px 80px; }
+    h1 { font-family: "Fraunces", Georgia, serif; font-weight: 600; letter-spacing: -0.01em; font-size: 2.25rem; line-height: 1.15; margin: 0 0 4px; }
+    h2 { font-size: 1.2rem; margin: 40px 0 12px; }
+    h3 { font-size: 1rem; margin: 24px 0 6px; }
+    p { margin: 0 0 12px; }
+    ul { padding-left: 20px; margin: 0 0 12px; }
+    li { margin-bottom: 6px; }
+    a { color: var(--link); }
+    .small { font-size: 0.9rem; color: var(--muted); }
+    .summary { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px; margin: 24px 0; }
+    .summary ul { margin: 0; }
+    .switch { color: var(--muted); font-size: 0.95rem; }
+    footer { margin-top: 64px; color: var(--muted); font-size: 0.9rem; }
+    footer a { color: inherit; }
+  </style>
+</head>
+<body>
+<main>
+  <p class="small"><a href="./">← Church Slides</a></p>
+  <h1>Import formats</h1>
+  <p class="small">What Church Slides can bring into your library</p>
+
+  <div class="summary">
+    <p><strong>Moving from another app?</strong> If ProPresenter, FreeShow, OpenLP or OpenSong is on the same computer,
+    open the Library, choose <strong>Import</strong>, and pick it at the top of the list. Your songs and recent services
+    come across together, and nothing in the other app is changed.</p>
+  </div>
+
+  <h2>Song files</h2>
+  <p>Library → Import → <strong>Song files</strong> or <strong>A whole folder</strong>, or drop files onto the Library.</p>
+  <ul>
+    <li><strong>PDF chord sheets</strong>, including SongSelect lead sheets</li>
+    <li><strong>ChordPro</strong> (.cho, .chopro, .chordpro, .pro) and <strong>OnSong</strong> (.onsong)</li>
+    <li><strong>OpenLyrics</strong> (.xml) — what OpenLP, Worship Extreme and others export</li>
+    <li><strong>OpenSong</strong> song files</li>
+    <li><strong>CCLI SongSelect</strong> downloads (.usr and .txt)</li>
+    <li><strong>Plain text</strong> — lyrics, or chords over lyrics, with section names like “Verse 1” and “Chorus”</li>
+  </ul>
+
+  <h2>From other presentation apps</h2>
+  <h3>ProPresenter</h3>
+  <ul>
+    <li>On the same computer: Import → <strong>From ProPresenter</strong> (version 22 and later).</li>
+    <li>Otherwise: in ProPresenter choose File → Export → <strong>Presentation…</strong> (a .pro file per song) or
+      <strong>Playlist…</strong> (.proplaylist — songs and running order together), then import the files.</li>
+    <li>Older versions: File → Export → <strong>Text</strong> gives an Export.txt with the whole library.</li>
+  </ul>
+  <h3>FreeShow</h3>
+  <p>On the same computer: Import → <strong>From FreeShow</strong>, with your projects as services.</p>
+  <h3>OpenLP</h3>
+  <ul>
+    <li>On the same computer: Import → <strong>From OpenLP</strong>.</li>
+    <li>Service files (.osz) import as a service with their songs. Songs exported as OpenLyrics import too.</li>
+  </ul>
+  <h3>OpenSong</h3>
+  <p>On the same computer: Import → <strong>From OpenSong</strong>, with your sets as services. Song files import directly.</p>
+  <h3>EasyWorship, Proclaim and others</h3>
+  <p>Export your songs as text or OpenLyrics if the app offers it, and import those files. Proclaim doesn’t export
+    songs; if they came from SongSelect, download them from SongSelect again.</p>
+
+  <h2>Something it can’t read?</h2>
+  <p>Connect an AI assistant (Settings → AI → AI assistants) and ask it to read the file into your library — it can
+    open nearly any format and adds songs through Church Slides’ own tools, so they arrive tidy and without duplicates.</p>
+  <p>Then tell us what the file was, with <strong>Send feedback</strong> in the app, so the next import just works.</p>
+
+  <footer>Church Slides · <a href="./">Download</a> · <a href="changelog.html">Changelog</a> · <a href="privacy.html">Privacy</a> · <a href="terms.html">Terms of use</a></footer>
+</main>
+</body>
+</html>

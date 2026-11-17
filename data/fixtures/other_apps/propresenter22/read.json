@@ -1,0 +1,197 @@
+{
+  "playlists": [
+    {
+      "items": [
+        {
+          "arrangement": null,
+          "document": "Libraries/Default/A Mighty Fortress is Our God.pro"
+        },
+        {
+          "arrangement": "656083D8-90A2-4CFF-B92F-EE122CAB2845",
+          "document": "Libraries/Default/Amazing Grace.pro"
+        },
+        {
+          "arrangement": null,
+          "document": "Libraries/Default/Be Thou My Vision.pro"
+        }
+      ],
+      "name": "Playlist"
+    }
+  ],
+  "presentations": [
+    {
+      "arrangements": [],
+      "ccli": {
+        "album": null,
+        "artist_credits": null,
+        "artwork": null,
+        "author": null,
+        "copyright_year": 0,
+        "display": false,
+        "publisher": null,
+        "song_number": 0,
+        "song_title": "Verse 1"
+      },
+      "groups": [
+        {
+          "id": "A2962B40-5AA2-4297-B3C6-0E21C09CA4AC",
+          "name": "Verse 1",
+          "slides": [
+            [
+              "{\\rtf1\\ansi\\ansicpg1252\\cocoartf2869\n\\cocoatextscaling0\\cocoaplatform0{\\fonttbl\\f0\\fnil\\fcharset0 HelveticaNeue;}\n{\\colortbl;\\red255\\green255\\blue255;\\red255\\green255\\blue255;}\n{\\*\\expandedcolortbl;;\\cssrgb\\c100000\\c100000\\c100000;}\n\\deftab1680\n\\pard\\pardeftab1680\\pardirnatural\\qc\\partightenfactor0\n\n\\f0\\fs84 \\cf2 \\CocoaLigature0 A mighty fortress is our God, a Bulwark never failing;\\\nOur Helper He amid the flood of mortal ills prevailing;\\\nFor still our ancient Foe doth seek to work us woe;\\\nHis craft and pow'r are great, and armed with cruel hate,\\\nOn earth is not his equal.}"
+            ]
+          ]
+        },
+        {
+          "id": "37B8B94A-E7F6-47A7-BACE-B3E54D044765",
+          "name": "Verse 2",
+          "slides": [
+            [
+              "{\\rtf1\\ansi\\ansicpg1252\\cocoartf2869\n\\cocoatextscaling0\\cocoaplatform0{\\fonttbl\\f0\\fnil\\fcharset0 HelveticaNeue;}\n{\\colortbl;\\red255\\green255\\blue255;\\red255\\green255\\blue255;}\n{\\*\\expandedcolortbl;;\\cssrgb\\c100000\\c100000\\c100000;}\n\\deftab1680\n\\pard\\pardeftab1680\\pardirnatural\\qc\\partightenfactor0\n\n\\f0\\fs84 \\cf2 \\CocoaLigature0 Did we in our own strength confide, our striving would be losing;\\\nWere not the right Man on our side, the Man of God's own choosing;\\\nDost ask who that may be: Christ Jesus it is He;\\\nLord Sabbaoth His name, from age to age the same,\\\nAnd He must win the battle.}"
+            ]
+          ]
+        },
+        {
+          "id": "8F3D1FB5-4BDD-4D90-A5FE-01E1F746FED2",
+          "name": "Verse 3",
+          "slides": [
+            [
+              "{\\rtf1\\ansi\\ansicpg1252\\cocoartf2869\n\\cocoatextscaling0\\cocoaplatform0{\\fonttbl\\f0\\fnil\\fcharset0 HelveticaNeue;}\n{\\colortbl;\\red255\\green255\\blue255;\\red255\\green255\\blue255;}\n{\\*\\expandedcolortbl;;\\cssrgb\\c100000\\c100000\\c100000;}\n\\deftab1680\n\\pard\\pardeftab1680\\pardirnatural\\qc\\partightenfactor0\n\n\\f0\\fs84 \\cf2 \\CocoaLigature0 And though this world with devils filled should threaten to undo us;\\\nWe will not fear for God hath willed His truth to triumph through us:\\\nThe prince of darkness grim, we tremble not for him;\\\nHis rage we can endure for lo, his doom is sure,\\\nOne little word shall fell him.}"
+            ]
+          ]
+        },
+        {
+          "id": "79E0859B-258C-47D6-9247-EC3D7279FEE7",
+          "name": "Verse 4",
+          "slides": [
+            [
+              "{\\rtf1\\ansi\\ansicpg1252\\cocoartf2869\n\\cocoatextscaling0\\cocoaplatform0{\\fonttbl\\f0\\fnil\\fcharset0 HelveticaNeue;}\n{\\colortbl;\\red255\\green255\\blue255;\\red255\\green255\\blue255;}\n{\\*\\expandedcolortbl;;\\cssrgb\\c100000\\c100000\\c100000;}\n\\deftab1680\n\\pard\\pardeftab1680\\pardirnatural\\qc\\partightenfactor0\n\n\\f0\\fs84 \\cf2 \\CocoaLigature0 That Word above all earthly pow'r, no thanks to them abideth;\\\nThe Spirit and the gifts are ours through Him who with us sideth;\\\nLet goods and kindred go, this mortal life also;\\\nThe body they may kill; God's truth abideth still,\\\nHis kingdom is forever!}"
+            ]
+          ]
+        }
+      ],
+      "path": "Default/A Mighty Fortress is Our God",
+      "selected_arrangement": null
+    },
+    {
+      "arrangements": [
+        {
+          "groups": [
+            "DA871B2C-7A78-4C9D-ADCA-BDF399208721",
+            "DF85642A-3F23-4BE1-BE2C-4C5B32151822",
+            "7136AC40-3F19-4399-8505-513B32D3BD78",
+            "263F8C74-8AAD-4406-A5F2-1A0746B7FB0E",
+            "DA871B2C-7A78-4C9D-ADCA-BDF399208721"
+          ],
+          "id": "656083D8-90A2-4CFF-B92F-EE122CAB2845",
+          "name": "Short"
+        }
+      ],
+      "ccli": {
+        "album": null,
+        "artist_credits": null,
+        "artwork": null,
+        "author": null,
+        "copyright_year": 0,
+        "display": false,
+        "publisher": null,
+        "song_number": 0,
+        "song_title": "Verse 1"
+      },
+      "groups": [
+        {
+          "id": "DA871B2C-7A78-4C9D-ADCA-BDF399208721",
+          "name": "Verse 1",
+          "slides": [
+            [
+              "{\\rtf1\\ansi\\ansicpg1252\\cocoartf2869\n\\cocoatextscaling0\\cocoaplatform0{\\fonttbl\\f0\\fnil\\fcharset0 HelveticaNeue;}\n{\\colortbl;\\red255\\green255\\blue255;\\red255\\green255\\blue255;}\n{\\*\\expandedcolortbl;;\\cssrgb\\c100000\\c100000\\c100000;}\n\\deftab1680\n\\pard\\pardeftab1680\\pardirnatural\\qc\\partightenfactor0\n\n\\f0\\fs84 \\cf2 \\CocoaLigature0 Amazing grace how sweet the sound that saved a wretch like me;\\\nI once was lost but now I'm found, was blind but now I see.}"
+            ]
+          ]
+        },
+        {
+          "id": "DF85642A-3F23-4BE1-BE2C-4C5B32151822",
+          "name": "Verse 2",
+          "slides": [
+            [
+              "{\\rtf1\\ansi\\ansicpg1252\\cocoartf2869\n\\cocoatextscaling0\\cocoaplatform0{\\fonttbl\\f0\\fnil\\fcharset0 HelveticaNeue;}\n{\\colortbl;\\red255\\green255\\blue255;\\red255\\green255\\blue255;}\n{\\*\\expandedcolortbl;;\\cssrgb\\c100000\\c100000\\c100000;}\n\\deftab1680\n\\pard\\pardeftab1680\\pardirnatural\\qc\\partightenfactor0\n\n\\f0\\fs84 \\cf2 \\CocoaLigature0 Twas grace that taught my heart to fear, and grace my fears relieved;\\\nHow precious did that grace appear the hour I first believed!}"
+            ]
+          ]
+        },
+        {
+          "id": "7136AC40-3F19-4399-8505-513B32D3BD78",
+          "name": "Verse 3",
+          "slides": [
+            [
+              "{\\rtf1\\ansi\\ansicpg1252\\cocoartf2869\n\\cocoatextscaling0\\cocoaplatform0{\\fonttbl\\f0\\fnil\\fcharset0 HelveticaNeue;}\n{\\colortbl;\\red255\\green255\\blue255;\\red255\\green255\\blue255;}\n{\\*\\expandedcolortbl;;\\cssrgb\\c100000\\c100000\\c100000;}\n\\deftab1680\n\\pard\\pardeftab1680\\pardirnatural\\qc\\partightenfactor0\n\n\\f0\\fs84 \\cf2 \\CocoaLigature0 Through many dangers, toils, and snares I have already come;\\\n'Tis grace that brought me safe thus far and grace will lead me home.}"
+            ]
+          ]
+        },
+        {
+          "id": "263F8C74-8AAD-4406-A5F2-1A0746B7FB0E",
+          "name": "Verse 4",
+          "slides": [
+            [
+              "{\\rtf1\\ansi\\ansicpg1252\\cocoartf2869\n\\cocoatextscaling0\\cocoaplatform0{\\fonttbl\\f0\\fnil\\fcharset0 HelveticaNeue;}\n{\\colortbl;\\red255\\green255\\blue255;\\red255\\green255\\blue255;}\n{\\*\\expandedcolortbl;;\\cssrgb\\c100000\\c100000\\c100000;}\n\\deftab1680\n\\pard\\pardeftab1680\\pardirnatural\\qc\\partightenfactor0\n\n\\f0\\fs84 \\cf2 \\CocoaLigature0 When we've been there ten thousand years bright shining as the sun;\\\nWe've no less days to sing God's praise than when we'd first begun!}"
+            ]
+          ]
+        }
+      ],
+      "path": "Default/Amazing Grace",
+      "selected_arrangement": null
+    },
+    {
+      "arrangements": [],
+      "ccli": {
+        "album": null,
+        "artist_credits": null,
+        "artwork": null,
+        "author": null,
+        "copyright_year": 0,
+        "display": false,
+        "publisher": null,
+        "song_number": 0,
+        "song_title": "Verse 1"
+      },
+      "groups": [
+        {
+          "id": "8D2874B6-48DB-46CB-B126-1A0DAD043ED6",
+          "name": "Verse 1",
+          "slides": [
+            [
+              "{\\rtf1\\ansi\\ansicpg1252\\cocoartf2869\n\\cocoatextscaling0\\cocoaplatform0{\\fonttbl\\f0\\fnil\\fcharset0 HelveticaNeue;}\n{\\colortbl;\\red255\\green255\\blue255;\\red255\\green255\\blue255;}\n{\\*\\expandedcolortbl;;\\cssrgb\\c100000\\c100000\\c100000;}\n\\deftab1680\n\\pard\\pardeftab1680\\pardirnatural\\qc\\partightenfactor0\n\n\\f0\\fs84 \\cf2 \\CocoaLigature0 Be Thou my Vision, O Lord of my heart,\\\nNaught be all else to me save that Thou art;\\\nThou my best thought by day or by night,\\\nWaking or sleeping, Thy presence my light.}"
+            ]
+          ]
+        },
+        {
+          "id": "364E66BF-E6CD-4871-B376-D754FE37D0C2",
+          "name": "Verse 2",
+          "slides": [
+            [
+              "{\\rtf1\\ansi\\ansicpg1252\\cocoartf2869\n\\cocoatextscaling0\\cocoaplatform0{\\fonttbl\\f0\\fnil\\fcharset0 HelveticaNeue;}\n{\\colortbl;\\red255\\green255\\blue255;\\red255\\green255\\blue255;}\n{\\*\\expandedcolortbl;;\\cssrgb\\c100000\\c100000\\c100000;}\n\\deftab1680\n\\pard\\pardeftab1680\\pardirnatural\\qc\\partightenfactor0\n\n\\f0\\fs84 \\cf2 \\CocoaLigature0 Be Thou my wisdom, be Thou my true Word,\\\nI ever with Thee and Thou with me, Lord;\\\nThou my great Father, and I thy true son,\\\nThou in me dwelling, and I with Thee one.}"
+            ]
+          ]
+        },
+        {
+          "id": "19BF871B-1EB5-4ED6-89ED-8681AB202E61",
+          "name": "Verse 3",
+          "slides": [
+            [
+              "{\\rtf1\\ansi\\ansicpg1252\\cocoartf2869\n\\cocoatextscaling0\\cocoaplatform0{\\fonttbl\\f0\\fnil\\fcharset0 HelveticaNeue;}\n{\\colortbl;\\red255\\green255\\blue255;\\red255\\green255\\blue255;}\n{\\*\\expandedcolortbl;;\\cssrgb\\c100000\\c100000\\c100000;}\n\\deftab1680\n\\pard\\pardeftab1680\\pardirnatural\\qc\\partightenfactor0\n\n\\f0\\fs84 \\cf2 \\CocoaLigature0 Riches I heed not, nor man's empty praise,\\\nThou mine Inheritance now and always;\\\nThou and Thou only, first in my heart,\\\nHigh King of heaven, my Treasure Thou art.}"
+            ]
+          ]
+        },
+        {
+          "id": "4F625159-9AD2-45BF-80C9-B25AC9790699",
+          "name": "Verse 4",
+          "slides": [
+            [
+              "{\\rtf1\\ansi\\ansicpg1252\\cocoartf2869\n\\cocoatextscaling0\\cocoaplatform0{\\fonttbl\\f0\\fnil\\fcharset0 HelveticaNeue;}\n{\\colortbl;\\red255\\green255\\blue255;\\red255\\green255\\blue255;}\n{\\*\\expandedcolortbl;;\\cssrgb\\c100000\\c100000\\c100000;}\n\\deftab1680\n\\pard\\pardeftab1680\\pardirnatural\\qc\\partightenfactor0\n\n\\f0\\fs84 \\cf2 \\CocoaLigature0 High King of heaven my victory won,\\\nMay I reach heaven's joys, O bright heav'n's Sun;\\\nHeart of my own heart, whatever befall,\\\nStill be my Vision, O Ruler of all.}"
+            ]
+          ]
+        }
+      ],
+      "path": "Default/Be Thou My Vision",
+      "selected_arrangement": null
+    }
+  ]
+}

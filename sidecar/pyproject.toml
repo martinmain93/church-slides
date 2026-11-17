@@ -1,0 +1,110 @@
+[project]
+name = "auto-presenter-sidecar"
+version = "0.0.1"
+description = "AI/ASR engine for Church Slides"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "websockets>=13.0",
+    "pydantic>=2.9",
+    "numpy>=2.4.4",
+    "faster-whisper>=1.2.1",
+    "sounddevice>=0.5.5",
+    "rapidfuzz>=3.10",
+    "metaphone>=0.6",
+    # Pronunciation dictionary. Double Metaphone reads spelling; this reads
+    # sound, which is what the matcher actually needs — see index/phonemic.py.
+    "certifi>=2024.2",
+    # Lead-sheet PDFs (auto_presenter/leadsheet): vector notation and text,
+    # read with pdfminer's content-stream interpreter. MIT; chosen over
+    # PyMuPDF, which reads the same primitives but is AGPL.
+    "pdfminer.six>=20250506",
+    # pdfminer pulls in cryptography (encrypted PDFs), whose 49+ ships no
+    # Intel-Mac wheel, so the Intel engine build would compile it from source
+    # and fail. 48.0.1 is universal2 (macOS 10.9+); uv resolves it for every Mac.
+    "cryptography<49; sys_platform == 'darwin' and platform_machine == 'x86_64'",
+    "sentry-sdk>=2.20",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.7",
+    "pyright>=1.1",
+    "pyinstaller>=6.10",
+    # scripts/perf_report.py samples the engine's CPU and memory from outside.
+    # Tooling only: the app never imports it, so the frozen engine doesn't ship it.
+    "psutil>=6.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project.optional-dependencies]
+# The fast channel, a parked spike (research/spikes/fast_channel): a
+# low-latency second listener that is no longer wired into the app. Kept out
+# of the base install because it ships its own onnxruntime binaries.
+# `research/spikes/fast_channel/setup_fast_channel.py` installs it with its model.
+fast = ["sherpa-onnx>=1.13"]
+
+# Whisper on Apple silicon's GPU. Optional because it only exists there —
+# `faster-whisper` stays the portable default. Worth having because
+# CTranslate2 has no Metal backend at all, so on an M1 the default runs CPU
+# float32 at ~1076 ms per 6 s window, which is slow enough that
+# `SlidingWindowWrapper`'s pacing rule rather than the configured step sets the
+# cadence. Measured on the seven approved goldens, identical windowing and
+# metrics: wrong-slide 0.330 -> 0.276 (better on 6/7, worse on none), cues
+# reached 89% -> 92%, median delay 1.4 s -> 0.8 s, at 1.69x realtime.
+#
+# `mlx-whisper` declares `torch` but never imports it on the inference path —
+# only `torch_whisper.py`, a checkpoint-conversion utility, does. Installing
+# this extra and then removing torch leaves it working at identical speed and
+# saves 526 MB, which is what keeps the no-PyTorch-at-runtime rule intact:
+#
+#     uv pip install -e ".[mlx]" && uv pip uninstall torch
+#
+# Same shape as `fast` above: a platform-specific extra a setup step installs,
+# not something the base install or PyInstaller has to carry.
+mlx = ["mlx-whisper>=0.4"]
+
+[tool.uv]
+# The frozen sidecar's minimum OS is the highest floor among its native wheels,
+# so the lock has to pick versions that still ship wheels for the oldest Macs we
+# support with AI: macOS 11 on both Intel and Apple silicon. Unconstrained, the
+# resolver picks onnxruntime 1.26 (no Intel wheel at all; Apple silicon needs
+# macOS 14) and av 17 (macOS 14 on Apple silicon) — which left every Intel Mac
+# and every Mac older than Sonoma unable to install the sidecar. Windows and
+# Linux keep the newer releases.
+#
+# onnxruntime isn't on the live path (only the chord model and the experimental
+# acoustic scorer use it); av is faster-whisper's file decoder.
+constraint-dependencies = [
+    "onnxruntime<1.20; sys_platform == 'darwin'",
+    "av<14.2; sys_platform == 'darwin'",  # 14.2 needs macOS 12; 14.3+ ships no Mac wheels
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["auto_presenter"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+# The lead-sheet reader came over from the music-only spike unchanged, and its
+# output is pinned bar for bar against nine real sheets (tests/leadsheet).
+# Its remaining findings are style (zip without strict=, closures in loops
+# called on the spot, a few dead locals); tidy them in a change of their own,
+# re-running that comparison, not mixed into one that moved it.
+"auto_presenter/leadsheet/omr.py" = ["B007", "B023", "B905", "E501", "E731", "F841", "RUF007", "RUF015"]
+# Same for the score unroller the follower ported from the spike (follower/score.py).
+"auto_presenter/follower/score.py" = ["RUF001", "RUF005"]

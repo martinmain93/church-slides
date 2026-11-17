@@ -1,0 +1,29 @@
+GCC runtime libraries bundled with numpy (and, on Apple silicon, scipy)
+
+numpy's macOS build includes three libraries from the GNU Compiler Collection
+as separate dynamic libraries, in numpy/.dylibs (and scipy/.dylibs):
+
+  libquadmath.0.dylib   GNU Lesser General Public License, version 2.1 or later
+  libgfortran.5.dylib   GNU General Public License, version 3, with the
+  libgcc_s.1.1.dylib    GCC Runtime Library Exception, version 3.1
+
+The licence texts are included in numpy's licence above.
+
+Source code. The source for these libraries is part of GCC, available from
+https://gcc.gnu.org (libquadmath is in the "libquadmath" directory of the GCC
+source tree). On request we will also provide, for at least three years from
+this release, a copy of the exact source used: write to
+martinmain93@gmail.com.
+
+Replacing libquadmath. You may replace it with your own version. In the app,
+it is at:
+
+  Church Slides.app/Contents/Resources/sidecar/_internal/numpy/.dylibs/libquadmath.0.dylib
+
+(and the same name under scipy/.dylibs on Apple silicon). Put your build in
+its place, then re-sign the app so macOS will open it, for example:
+
+  codesign --force --deep --sign - "Church Slides.app"
+
+Church Slides is distributed directly, not through the Mac App Store, and is
+signed ad hoc, so a re-signed copy runs the same way the original does.

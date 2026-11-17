@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Privacy · Church Slides</title>
+  <meta name="description" content="What Church Slides sends, where it goes, and how to turn it off.">
+  <meta name="robots" content="noindex">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon.png">
+  <link rel="apple-touch-icon" href="icon.png">
+  <!-- Keep in step with what the app sends: src/lib/usage.ts,
+       src-tauri/src/telemetry.rs, src-tauri/src/feedback.rs and stats/. -->
+  <style>
+    @font-face {
+      font-family: "Fraunces";
+      font-weight: 600;
+      font-style: normal;
+      font-display: swap;
+      src: url("fonts/fraunces-latin-600-normal.woff2") format("woff2");
+    }
+    :root {
+      color-scheme: dark;
+      --bg: #140e15;
+      --surface: #1e1620;
+      --text: #f1ebe4;
+      --muted: #a89c9f;
+      --border: #33283a;
+      --link: #f6c453;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    main { max-width: 720px; margin: 0 auto; padding: 56px 16px 80px; }
+    h1 { font-family: "Fraunces", Georgia, serif; font-weight: 600; letter-spacing: -0.01em; font-size: 2.25rem; line-height: 1.15; margin: 0 0 4px; }
+    h2 { font-size: 1.2rem; margin: 40px 0 12px; }
+    h3 { font-size: 1rem; margin: 24px 0 6px; }
+    p { margin: 0 0 12px; }
+    ul { padding-left: 20px; margin: 0 0 12px; }
+    li { margin-bottom: 6px; }
+    a { color: var(--link); }
+    .small { font-size: 0.9rem; color: var(--muted); }
+    .summary { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px; margin: 24px 0; }
+    .summary ul { margin: 0; }
+    .switch { color: var(--muted); font-size: 0.95rem; }
+    footer { margin-top: 64px; color: var(--muted); font-size: 0.9rem; }
+    footer a { color: inherit; }
+  </style>
+</head>
+<body>
+<main>
+  <p class="small"><a href="./">← Church Slides</a></p>
+  <h1>Privacy</h1>
+  <p class="small">Last updated 21 October 2026</p>
+
+  <p>
+    Church Slides is made by Martin Main, an individual developer in Nova Scotia, Canada. This page
+    explains what the app and this website send, where it goes, and how to turn it off. Martin is
+    responsible for privacy here; questions, or a request to see or delete your data:
+    <a href="mailto:martinmain93@gmail.com">martinmain93@gmail.com</a>.
+  </p>
+
+  <div class="summary">
+    <ul>
+      <li>Your songs, setlists, logs and any service recordings stay on your computer. The only exception is the short log extract in an error report (see below).</li>
+      <li>Audio from the microphone or sound desk is never sent to us.</li>
+      <li>The app doesn’t record services unless you turn recording on.</li>
+      <li>No advertising, no selling of data, and no cookies or tracking on this website.</li>
+      <li>The app asks before it sends us anything automatically, and you can change your mind in Settings &rarr; Privacy.</li>
+    </ul>
+  </div>
+
+  <h2>Who is responsible for what</h2>
+  <p>
+    For error reports, feedback, usage statistics and download counts, we decide what is collected
+    and why, so we are responsible for them. Everything else (your library, setlists, settings, the
+    app’s log, and any recordings) is held only on your church’s computers. Your church is
+    responsible for that, and we don’t receive it, apart from the log extract in an error report.
+  </p>
+
+  <h2>What the app sends</h2>
+
+  <h3>Error reports</h3>
+  <p>
+    When something goes wrong, the app sends a technical report so it can be fixed: the error, the
+    app’s version, the computer’s model, system version and chip, and the end of the app’s log. The
+    log can include song titles, lyrics and audio device names. Before a report leaves your
+    computer, the app is designed to remove anything said into the microphone, your user name, the computer’s
+    name, and people’s names in device names (such as “Sarah’s AirPods”). Reports carry a random
+    install number that doesn’t say who you are, plus a contact only if you type one in.
+  </p>
+  <p class="switch">The app asks when you first open it, with error reports ticked; you can untick it then, or turn it off any time in Settings &rarr; Privacy &rarr; Send error reports. Nothing is sent before you’ve answered.</p>
+
+  <h3>Usage statistics</h3>
+  <p>
+    Only if you say yes when the app asks. For each service: how long it ran, how many songs it had,
+    how long the AI was on, how many slide changes were made by the AI and how many by hand, and
+    which screen layout was used. Once a day: how many songs are in the library and whether the AI
+    could start. Never song titles, lyrics, setlist names, or anything typed or said.
+  </p>
+  <p>
+    With usage statistics on, the app’s update checks (when it opens, then once a day) also send a
+    random install number, the app’s version, and the computer’s system version and chip, so we
+    know how many installs are in use and which systems need supporting. Our server notes the country
+    a request comes from, but doesn’t keep your IP address. With it off, update checks still
+    happen but aren’t counted.
+  </p>
+  <p>
+    The install number isn’t your name or your church’s, but because it stays the same it is still
+    treated as personal data, and everything on this page applies to it.
+  </p>
+  <p class="switch">Off unless you agree. Change it any time: Settings &rarr; Privacy &rarr; Share usage statistics.</p>
+
+  <h3>Feedback</h3>
+  <p>
+    When you use Send feedback, we get your message, the email or church name you give (if any),
+    the install number, the app version and system details. For a problem report you can also
+    attach the app’s recent log, cleaned as described under error reports. Feedback is also
+    delivered to the developer’s email so we can reply.
+  </p>
+
+  <h2>Service recordings</h2>
+  <p>
+    The app can save a recording of each service (the audio, a transcript of what the AI heard,
+    and when each slide changed) to help tune the AI. It is off unless someone turns it on in
+    Settings &rarr; Developer tools, and the app explains what it captures before it starts. While it’s on,
+    the operator screen shows <strong>Recording</strong>. Recordings stay on your computer, are
+    never sent to us, and are deleted after 30 days unless you choose otherwise or approve one
+    in Developer tools to keep.
+  </p>
+  <p>
+    A recording picks up everything the microphone hears, which can include prayers, announcements,
+    visitors and children. If your church records, it is responsible for telling the people present
+    (for example on the service sheet or a notice at the door) and for following the recording and
+    privacy laws where you are.
+  </p>
+  <p>
+    The app turns speech into text to follow the songs. It doesn’t identify who is speaking or
+    create voiceprints.
+  </p>
+
+  <h2>Features that go online because you choose them</h2>
+  <p>
+    These go to other companies, not to us, and each is used only if you set it up. Where your church
+    uses them, your church is that company’s customer and is responsible for telling the people
+    present if live audio leaves the building.
+  </p>
+  <ul>
+    <li><strong>Speech model download.</strong> The AI’s speech model is downloaded once from
+      Hugging Face, which sees your computer’s internet address.</li>
+    <li><strong>Adding hymns.</strong> Library → Add hymns fetches hymns from the Open Hymnal
+      Project (openhymnal.org), which sees your computer’s internet address.</li>
+    <li><strong>Online speech or AI services.</strong> If you enter your own API key for an online
+      service (such as Groq), live audio or the text the AI heard goes to that service under your
+      account and its terms. So, in the song editor, do the words and chords of the song you’re
+      charting when you ask for chord suggestions, and your recording when you use Voice. Keys are
+      stored unencrypted in the app’s folder on your computer.</li>
+    <li><strong>AI assistants.</strong> If you connect Claude or another assistant to your library,
+      the songs and setlists it reads go to that assistant’s provider under your own account.</li>
+    <li><strong>Online band screens.</strong> These run in your church’s own Cloudflare account,
+      not ours.</li>
+    <li><strong>Band screens and setlist sharing on your network.</strong> These talk directly
+      between computers on your church’s network and don’t go through us.</li>
+  </ul>
+
+  <h2>This website and downloads</h2>
+  <p>
+    The download buttons pass through our server, which counts each download: which installer, the
+    country it came from, whether it was a Mac or Windows browser, and the site that linked to us.
+    It doesn’t keep IP addresses. The installers and updates themselves come from GitHub, which
+    sees your internet address as any website does. The site sets no cookies and runs no analytics
+    scripts. Our host, Netlify, keeps standard web server logs.
+  </p>
+
+  <h2>Where it goes, and for how long</h2>
+  <ul>
+    <li><strong>Error reports and feedback:</strong> <a href="https://sentry.io/privacy/">Sentry</a>,
+      in the United States, kept for Sentry’s standard retention period.</li>
+    <li><strong>Feedback emails:</strong> the developer’s email (Google), kept as long as it’s useful
+      for helping you; ask and we’ll delete it.</li>
+    <li><strong>Usage statistics and download counts:</strong> our own server on
+      <a href="https://www.cloudflare.com/privacypolicy/">Cloudflare</a>, under Cloudflare’s data
+      processing terms. Kept for up to two years, then deleted automatically.</li>
+  </ul>
+  <p>
+    This means some data is stored outside Canada, where it can be accessed by courts and
+    authorities under that country’s laws.
+  </p>
+  <p>
+    Only people working on Church Slides have access to this data. Sentry, Google and Cloudflare store it for us
+    under their data processing terms and don’t use it for themselves. It’s used to fix problems
+    and decide what to build next, and never for anything else.
+  </p>
+
+  <h2>Your choices and rights</h2>
+  <p>
+    Each kind of automatic sending has its own switch in Settings &rarr; Privacy, and changes take effect
+    straight away. Error reports are on unless you turn them off, after the app has told you about
+    them; usage statistics are sent only if you say yes. You can change either at any time. Feedback
+    is sent because you choose to send it. Download counts hold
+    nothing that identifies you.
+  </p>
+  <p>
+    You can ask to see or delete what we hold about your install: use <strong>Ask for my
+    data to be deleted</strong> at the bottom of Settings &rarr; Privacy, or email us your install
+    number (shown in the same place). We’ll delete what we can find linked to that number and
+    reply within 30 days. Standard server logs kept by our hosts can’t be searched by install
+    number.
+  </p>
+  <p>
+    If you’re not satisfied with our answer, you can complain to the
+    <a href="https://www.priv.gc.ca/en/report-a-concern/">Office of the Privacy Commissioner of Canada</a>,
+    or in Quebec, the <a href="https://www.cai.gouv.qc.ca/">Commission d’accès à l’information</a>.
+    If you’re in the UK or EU, you can also complain to your data protection authority.
+  </p>
+
+  <h2>Children</h2>
+  <p>Church Slides is made for church teams, not for children, and we don’t knowingly collect anything from children.</p>
+
+  <h2>Changes</h2>
+  <p>If this changes, we’ll update this page and the date at the top. We’ll mention significant changes in the <a href="changelog.html">changelog</a>.</p>
+
+  <footer>Church Slides · <a href="./">Download</a> · <a href="changelog.html">Changelog</a> · <a href="terms.html">Terms of use</a></footer>
+</main>
+</body>
+</html>

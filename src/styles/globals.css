@@ -1,0 +1,257 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
+    --primary: 240 5.9% 10%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 240 5.9% 10%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 255 18% 5.5%;
+    --foreground: 38 33% 96%;
+    --card: 255 16% 8%;
+    --card-foreground: 38 33% 96%;
+    --popover: 255 16% 8%;
+    --popover-foreground: 38 33% 96%;
+    --primary: 38 40% 96%;
+    --primary-foreground: 255 18% 7%;
+    --secondary: 255 12% 15.5%;
+    --secondary-foreground: 38 33% 96%;
+    --muted: 255 12% 14.5%;
+    --muted-foreground: 250 8% 66%;
+    --accent: 255 14% 17.5%;
+    --accent-foreground: 38 33% 96%;
+    --destructive: 0 62.8% 35%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 255 12% 17.5%;
+    --input: 255 12% 17.5%;
+    --ring: 38 92% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+  /* The app is always dark: say so, so WebKit draws its native parts
+     (menus, scrollbars, form controls) dark on every macOS version rather
+     than in its light default. */
+  .dark {
+    color-scheme: dark;
+  }
+}
+
+/* Native form controls look the same on every Mac, iPad, iPhone, and Android.
+   Newer macOS WebKit draws native <select>, <input type="checkbox">,
+   <input type="radio">, and <input type="range"> with a 3D metallic gradient
+   bezel and OS-specific system accent colours where older systems drew them
+   flat. Stripping native appearance here ensures deterministic rendering
+   across all devices. */
+@layer base {
+  select:not([multiple]):not([size]) {
+    background-color: hsl(var(--background));
+    border: 1px solid hsl(var(--border));
+    color: hsl(var(--foreground));
+  }
+
+  input[type="checkbox"] {
+    width: 1rem;
+    height: 1rem;
+    flex-shrink: 0;
+    border-radius: 0.25rem;
+    border: 1px solid hsl(var(--border));
+    background-color: hsl(var(--background));
+    cursor: pointer;
+    vertical-align: middle;
+  }
+
+  input[type="radio"] {
+    width: 1rem;
+    height: 1rem;
+    flex-shrink: 0;
+    border-radius: 9999px;
+    border: 1px solid hsl(var(--border));
+    background-color: hsl(var(--background));
+    cursor: pointer;
+    vertical-align: middle;
+  }
+}
+
+select:not([multiple]):not([size]) {
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a1a1aa' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 15 5 5 5-5'/%3E%3Cpath d='m7 9 5-5 5 5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.5rem center;
+  background-size: 1rem 1rem;
+  /* room for the chevron; a utility's px-* would otherwise sit under it */
+  padding-right: 2rem !important;
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+  -webkit-appearance: none;
+  appearance: none;
+  background-origin: border-box;
+  user-select: none;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+input[type="checkbox"]:hover:not(:disabled),
+input[type="radio"]:hover:not(:disabled) {
+  border-color: hsl(var(--muted-foreground));
+}
+
+input[type="checkbox"]:focus-visible,
+input[type="radio"]:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+input[type="checkbox"]:checked {
+  background-color: #10b981;
+  border-color: #10b981;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%2309090b' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 8.5 6.5 11.5 12.5 4.5'/%3E%3C/svg%3E");
+  background-size: 100% 100%;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+input[type="radio"]:checked {
+  background-color: #10b981;
+  border-color: #10b981;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='3.5' fill='%2309090b'/%3E%3C/svg%3E");
+  background-size: 100% 100%;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+input[type="checkbox"]:disabled,
+input[type="radio"]:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 0.375rem;
+  border-radius: 9999px;
+  background: hsl(var(--muted));
+  border: 1px solid hsl(var(--border));
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 0.875rem;
+  height: 0.875rem;
+  border-radius: 9999px;
+  background: hsl(var(--foreground));
+  border: 2px solid hsl(var(--background));
+  margin-top: -0.3125rem;
+}
+
+@keyframes ai-card-glow {
+  0% {
+    opacity: 0;
+    box-shadow: inset 0 0 0 0 rgba(251, 191, 36, 0);
+  }
+  15% {
+    opacity: 1;
+  }
+  40% {
+    box-shadow:
+      inset 0 0 0 2px rgba(251, 191, 36, 0.9),
+      0 0 28px rgba(251, 191, 36, 0.45);
+  }
+  100% {
+    opacity: 0;
+    box-shadow: inset 0 0 0 0 rgba(251, 191, 36, 0);
+  }
+}
+
+@keyframes ai-spark {
+  0% {
+    opacity: 0;
+    transform: scale(0.4) translateY(6px);
+  }
+  20% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.75) translateY(-12px);
+  }
+}
+
+.ai-change-glow {
+  animation: ai-card-glow 1.8s ease-out forwards;
+}
+
+.ai-spark {
+  animation: ai-spark 1.8s ease-out forwards;
+  filter: drop-shadow(0 0 6px rgba(251, 191, 36, 0.85));
+}
+
+.ai-spark-late {
+  animation-delay: 0.12s;
+}
+
+.ai-spark-end {
+  animation-delay: 0.22s;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+/* Band screen windows on the operator's monitors hide an idle pointer (BandView). */
+.cursor-hidden,
+.cursor-hidden * {
+  cursor: none !important;
+}
+
+/* A setlist's slide grid (builder and live view). Columns follow the pane's
+   own width, not the window's — the side panels eat most of it — so a slide
+   is never narrower than 15rem, with 2 to 4 columns. */
+.slide-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(min(max(15rem, calc((100% - 2.25rem) / 4)), calc((100% - 0.75rem) / 2)), 1fr)
+  );
+}

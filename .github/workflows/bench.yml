@@ -1,0 +1,130 @@
+name: bench
+
+# How fast this Windows machine runs what live following asks of Whisper
+# (scripts/bench_whisper.py): transcription passes, short-context passes, and
+# span scoring on CTranslate2 and on ONNX Runtime. Runs only when started by
+# hand (scripts/bench_windows.sh starts it, waits, and prints the table).
+# GitHub's Windows runner is a modest 4-core cloud machine with no GPU: a
+# floor for a church PC, not a ceiling. Nothing here builds or ships the app.
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Commit, branch or tag to measure
+        required: true
+        default: main
+      models:
+        description: Whisper models, comma-separated
+        required: true
+        default: tiny.en,base.en,small.en
+      jobs:
+        description: What to run
+        type: choice
+        options: [both, machine-check, bench]
+        default: both
+
+jobs:
+  whisper:
+    if: inputs.jobs != 'machine-check'
+    runs-on: windows-2022
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: This machine
+        shell: pwsh
+        run: |
+          Get-CimInstance Win32_Processor | Select-Object Name, NumberOfCores, NumberOfLogicalProcessors | Format-List
+          "{0:N1} GB memory" -f ((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB)
+
+      # Torch is for the export only, in its own throwaway environment: never
+      # the engine's (sidecar/), never the app.
+      - name: Export the ONNX span scorer
+        env:
+          PYTHONUTF8: "1"
+          MODELS: ${{ inputs.models }}
+        shell: bash
+        run: |
+          uv run --no-project --with "torch==2.5.1" --with "transformers==4.46.3" \
+            --with "onnx==1.17.0" --with "onnxruntime==1.19.2" --with soundfile \
+            python scripts/export_whisper_scorer_onnx.py --int8 ${MODELS//,/ }
+
+      - name: Benchmark
+        env:
+          PYTHONUTF8: "1"
+          MODELS: ${{ inputs.models }}
+        shell: bash
+        run: |
+          mkdir -p out
+          uv run --project sidecar --with soundfile python scripts/bench_whisper.py --engines ct2,onnx \
+            --models "$MODELS" --out out/bench-windows-x64-ci.json | tee out/bench.txt
+          echo "--- int8 ONNX scorer ---" | tee -a out/bench.txt
+          uv run --project sidecar --with soundfile python scripts/bench_whisper.py --engines onnx --onnx-variant int8 \
+            --models "$MODELS" --out out/bench-windows-x64-ci-int8.json | tee -a out/bench.txt
+          {
+            echo '### Whisper on this runner'
+            echo '```'
+            cat out/bench.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bench-windows
+          path: out/
+          if-no-files-found: error
+          retention-days: 30
+
+  # The verdict the app itself would reach on this runner: the engine's
+  # machine check (scripts/machine_check.py), with the speech model and the
+  # pinned scorer fetched the way the app fetches them.
+  machine-check:
+    if: inputs.jobs != 'bench'
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: This machine
+        shell: pwsh
+        run: |
+          Get-CimInstance Win32_Processor | Select-Object Name, NumberOfCores, NumberOfLogicalProcessors | Format-List
+          "{0:N1} GB memory" -f ((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB)
+
+      - name: Chord model
+        env:
+          PYTHONUTF8: "1"
+        shell: bash
+        run: uv run --project sidecar python scripts/setup_chord_model.py
+
+      - name: Machine check
+        env:
+          PYTHONUTF8: "1"
+        shell: bash
+        run: |
+          mkdir -p out
+          uv run --project sidecar python scripts/machine_check.py --out out/machine-check.json | tee out/machine-check.txt
+          {
+            echo '### Machine check on this runner'
+            echo '```'
+            cat out/machine-check.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: machine-check-windows
+          path: out/
+          if-no-files-found: error
+          retention-days: 30

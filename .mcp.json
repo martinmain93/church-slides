@@ -1,0 +1,26 @@
+{
+  "mcpServers": {
+    "auto-presenter-dev": {
+      "type": "stdio",
+      "command": "uv",
+      "args": [
+        "run",
+        "--project",
+        "sidecar",
+        "python",
+        "-m",
+        "auto_presenter.dev.mcp"
+      ],
+      "env": {}
+    },
+    "tauri": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@hypothesi/tauri-mcp-server"
+      ],
+      "env": {}
+    }
+  }
+}

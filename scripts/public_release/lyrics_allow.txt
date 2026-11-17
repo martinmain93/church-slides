@@ -1,0 +1,19 @@
+# Phrases the lyric scan may find, reviewed and allowed: every 7-word run
+# inside a line here is skipped. Lowercase, as the scan prints them.
+# Add a line only after checking the words are public domain, scripture, a
+# song title, or the project's own.
+
+# Public-domain hymns (the library has modern songs that quote them)
+i will ever love and trust him
+the world behind me the cross before me
+it is well it is well with my soul
+# Song titles
+i could sing of your love forever
+this is how i fight my battles
+# Scripture (Revelation 5:12)
+worthy is the lamb who was slain
+# The project's own recording (data/fixtures/perf), by its songwriter
+can stand in the way of the
+no sin and no force of darkness
+# Generic phrases
+we want to see we want to see

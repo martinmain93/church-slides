@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "composite": true,
+    "skipLibCheck": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    // Emit (composite projects must) into an ignored folder, not beside
+    // vite.config.ts: Vite loads vite.config.js ahead of .ts, so a compiled
+    // copy there silently replaces the real config until the next `tsc -b`.
+    "outDir": "./.tsbuild/node",
+    "tsBuildInfoFile": "./.tsbuild/tsconfig.node.tsbuildinfo"
+  },
+  "include": ["vite.config.ts"]
+}

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Merged into the bundle's Info.plist by `tauri build`. -->
+<plist version="1.0">
+<dict>
+	<!-- Live AI listens to the band. The AI engine is a child process, but macOS
+	     attributes its microphone use to this app, and without this string a
+	     signed build is denied the microphone (or killed) rather than asked. -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Church Slides listens to the music so live AI can follow the song and change slides for you. Audio stays on this computer.</string>
+	<!-- Band screens: phones and tablets on the same Wi-Fi connect to this Mac. -->
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Church Slides shares chord charts and lyrics with band members' phones and tablets, and finds other Church Slides computers to send setlists to, on your network.</string>
+	<!-- Operator-to-operator setlist transfer announces and looks for this. -->
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_churchslides._tcp</string>
+	</array>
+</dict>
+</plist>

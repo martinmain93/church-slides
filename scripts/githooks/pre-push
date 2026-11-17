@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Pushing a `v*` tag releases it: builds both installers, publishes them and
+# redeploys the download page (scripts/release.sh). If the release fails, the
+# push is refused, so a tag on GitHub always has installers behind it.
+#
+# Enable once per clone:   git config core.hooksPath scripts/githooks
+# Push without releasing:  git push --no-verify ...
+set -euo pipefail
+
+zero=0000000000000000000000000000000000000000
+tags=()
+while read -r local_ref local_sha remote_ref _remote_sha; do
+  [[ "$local_sha" == "$zero" ]] && continue          # deleting a ref
+  [[ "$remote_ref" == refs/tags/v* ]] && tags+=("${remote_ref#refs/tags/}")
+done
+
+[[ ${#tags[@]} -eq 0 ]] && exit 0
+[[ ${#tags[@]} -gt 1 ]] && { echo "pre-push: push one release tag at a time (${tags[*]})" >&2; exit 1; }
+
+tag="${tags[0]}"
+if [[ "$(git rev-parse "$tag^{commit}")" != "$(git rev-parse HEAD)" ]]; then
+  echo "pre-push: check out $tag before pushing it; the release builds the working tree" >&2
+  exit 1
+fi
+
+echo "pre-push: releasing $tag (this takes a while; --no-verify skips it)"
+exec "$(git rev-parse --show-toplevel)/scripts/release.sh" </dev/null

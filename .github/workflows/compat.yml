@@ -1,0 +1,130 @@
+name: compat
+
+# Does the app build, start and run on every OS it ships to? `ci.yml` only
+# runs on Linux, and nearly every compatibility bug found in the 2026-09 review
+# was invisible there: a Unix-only import that stopped the sidecar starting on
+# Windows, a liveness check that would have killed the app on Windows, a lock
+# that couldn't install on any Intel Mac, and a frozen engine that needed
+# macOS 26 because of the interpreter it was built with.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  # The lock must keep shipping wheels for every AI platform at its oldest
+  # supported version. Cheap, and it catches a `uv lock --upgrade` that
+  # quietly drops Intel Macs or macOS 11.
+  sidecar-wheels:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - run: uv run --project sidecar python scripts/check_sidecar_wheels.py
+
+  # The Python tests on each OS the sidecar runs on.
+  sidecar-tests:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, windows-2022, ubuntu-22.04]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+      - name: PortAudio (Linux has no bundled copy)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libportaudio2
+      - name: pytest
+        working-directory: sidecar
+        run: uv run pytest -q
+
+  # Freeze the engine, verify it (self-check, real transcription, start/stop
+  # with its parent), bundle it into the app, and upload the installers.
+  # Intel Macs are built on the Apple-silicon runner under Rosetta — the same
+  # path that was verified by hand.
+  app:
+    needs: [sidecar-wheels]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: macos-14, arch: aarch64, rust_target: aarch64-apple-darwin, name: macos-apple-silicon }
+          - { os: macos-14, arch: x86_64, rust_target: x86_64-apple-darwin, name: macos-intel }
+          - { os: windows-2022, arch: x86_64, rust_target: x86_64-pc-windows-msvc, name: windows-x64 }
+          - { os: ubuntu-22.04, arch: x86_64, rust_target: x86_64-unknown-linux-gnu, name: linux-x64 }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: ${{ matrix.name }}
+      - uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: System libraries (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev \
+            librsvg2-dev patchelf libsoup-3.0-dev libjavascriptcoregtk-4.1-dev \
+            build-essential libportaudio2
+
+      - run: pnpm install --frozen-lockfile=false
+
+      - name: Install the chord model (bundled into the engine; MIT)
+        run: uv run --project sidecar python scripts/setup_chord_model.py
+
+      - name: Freeze and verify the AI engine
+        run: uv run --project sidecar python scripts/build_sidecar.py --arch ${{ matrix.arch }}
+
+      - name: Build the app with the engine
+        run: pnpm tauri build --target ${{ matrix.rust_target }} --config src-tauri/tauri.sidecar.conf.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: church-slides-${{ matrix.name }}
+          path: |
+            src-tauri/target/${{ matrix.rust_target }}/release/bundle/**/*.dmg
+            src-tauri/target/${{ matrix.rust_target }}/release/bundle/**/*.msi
+            src-tauri/target/${{ matrix.rust_target }}/release/bundle/**/*-setup.exe
+            src-tauri/target/${{ matrix.rust_target }}/release/bundle/**/*.AppImage
+            src-tauri/target/${{ matrix.rust_target }}/release/bundle/**/*.deb
+          if-no-files-found: error
+
+  # The web views we ship to are older than the browsers we develop in:
+  # Safari 14 on a macOS 10.15/11 Mac, and whatever phones the band brings.
+  # `browserslist` in package.json is the floor; this fails on APIs below it.
+  frontend-compat:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Browser-API compatibility (eslint-plugin-compat)
+        # AudioContext is listed as polyfilled in the config: both uses fall
+        # back to webkitAudioContext, which the rule can't see.
+        run: >
+          npx --yes -p eslint@8 -p eslint-plugin-compat@6
+          -p @typescript-eslint/parser@7 -p typescript@5.7
+          eslint --no-eslintrc --no-inline-config -c scripts/compat.eslintrc.json
+          --ext .ts,.tsx --ignore-pattern "__tests__" src

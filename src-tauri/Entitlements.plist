@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Hardened-runtime entitlements for the signed app and the bundled AI engine
+     (scripts/build_sidecar.py signs the engine with this same file). -->
+<plist version="1.0">
+<dict>
+	<!-- The microphone, for live AI. -->
+	<key>com.apple.security.device.audio-input</key>
+	<true/>
+	<!-- The engine's audio input goes through cffi callbacks (sounddevice),
+	     which need writable+executable memory under the hardened runtime. -->
+	<key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+	<true/>
+	<!-- The engine loads native libraries shipped inside third-party wheels
+	     (CTranslate2, onnxruntime, PortAudio, FFmpeg), which aren't signed by
+	     this app's team. -->
+	<key>com.apple.security.cs.disable-library-validation</key>
+	<true/>
+</dict>
+</plist>

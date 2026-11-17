@@ -1,0 +1,505 @@
+[
+  {
+    "name": "basic_three_section_song",
+    "slides": [
+      {
+        "section": {
+          "type": "verse",
+          "number": 1
+        },
+        "order_in_song": 0,
+        "order_in_section": 0,
+        "lyrics": "Amazing grace how sweet the sound\nThat saved a wretch like me",
+        "words": [
+          "amazing",
+          "grace",
+          "how",
+          "sweet",
+          "the",
+          "sound",
+          "that",
+          "saved",
+          "a",
+          "wretch",
+          "like",
+          "me"
+        ]
+      },
+      {
+        "section": {
+          "type": "chorus",
+          "number": 1
+        },
+        "order_in_song": 1,
+        "order_in_section": 0,
+        "lyrics": "Grace upon grace now covers me\nMy shepherd and my Savior leads me home",
+        "words": [
+          "grace",
+          "upon",
+          "grace",
+          "now",
+          "covers",
+          "me",
+          "my",
+          "shepherd",
+          "and",
+          "my",
+          "savior",
+          "leads",
+          "me",
+          "home"
+        ]
+      },
+      {
+        "section": {
+          "type": "verse",
+          "number": 2
+        },
+        "order_in_song": 2,
+        "order_in_section": 0,
+        "lyrics": "'Twas grace that taught my heart to fear\nAnd grace my fears relieved",
+        "words": [
+          "twas",
+          "grace",
+          "that",
+          "taught",
+          "my",
+          "heart",
+          "to",
+          "fear",
+          "and",
+          "grace",
+          "my",
+          "fears",
+          "relieved"
+        ]
+      }
+    ],
+    "section_order": [
+      {
+        "type": "verse",
+        "number": 1
+      },
+      {
+        "type": "chorus",
+        "number": 1
+      },
+      {
+        "type": "verse",
+        "number": 2
+      }
+    ]
+  },
+  {
+    "name": "blank_lines_split_within_section",
+    "slides": [
+      {
+        "section": {
+          "type": "verse",
+          "number": 1
+        },
+        "order_in_song": 0,
+        "order_in_section": 0,
+        "lyrics": "Slide one line one\nSlide one line two",
+        "words": [
+          "slide",
+          "one",
+          "line",
+          "one",
+          "slide",
+          "one",
+          "line",
+          "two"
+        ]
+      },
+      {
+        "section": {
+          "type": "verse",
+          "number": 1
+        },
+        "order_in_song": 1,
+        "order_in_section": 1,
+        "lyrics": "Slide two line one\nSlide two line two",
+        "words": [
+          "slide",
+          "two",
+          "line",
+          "one",
+          "slide",
+          "two",
+          "line",
+          "two"
+        ]
+      }
+    ],
+    "section_order": [
+      {
+        "type": "verse",
+        "number": 1
+      }
+    ]
+  },
+  {
+    "name": "implicit_break_on_section_tag",
+    "slides": [
+      {
+        "section": {
+          "type": "verse",
+          "number": 1
+        },
+        "order_in_song": 0,
+        "order_in_section": 0,
+        "lyrics": "Verse line",
+        "words": [
+          "verse",
+          "line"
+        ]
+      },
+      {
+        "section": {
+          "type": "chorus",
+          "number": 1
+        },
+        "order_in_song": 1,
+        "order_in_section": 0,
+        "lyrics": "Chorus line",
+        "words": [
+          "chorus",
+          "line"
+        ]
+      }
+    ],
+    "section_order": [
+      {
+        "type": "verse",
+        "number": 1
+      },
+      {
+        "type": "chorus",
+        "number": 1
+      }
+    ]
+  },
+  {
+    "name": "smart_quotes",
+    "slides": [
+      {
+        "section": {
+          "type": "verse",
+          "number": 1
+        },
+        "order_in_song": 0,
+        "order_in_section": 0,
+        "lyrics": "'Tis grace",
+        "words": [
+          "tis",
+          "grace"
+        ]
+      }
+    ],
+    "section_order": [
+      {
+        "type": "verse",
+        "number": 1
+      }
+    ]
+  },
+  {
+    "name": "windows_line_endings",
+    "slides": [
+      {
+        "section": {
+          "type": "verse",
+          "number": 1
+        },
+        "order_in_song": 0,
+        "order_in_section": 0,
+        "lyrics": "Line one\nLine two",
+        "words": [
+          "line",
+          "one",
+          "line",
+          "two"
+        ]
+      }
+    ],
+    "section_order": [
+      {
+        "type": "verse",
+        "number": 1
+      }
+    ]
+  },
+  {
+    "name": "content_before_any_tag",
+    "slides": [
+      {
+        "section": {
+          "type": "other",
+          "number": 1
+        },
+        "order_in_song": 0,
+        "order_in_section": 0,
+        "lyrics": "Some intro text\nthat nobody tagged",
+        "words": [
+          "some",
+          "intro",
+          "text",
+          "that",
+          "nobody",
+          "tagged"
+        ]
+      },
+      {
+        "section": {
+          "type": "verse",
+          "number": 1
+        },
+        "order_in_song": 1,
+        "order_in_section": 0,
+        "lyrics": "Verse content",
+        "words": [
+          "verse",
+          "content"
+        ]
+      }
+    ],
+    "section_order": [
+      {
+        "type": "other",
+        "number": 1
+      },
+      {
+        "type": "verse",
+        "number": 1
+      }
+    ]
+  },
+  {
+    "name": "empty_section_tag_skipped",
+    "slides": [
+      {
+        "section": {
+          "type": "chorus",
+          "number": 1
+        },
+        "order_in_song": 0,
+        "order_in_section": 0,
+        "lyrics": "Chorus content",
+        "words": [
+          "chorus",
+          "content"
+        ]
+      }
+    ],
+    "section_order": [
+      {
+        "type": "verse",
+        "number": 1
+      },
+      {
+        "type": "chorus",
+        "number": 1
+      }
+    ]
+  },
+  {
+    "name": "abbreviation_aliases",
+    "slides": [
+      {
+        "section": {
+          "type": "verse",
+          "number": 1
+        },
+        "order_in_song": 0,
+        "order_in_section": 0,
+        "lyrics": "Verse one",
+        "words": [
+          "verse",
+          "one"
+        ]
+      },
+      {
+        "section": {
+          "type": "chorus",
+          "number": 1
+        },
+        "order_in_song": 1,
+        "order_in_section": 0,
+        "lyrics": "Chorus",
+        "words": [
+          "chorus"
+        ]
+      },
+      {
+        "section": {
+          "type": "bridge",
+          "number": 1
+        },
+        "order_in_song": 2,
+        "order_in_section": 0,
+        "lyrics": "Bridge",
+        "words": [
+          "bridge"
+        ]
+      },
+      {
+        "section": {
+          "type": "pre-chorus",
+          "number": 1
+        },
+        "order_in_song": 3,
+        "order_in_section": 0,
+        "lyrics": "Pre-chorus",
+        "words": [
+          "pre-chorus"
+        ]
+      }
+    ],
+    "section_order": [
+      {
+        "type": "verse",
+        "number": 1
+      },
+      {
+        "type": "chorus",
+        "number": 1
+      },
+      {
+        "type": "bridge",
+        "number": 1
+      },
+      {
+        "type": "pre-chorus",
+        "number": 1
+      }
+    ]
+  },
+  {
+    "name": "repeat_section",
+    "slides": [
+      {
+        "section": {
+          "type": "verse",
+          "number": 1
+        },
+        "order_in_song": 0,
+        "order_in_section": 0,
+        "lyrics": "Verse",
+        "words": [
+          "verse"
+        ]
+      },
+      {
+        "section": {
+          "type": "chorus",
+          "number": 1
+        },
+        "order_in_song": 1,
+        "order_in_section": 0,
+        "lyrics": "Chorus",
+        "words": [
+          "chorus"
+        ]
+      },
+      {
+        "section": {
+          "type": "verse",
+          "number": 2
+        },
+        "order_in_song": 2,
+        "order_in_section": 0,
+        "lyrics": "Verse 2",
+        "words": [
+          "verse",
+          "2"
+        ]
+      },
+      {
+        "section": {
+          "type": "chorus",
+          "number": 1
+        },
+        "order_in_song": 3,
+        "order_in_section": 1,
+        "lyrics": "Chorus again",
+        "words": [
+          "chorus",
+          "again"
+        ]
+      }
+    ],
+    "section_order": [
+      {
+        "type": "verse",
+        "number": 1
+      },
+      {
+        "type": "chorus",
+        "number": 1
+      },
+      {
+        "type": "verse",
+        "number": 2
+      },
+      {
+        "type": "chorus",
+        "number": 1
+      }
+    ]
+  },
+  {
+    "name": "tokenize_punctuation",
+    "slides": [
+      {
+        "section": {
+          "type": "verse",
+          "number": 1
+        },
+        "order_in_song": 0,
+        "order_in_section": 0,
+        "lyrics": "My God, my Shepherd has carried me!",
+        "words": [
+          "my",
+          "god",
+          "my",
+          "shepherd",
+          "has",
+          "carried",
+          "me"
+        ]
+      },
+      {
+        "section": {
+          "type": "verse",
+          "number": 1
+        },
+        "order_in_song": 1,
+        "order_in_section": 1,
+        "lyrics": "It's don't can't won't.",
+        "words": [
+          "it's",
+          "don't",
+          "can't",
+          "won't"
+        ]
+      }
+    ],
+    "section_order": [
+      {
+        "type": "verse",
+        "number": 1
+      }
+    ]
+  },
+  {
+    "name": "empty_body",
+    "slides": [],
+    "section_order": []
+  },
+  {
+    "name": "whitespace_only_body",
+    "slides": [],
+    "section_order": []
+  }
+]

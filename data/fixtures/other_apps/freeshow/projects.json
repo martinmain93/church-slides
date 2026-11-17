@@ -1,0 +1,48 @@
+{
+	"projects": {
+		"default": {
+			"name": "Example",
+			"created": 1640995200000,
+			"parent": "default",
+			"shows": [
+				{
+					"id": "default"
+				},
+				{
+					"id": "section",
+					"type": "section",
+					"name": "Example",
+					"notes": "Write notes here"
+				}
+			]
+		},
+		"ff1be631ef0": {
+			"name": "10/26/26",
+			"created": 1793062292273,
+			"parent": "/",
+			"shows": [
+				{
+					"id": "650df2ff1be",
+					"index": 0
+				},
+				{
+					"id": "5a6626eed09",
+					"index": 1
+				},
+				{
+					"id": "58f5ff450a3",
+					"index": 2
+				}
+			],
+			"modified": 1793062300607,
+			"used": 1793062292273
+		}
+	},
+	"folders": {
+		"default": {
+			"name": "Meetings",
+			"parent": "/"
+		}
+	},
+	"projectTemplates": {}
+}

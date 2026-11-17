@@ -1,0 +1,70 @@
+import { DndContext } from "@dnd-kit/core";
+import { SortableContext } from "@dnd-kit/sortable";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { SetlistSlideCard } from "@/components/setlists/SetlistSlideCard";
+import { DEFAULT_LOOK } from "@/lib/displayLook";
+import { insertAfter } from "@/lib/presentation/slideEditing";
+
+afterEach(cleanup);
+
+function renderCard(handlers: { onInsertAfter?: () => void; onDuplicate?: () => void; onDelete?: () => void } = {}) {
+  render(
+    <DndContext>
+      <SortableContext items={["s1"]}>
+        <SetlistSlideCard
+          sortableId="s1"
+          look={DEFAULT_LOOK}
+          sectionLabel="verse 1"
+          sectionType="verse"
+          lyrics="Amazing grace"
+          emptyText="(blank)"
+          selected={false}
+          editing={false}
+          selectLabel="Select slide"
+          onSelect={vi.fn()}
+          onStartEdit={vi.fn()}
+          onStopEdit={vi.fn()}
+          onInsertAfter={handlers.onInsertAfter ?? vi.fn()}
+          onDuplicate={handlers.onDuplicate ?? vi.fn()}
+          onDelete={handlers.onDelete ?? vi.fn()}
+          data={{ "data-testid": "card" }}
+        />
+      </SortableContext>
+    </DndContext>,
+  );
+}
+
+describe("a setlist slide card", () => {
+  it("drags by the card itself, so there's no separate drag button", () => {
+    renderCard();
+    expect(screen.queryByRole("button", { name: /drag/i })).toBeNull();
+  });
+
+  it("offers Insert slide, Duplicate and Delete in its menu, and no second Edit", () => {
+    const onInsertAfter = vi.fn();
+    renderCard({ onInsertAfter });
+    fireEvent.click(screen.getByRole("button", { name: "More slide actions" }));
+    const items = screen.getAllByRole("menuitem").map((item) => item.textContent);
+    expect(items).toEqual(["Insert slide", "Duplicate", "Delete"]);
+    fireEvent.click(screen.getByRole("menuitem", { name: "Insert slide" }));
+    expect(onInsertAfter).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("menu")).toBeNull();
+  });
+});
+
+describe("insertAfter", () => {
+  it("adds an empty slide in the same section straight after the given one", () => {
+    const slides = [
+      { section: { type: "verse" as const, number: 1 }, lyrics: "One" },
+      { section: { type: "chorus" as const, number: 1 }, lyrics: "Two" },
+    ];
+    expect(insertAfter(slides, 0)).toEqual([
+      slides[0],
+      { section: { type: "verse", number: 1 }, lyrics: "" },
+      slides[1],
+    ]);
+    expect(insertAfter(slides, 5)).toBe(slides);
+  });
+});

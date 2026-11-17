@@ -1,0 +1,16 @@
+# Church Slides stats Worker, on the developer's own Cloudflare account.
+# See stats/README.md for first-time setup (D1 database, password, deploy).
+name = "church-slides-stats"
+main = "src/worker.ts"
+compatibility_date = "2025-09-01"
+workers_dev = true
+
+# Prune rows older than two years, once a day.
+[triggers]
+crons = ["17 3 * * *"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "church-slides-stats"
+# From `wrangler d1 create church-slides-stats` (2026-10-15).
+database_id = "870967d9-ffd5-4552-b42c-a10dd24fe171"

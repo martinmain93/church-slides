@@ -1,0 +1,17 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "mcp-bridge",
+  "description": "The agent UI driver, consumed only in debug builds (the plugin is never initialised in release). Not on Windows, where the plugin isn't built (see Cargo.toml).",
+  "windows": [
+    "main",
+    "audience",
+    "debug"
+  ],
+  "platforms": [
+    "macOS",
+    "linux"
+  ],
+  "permissions": [
+    "mcp-bridge:default"
+  ]
+}

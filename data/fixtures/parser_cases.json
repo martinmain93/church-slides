@@ -1,0 +1,50 @@
+[
+  {
+    "name": "basic_three_section_song",
+    "body": "[verse 1]\nAmazing grace how sweet the sound\nThat saved a wretch like me\n\n[chorus]\nGrace upon grace now covers me\nMy shepherd and my Savior leads me home\n\n[verse 2]\n'Twas grace that taught my heart to fear\nAnd grace my fears relieved\n"
+  },
+  {
+    "name": "blank_lines_split_within_section",
+    "body": "[verse 1]\nSlide one line one\nSlide one line two\n\nSlide two line one\nSlide two line two\n"
+  },
+  {
+    "name": "implicit_break_on_section_tag",
+    "body": "[verse 1]\nVerse line\n[chorus]\nChorus line\n"
+  },
+  {
+    "name": "smart_quotes",
+    "body": "[verse 1]\n‘Tis grace\n"
+  },
+  {
+    "name": "windows_line_endings",
+    "body": "[verse 1]\r\nLine one\r\nLine two\r\n"
+  },
+  {
+    "name": "content_before_any_tag",
+    "body": "Some intro text\nthat nobody tagged\n\n[verse 1]\nVerse content\n"
+  },
+  {
+    "name": "empty_section_tag_skipped",
+    "body": "[verse 1]\n[chorus]\nChorus content\n"
+  },
+  {
+    "name": "abbreviation_aliases",
+    "body": "[v]\nVerse one\n\n[c]\nChorus\n\n[b]\nBridge\n\n[p]\nPre-chorus\n"
+  },
+  {
+    "name": "repeat_section",
+    "body": "[verse 1]\nVerse\n[chorus]\nChorus\n[verse 2]\nVerse 2\n[chorus]\nChorus again\n"
+  },
+  {
+    "name": "tokenize_punctuation",
+    "body": "[v]\nMy God, my Shepherd has carried me!\n\nIt's don't can't won't.\n"
+  },
+  {
+    "name": "empty_body",
+    "body": ""
+  },
+  {
+    "name": "whitespace_only_body",
+    "body": "\n\n   \n\n"
+  }
+]

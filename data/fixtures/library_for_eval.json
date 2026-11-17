@@ -1,0 +1,127 @@
+{
+  "schema_version": 1,
+  "exported_at": 1747267200000,
+  "notes": "Eval-set library for the AI matcher. Songs are chosen to exercise specific deviation cases that the matcher (Phases 5+) and the particle filter (Phase 6+) need to handle correctly. Six are public-domain hymns; four are synthetic worship songs written for this fixture (no copyrighted lyrics). Each song's purpose is documented in `eval_purpose` next to the regular fields. The export shape mirrors `LibraryExport` from src-tauri/src/library_export.rs so this file imports cleanly into a fresh dev database via Settings > Library > Import.",
+  "songs": [
+    {
+      "id": "eval_amazing_grace",
+      "title": "Amazing Grace",
+      "body_text": "[verse 1]\nAmazing grace how sweet the sound\nThat saved a wretch like me\n\nI once was lost but now am found\nWas blind but now I see\n\n[verse 2]\n'Twas grace that taught my heart to fear\nAnd grace my fears relieved\n\nHow precious did that grace appear\nThe hour I first believed\n\n[verse 3]\nThrough many dangers toils and snares\nI have already come\n\n'Tis grace hath brought me safe thus far\nAnd grace will lead me home\n\n[verse 4]\nWhen we've been there ten thousand years\nBright shining as the sun\n\nWe've no less days to sing God's praise\nThan when we'd first begun\n",
+      "ccli": null,
+      "author": "John Newton",
+      "copyright": "Public domain",
+      "default_tempo_wps": 1.6,
+      "created_at": 1747267200000,
+      "updated_at": 1747267200000,
+      "eval_purpose": "Verse-only structure with 4 distinct verses — no chorus to anchor the matcher. Tests the case where a forward-progress prior is the main signal."
+    },
+    {
+      "id": "eval_holy_holy_holy",
+      "title": "Holy Holy Holy",
+      "body_text": "[verse 1]\nHoly holy holy Lord God Almighty\nEarly in the morning our song shall rise to thee\n\nHoly holy holy merciful and mighty\nGod in three persons blessed Trinity\n\n[verse 2]\nHoly holy holy all the saints adore thee\nCasting down their golden crowns around the glassy sea\n\nCherubim and seraphim falling down before thee\nWho wert and art and evermore shall be\n\n[verse 3]\nHoly holy holy though the darkness hide thee\nThough the eye of sinful man thy glory may not see\n\nOnly thou art holy there is none beside thee\nPerfect in power in love and purity\n\n[verse 4]\nHoly holy holy Lord God Almighty\nAll thy works shall praise thy name in earth and sky and sea\n\nHoly holy holy merciful and mighty\nGod in three persons blessed Trinity\n",
+      "ccli": null,
+      "author": "Reginald Heber",
+      "copyright": "Public domain",
+      "default_tempo_wps": 1.4,
+      "created_at": 1747267200000,
+      "updated_at": 1747267200000,
+      "eval_purpose": "Ambiguous opening words — verse 1 and verse 4 share `Holy holy holy Lord God Almighty / ... merciful and mighty / God in three persons blessed Trinity`. Stress-tests the tracker's ability to disambiguate via context."
+    },
+    {
+      "id": "eval_be_thou_my_vision",
+      "title": "Be Thou My Vision",
+      "body_text": "[verse 1]\nBe thou my vision O Lord of my heart\nNaught be all else to me save that thou art\n\nThou my best thought by day or by night\nWaking or sleeping thy presence my light\n\n[verse 2]\nBe thou my wisdom and thou my true word\nI ever with thee and thou with me Lord\n\nThou my great Father I thy true son\nThou in me dwelling and I with thee one\n\n[verse 3]\nRiches I heed not nor man's empty praise\nThou mine inheritance now and always\n\nThou and thou only first in my heart\nHigh King of heaven my treasure thou art\n\n[verse 4]\nHigh King of heaven my victory won\nMay I reach heaven's joys O bright heaven's sun\n\nHeart of my own heart whatever befall\nStill be my vision O ruler of all\n",
+      "ccli": null,
+      "author": "Eleanor Hull (trans.)",
+      "copyright": "Public domain",
+      "default_tempo_wps": 1.3,
+      "created_at": 1747267200000,
+      "updated_at": 1747267200000,
+      "eval_purpose": "Verse-only with metrical refrain echoes (each verse ends with the title phrase or its inversion). Tests partial-phrase matching when the operator skips a verse."
+    },
+    {
+      "id": "eval_doxology",
+      "title": "Doxology",
+      "body_text": "[verse 1]\nPraise God from whom all blessings flow\nPraise him all creatures here below\nPraise him above ye heavenly host\nPraise Father Son and Holy Ghost\n",
+      "ccli": null,
+      "author": "Thomas Ken",
+      "copyright": "Public domain",
+      "default_tempo_wps": 1.5,
+      "created_at": 1747267200000,
+      "updated_at": 1747267200000,
+      "eval_purpose": "Single-slide song (one short verse). Tests the short-tag / minimum-length case the matcher tends to under-commit on."
+    },
+    {
+      "id": "eval_come_thou_fount",
+      "title": "Come Thou Fount of Every Blessing",
+      "body_text": "[verse 1]\nCome thou fount of every blessing\nTune my heart to sing thy grace\n\nStreams of mercy never ceasing\nCall for songs of loudest praise\n\nTeach me some melodious sonnet\nSung by flaming tongues above\n\nPraise the mount I'm fixed upon it\nMount of thy redeeming love\n\n[verse 2]\nHere I raise mine Ebenezer\nHither by thy help I'm come\n\nAnd I hope by thy good pleasure\nSafely to arrive at home\n\nJesus sought me when a stranger\nWandering from the fold of God\n\nHe to rescue me from danger\nInterposed his precious blood\n\n[verse 3]\nO to grace how great a debtor\nDaily I'm constrained to be\n\nLet thy goodness like a fetter\nBind my wandering heart to thee\n\nProne to wander Lord I feel it\nProne to leave the God I love\n\nHere's my heart Lord take and seal it\nSeal it for thy courts above\n",
+      "ccli": null,
+      "author": "Robert Robinson",
+      "copyright": "Public domain",
+      "default_tempo_wps": 1.5,
+      "created_at": 1747267200000,
+      "updated_at": 1747267200000,
+      "eval_purpose": "Verses with internal multi-stanza splits (each verse has 4 sub-stanzas separated by blank lines, producing 4 slides per verse). Tests the in-section slide-advance signal."
+    },
+    {
+      "id": "eval_crown_him",
+      "title": "Crown Him with Many Crowns",
+      "body_text": "[verse 1]\nCrown him with many crowns\nThe Lamb upon his throne\n\nHark how the heavenly anthem drowns\nAll music but its own\n\nAwake my soul and sing\nOf him who died for thee\n\nAnd hail him as thy matchless King\nThrough all eternity\n\n[verse 2]\nCrown him the Lord of love\nBehold his hands and side\n\nThose wounds yet visible above\nIn beauty glorified\n\nNo angel in the sky\nCan fully bear that sight\n\nBut downward bends his burning eye\nAt mysteries so bright\n\n[verse 3]\nCrown him the Lord of life\nWho triumphed o'er the grave\n\nWho rose victorious in the strife\nFor those he came to save\n\nHis glories now we sing\nWho died and rose on high\n\nWho died eternal life to bring\nAnd lives that death may die\n",
+      "ccli": null,
+      "author": "Matthew Bridges, Godfrey Thring",
+      "copyright": "Public domain",
+      "default_tempo_wps": 1.5,
+      "created_at": 1747267200000,
+      "updated_at": 1747267200000,
+      "eval_purpose": "Highly repetitive verse-opening words (each verse begins `Crown him the/with...`). Tests confusable-opening disambiguation by the third or fourth word."
+    },
+    {
+      "id": "eval_synth_modern_anthem",
+      "title": "We Lift Our Hearts (Eval Synthetic 1)",
+      "body_text": "[verse 1]\nWe lift our hearts to heaven's throne\nThe maker of the morning sun\n\nWith every breath we sing your name\nThe author of the saving plan\n\n[pre-chorus]\nAnd we will not be silent\nAnd we will not be still\n\n[chorus]\nGlory to the King of kings\nGlory to the risen Son\n\nEvery knee shall bow and sing\nJesus you alone have won\n\n[verse 2]\nWe lift our voices through the night\nThe banner of the conquering one\n\nWith every tear we know your light\nThe shadow of the cross has gone\n\n[pre-chorus]\nAnd we will not be silent\nAnd we will not be still\n\n[chorus]\nGlory to the King of kings\nGlory to the risen Son\n\nEvery knee shall bow and sing\nJesus you alone have won\n\n[bridge]\nThe nations rise to praise your name\nThe oceans roar your endless fame\n\n[chorus]\nGlory to the King of kings\nGlory to the risen Son\n\nEvery knee shall bow and sing\nJesus you alone have won\n",
+      "ccli": null,
+      "author": "Synthetic (eval fixture)",
+      "copyright": "Synthetic — written for this fixture, not under CCLI",
+      "default_tempo_wps": 2.1,
+      "created_at": 1747267200000,
+      "updated_at": 1747267200000,
+      "eval_purpose": "Modern V-PC-C structure with chorus repeated three times after V/PC, V/PC, and bridge. The exact-repeat chorus is the canonical case where the matcher must rely on item-position context, not lyrics alone."
+    },
+    {
+      "id": "eval_synth_long_chorus",
+      "title": "Endless Mercy (Eval Synthetic 2)",
+      "body_text": "[verse 1]\nIn the quiet of the dawn we call to you\nFor your mercy is the river running through\n\nIn the silence of the night your voice is true\nAnd your kindness leads us back to start anew\n\n[chorus]\nMercy mercy oh your mercy never ends\nMercy mercy oh your mercy never ends\nWe will sing of mercy that's deeper than the sea\nWe will sing of mercy that has set the captive free\nMercy mercy oh your mercy never ends\nAnd your mercy is enough for me\n\n[verse 2]\nIn the breaking of the bread we know your name\nIn the lifting of the cup we share your fame\n\nIn the gathering of saints we are the same\nFor your mercy is the fire and we are flame\n\n[chorus]\nMercy mercy oh your mercy never ends\nMercy mercy oh your mercy never ends\nWe will sing of mercy that's deeper than the sea\nWe will sing of mercy that has set the captive free\nMercy mercy oh your mercy never ends\nAnd your mercy is enough for me\n\n[tag]\nEnough for me\nEnough for me\n",
+      "ccli": null,
+      "author": "Synthetic (eval fixture)",
+      "copyright": "Synthetic — written for this fixture, not under CCLI",
+      "default_tempo_wps": 1.8,
+      "created_at": 1747267200000,
+      "updated_at": 1747267200000,
+      "eval_purpose": "Long six-line chorus with internal repetition (`mercy mercy oh your mercy never ends` ×3). Tests within-chorus position tracking when the same phrase appears multiple times."
+    },
+    {
+      "id": "eval_synth_bridge_heavy",
+      "title": "Take the High Road (Eval Synthetic 3)",
+      "body_text": "[verse 1]\nA wandering road across the hills\nA fire that warms the dark\n\nA story written in the stars\nA voice that wakes my heart\n\n[chorus]\nTake the high road home\nTake the high road home\n\n[verse 2]\nThe morning rises on the plain\nThe wheat is whispering grace\n\nThe shepherd calls the lambs again\nAnd turns to find my face\n\n[chorus]\nTake the high road home\nTake the high road home\n\n[bridge]\nOh come oh come the day is bright\nThe valley fills with song\n\nOh come oh come the gates are open wide\nThe pilgrim journey long\n\nOh come oh come the lamps are lit\nThe table set for two\n\nOh come oh come the lamps are lit\nThe road is leading you\n\n[chorus]\nTake the high road home\nTake the high road home\n\n[outro]\nHome\nHome\nHome\n",
+      "ccli": null,
+      "author": "Synthetic (eval fixture)",
+      "copyright": "Synthetic — written for this fixture, not under CCLI",
+      "default_tempo_wps": 1.7,
+      "created_at": 1747267200000,
+      "updated_at": 1747267200000,
+      "eval_purpose": "Short two-line chorus with a four-stanza bridge. Tests the matcher when the bridge dominates duration but the chorus is short — common failure mode where the matcher commits to the chorus too early during a long bridge."
+    },
+    {
+      "id": "eval_synth_ambiguous_verses",
+      "title": "Day by Day (Eval Synthetic 4)",
+      "body_text": "[verse 1]\nDay by day and hour by hour\nI will trust in you\n\nDay by day in every storm\nYour mercies are new\n\n[chorus]\nFaithful Father you are with me\nFaithful Father you are near\n\n[verse 2]\nNight by night and song by song\nI will sing of you\n\nNight by night in every dawn\nYour mercies are new\n\n[chorus]\nFaithful Father you are with me\nFaithful Father you are near\n\n[verse 3]\nDay by day and hour by hour\nI will trust in you\n\nDay by day in every storm\nYour mercies are new\n\n[chorus]\nFaithful Father you are with me\nFaithful Father you are near\n",
+      "ccli": null,
+      "author": "Synthetic (eval fixture)",
+      "copyright": "Synthetic — written for this fixture, not under CCLI",
+      "default_tempo_wps": 1.6,
+      "created_at": 1747267200000,
+      "updated_at": 1747267200000,
+      "eval_purpose": "Verse 1 and verse 3 share identical lyrics. Tests how the tracker handles a deliberately ambiguous verse — without item-position context it cannot tell V1 from V3 by words alone. This is the worst-case scenario for Phase 6's particle filter."
+    }
+  ]
+}

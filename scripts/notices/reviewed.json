@@ -1,0 +1,25 @@
+{
+  "_about": "Licences scripts/third_party_notices.py flags (GPL, LGPL, AGPL, non-commercial, proprietary), with what was decided. 'accepted': fine to ship, with why. 'open': still needs a decision; every build prints it as a warning. A flagged package missing from here fails the build.",
+  "packages": {
+    "runtime:PyInstaller bootloader": {
+      "status": "accepted",
+      "note": "GPL-2.0-or-later with PyInstaller's bootloader exception, which allows the bootloader to be distributed with programs under any licence. PyInstaller itself doesn't ship."
+    },
+    "python:numpy": {
+      "status": "accepted",
+      "note": "Accepted 2026-10-17. libquadmath (LGPL-2.1+) ships as a separate dynamic library (numpy/.dylibs), with its licence text, attribution, a source location and a written offer, and replacement steps (supplements/gcc-runtime-libraries.txt). The app is distributed directly (not the Mac App Store) and signed ad hoc, so a user can swap the dylib and re-sign with `codesign --force --deep --sign -`. libgfortran/libgcc_s are GPL-3 with the GCC Runtime Library Exception: fine."
+    },
+    "python:scipy": {
+      "status": "accepted",
+      "note": "Apple-silicon engine only (the MLX layer). Accepted 2026-10-17. libquadmath (LGPL-2.1+) ships as a separate dynamic library (scipy/.dylibs), with its licence text, attribution, a source location and a written offer, and replacement steps (supplements/gcc-runtime-libraries.txt). The app is distributed directly (not the Mac App Store) and signed ad hoc, so a user can swap the dylib and re-sign with `codesign --force --deep --sign -`. libgfortran/libgcc_s are GPL-3 with the GCC Runtime Library Exception: fine."
+    },
+    "runtime:Intel oneMKL and OpenMP runtime (in CTranslate2)": {
+      "status": "accepted",
+      "note": "Accepted 2026-10-17. Intel's End User License Agreement for Developer Tools (April 2023; text from the intel-openmp 2023.2.0 wheel, supplements/intel-developer-tools-eula.txt) allows redistributing the Redistributables in object code inside a product that adds significant functionality, under a licence that prohibits reverse engineering, decompiling or disassembling them (§2.1.D). The Terms of use (site/terms.html) carry that clause; the notices carry Intel's text. No Intel names or endorsement are used to market the app."
+    },
+    "runtime:Steinberg ASIO SDK (in PortAudio)": {
+      "status": "open",
+      "note": "Windows engine only: collect_dynamic_libs('_sounddevice_data') takes sounddevice's ASIO-enabled PortAudio DLL, which compiles in Steinberg's ASIO SDK (Steinberg licence or GPL-3). Excluding the *-asio.dll from sidecar.spec would remove it."
+    }
+  }
+}

@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="24 -6 112 164.81">
+<defs><linearGradient id="lcenter" x1="0" y1="0" x2="0" y2="1"><stop offset="0.00" style="stop-color:#F4BC45"/><stop offset="1.00" style="stop-color:#EC962C"/></linearGradient><linearGradient id="lleft" x1="0" y1="0" x2="0" y2="1"><stop offset="0.00" style="stop-color:#EE9447"/><stop offset="1.00" style="stop-color:#CF4A58"/></linearGradient><linearGradient id="lright" x1="0" y1="0" x2="0" y2="1"><stop offset="0.00" style="stop-color:#F2B53E"/><stop offset="1.00" style="stop-color:#E47E2A"/></linearGradient><linearGradient id="llower" x1="0" y1="0" x2="0" y2="1"><stop offset="0.00" style="stop-color:#DC4B2B"/><stop offset="1.00" style="stop-color:#7A2450"/></linearGradient><mask id="lcut" maskUnits="userSpaceOnUse" x="0" y="-10" width="160" height="173"><rect x="0" y="-10" width="160" height="173" fill="#FFFFFF"/><line x1="30.5" y1="76.81" x2="129.5" y2="76.81" fill="none" style="stroke:#000000;stroke-width:6.2;stroke-linecap:round;stroke-linejoin:round"/><path d="M51.39 20.81 Q69.13 27.76 80 52.40 Q90.87 27.76 108.61 20.81" fill="none" style="stroke:#000000;stroke-width:6.2;stroke-linecap:round;stroke-linejoin:round"/><line x1="80" y1="52.40" x2="80" y2="76.81" fill="none" style="stroke:#000000;stroke-width:6.2;stroke-linecap:round;stroke-linejoin:round"/></mask></defs>
+<g mask="url(#lcut)">
+<path d="M30 76.81 H130 V152.81 H30 Z" fill="url(#llower)"/>
+<path d="M30 76.81 A84 84 0 0 1 51.39 20.81 Q69.13 27.76 80 52.40 L80 76.81 Z" fill="url(#lleft)"/>
+<path d="M80 76.81 L80 52.40 Q90.87 27.76 108.61 20.81 A84 84 0 0 1 130 76.81 Z" fill="url(#lright)"/>
+<path d="M51.39 20.81 A84 84 0 0 1 80 0 A84 84 0 0 1 108.61 20.81 Q90.87 27.76 80 52.40 Q69.13 27.76 51.39 20.81 Z" fill="url(#lcenter)"/>
+</g>
+<polygon points="61.50,152.81 43.58,106.04 51.71,102.93 108.29,102.93 116.42,106.04 98.50,152.81" fill="#FFFFFF" opacity=".26"/>
+<rect x="43.00" y="59.40" width="74.00" height="52.24" rx="8.71" fill="#FFF6E4"/>
+<rect x="53.88" y="73.55" width="52.24" height="7.62" rx="3.81" fill="#2A1A14"/>
+<rect x="53.88" y="88.78" width="34.82" height="7.62" rx="3.81" fill="#2A1A14"/>
+</svg>
