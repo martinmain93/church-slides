@@ -42,6 +42,10 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libportaudio2
       - name: pytest
         working-directory: sidecar
+        # UTF-8 mode, as the frozen engine runs (sidecar.spec): Windows
+        # otherwise reads source and log files as cp1252.
+        env:
+          PYTHONUTF8: "1"
         run: uv run pytest -q
 
   # Freeze the engine, verify it (self-check, real transcription, start/stop
@@ -122,7 +126,11 @@ jobs:
           node-version: 22
       - name: Browser-API compatibility (eslint-plugin-compat)
         # AudioContext is listed as polyfilled in the config: both uses fall
-        # back to webkitAudioContext, which the rule can't see.
+        # back to webkitAudioContext, which the rule can't see. ESLint 8
+        # would otherwise find the repo's flat eslint.config.js and refuse
+        # the eslintrc-style options below.
+        env:
+          ESLINT_USE_FLAT_CONFIG: "false"
         run: >
           npx --yes -p eslint@8 -p eslint-plugin-compat@6
           -p @typescript-eslint/parser@7 -p typescript@5.7
