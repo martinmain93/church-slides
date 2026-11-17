@@ -7,6 +7,7 @@
 | [roadmap/](roadmap/) | What's next, and the open work in this repo |
 | [PRODUCT_PRINCIPLES.md](PRODUCT_PRINCIPLES.md) | Simple first: how every design is judged |
 | [SONG_FORMAT.md](SONG_FORMAT.md) | The song text format: sections, slides, slide order |
+| [server-protocol/](server-protocol/) | How the app talks to a Church Slides server: discovery, sign-in, the account |
 
 | Folder | What's in it |
 | --- | --- |

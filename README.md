@@ -56,6 +56,7 @@ person to confirm.
 | [Features](docs/FEATURES.md) | What the app does, with links to each feature's design |
 | [Roadmap](docs/roadmap/) | What's next, and the open work |
 | [Product principles](docs/PRODUCT_PRINCIPLES.md) | Simple first: how every design is judged |
+| [Server protocol](docs/server-protocol/) | How the app talks to an optional server; anyone can implement it |
 | [Research](docs/research/) | Ideas that were measured and parked or rejected, and why |
 | [Done](docs/done/) | Designs and reviews for work that has shipped |
 
