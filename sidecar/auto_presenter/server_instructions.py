@@ -11,6 +11,7 @@ downloading one, saving a hosted key — is reached only from `_dispatch`.
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import logging
 import time
 
@@ -488,12 +489,13 @@ async def _handle_download_instruction_model(
         await _send_error(ws, msg.id, f"not a downloadable local model: {msg.model_id!r}")
         return
     loop = asyncio.get_running_loop()
+    sent: list[concurrent.futures.Future[None]] = []
 
     def on_progress(event: ollama_manager.PullProgressEvent) -> None:
         # Runs on the worker thread `pull()` blocks in — hop back onto the
         # event loop to broadcast, same pattern the audio capture thread
         # uses for its own cross-thread broadcasts.
-        asyncio.run_coroutine_threadsafe(
+        sent.append(asyncio.run_coroutine_threadsafe(
             _broadcast(InstructionModelDownloadProgressMessage(
                 model_id=msg.model_id,
                 bytes_downloaded=event.bytes_downloaded,
@@ -503,7 +505,7 @@ async def _handle_download_instruction_model(
                 detail=event.detail,
             )),
             loop,
-        )
+        ))
 
     await _send(ws, PongMessage(id=msg.id))
     try:
@@ -513,6 +515,10 @@ async def _handle_download_instruction_model(
     except Exception:  # pragma: no cover - defensive; on_progress already
         # broadcast a "failed" event with the real reason before this raised.
         log.exception("download of %s failed", msg.model_id)
+    # The last progress message ("completed" or "failed") was handed to the
+    # loop from the worker thread; finish sending it before this returns, or
+    # it can arrive after the download is reported done (seen on Linux CI).
+    await asyncio.gather(*(asyncio.wrap_future(f) for f in sent), return_exceptions=True)
 
 
 async def _handle_set_instruction_model_api_key(
