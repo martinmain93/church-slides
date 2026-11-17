@@ -57,6 +57,9 @@ say "Installing the AI engine's Python environment (sidecar/.venv)"
 say "Generating TypeScript types from the engine's models"
 pnpm codegen
 
+say "Building the interface (the Rust tests embed it)"
+pnpm build
+
 if (( models )); then
   say "Installing the bundled models"
   uv run --project sidecar python scripts/setup_chord_model.py
