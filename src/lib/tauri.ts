@@ -233,6 +233,25 @@ export async function importLibrary(json: string, mode: ImportMode): Promise<Imp
 
 // --- Setlists --------------------------------------------------------------
 
+// --- Libraries --------------------------------------------------------------
+
+/** One library on this computer: its own, or an organization's. */
+export interface LibraryInfo {
+  id: string;
+  name: string;
+  kind: "computer" | "organization";
+  open: boolean;
+}
+
+export async function listLibraries(): Promise<LibraryInfo[]> {
+  return invoke<LibraryInfo[]>("list_libraries");
+}
+
+/** Switch libraries; every view reloads on the `library-changed` event. */
+export async function openLibrary(id: string): Promise<void> {
+  return invoke<void>("open_library", { id });
+}
+
 export async function listSetlists(): Promise<SetlistRow[]> {
   return invoke<SetlistRow[]>("list_setlists");
 }

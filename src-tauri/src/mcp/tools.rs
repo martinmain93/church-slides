@@ -63,6 +63,14 @@ impl Library {
     /// Run a tool. `Err` is a failed call the model should see and recover
     /// from (bad id, missing field) — the server reports it as `isError`.
     pub fn call(&self, name: &str, args: &Value) -> Result<Value> {
+        // Work on whichever library the app has open now: the person may
+        // have switched since this assistant session started.
+        let open = crate::libraries::remembered_path(self.db.home_path());
+        if open != self.db.open_path() {
+            self.db.switch_to(&open)?;
+            // A snapshot of the other library doesn't cover this one.
+            *self.backup.lock().unwrap() = None;
+        }
         let args = args.as_object().cloned().unwrap_or_default();
         match name {
             "list_songs" => self.list_songs(&args),

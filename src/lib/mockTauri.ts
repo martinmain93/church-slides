@@ -429,6 +429,14 @@ export const mockTauri = {
     };
   },
 
+  // --- Libraries ----------------------------------------------------------
+
+  async list_libraries() {
+    return [{ id: "this-computer", name: "This computer", kind: "computer", open: true }];
+  },
+
+  async open_library() {},
+
   // --- Setlists -----------------------------------------------------------
 
   async list_setlists(): Promise<SetlistRow[]> {

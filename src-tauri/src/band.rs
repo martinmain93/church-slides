@@ -136,7 +136,7 @@ const PIN_KEY: &str = "band_leader_pin";
 /// single-screen mode, nowhere on the laptop to read the new one.
 fn stored_pin(db: &Db) -> String {
     use rusqlite::{params, OptionalExtension};
-    let conn = db.conn().lock().unwrap();
+    let conn = db.home();
     // Values in `settings` are JSON-encoded (see migrations/002_settings.sql).
     let existing = conn
         .query_row("SELECT value FROM settings WHERE key = ?1", params![PIN_KEY], |r| r.get::<_, String>(0))

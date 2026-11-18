@@ -28,6 +28,7 @@ import { IncomingSync } from "@/components/peerSync/IncomingSync";
 import { UpdatePrompt } from "@/components/UpdatePrompt";
 import { SongEditor } from "@/components/library/SongEditor";
 import { useLibraryChanged } from "@/lib/assistantConnect";
+import { LibrarySwitcher } from "@/components/LibrarySwitcher";
 import { useAssistantImport } from "@/lib/assistantImport";
 import { loadAudioInputPrefs } from "@/lib/audioInputPrefs";
 import { getAiEngineStatus, listSongs } from "@/lib/tauri";
@@ -441,6 +442,7 @@ function Sidebar({
         </span>
         <SidecarStatusBadge />
       </div>
+      <LibrarySwitcher onSwitched={onSelectHome} />
       <nav className="flex flex-1 flex-col gap-1 px-2">
         <SidebarLink
           icon={<HomeIcon className="size-4" />}

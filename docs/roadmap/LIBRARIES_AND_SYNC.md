@@ -35,9 +35,8 @@ Today all of the app's content lives in one `library.db`. Instead of adding a
 own database file**:
 
 ```
-<app data>/library.db                    this computer's own library (as today)
+<app data>/library.db                    this computer's own library and its settings (as today)
 <app data>/orgs/<org id>/library.db      one per organization, synced
-<app data>/settings.db                   this computer's settings (moved out)
 ```
 
 The app has one library open at a time, and switching libraries opens the
@@ -57,9 +56,13 @@ other file.
   so it moves with the library.
 - **Leaving an organization is clean:** delete its folder.
 
-**The cost:** settings live in `library.db` today, so they move to their own
-file (a one-time migration). And nothing can ever show two libraries at once.
-Decision 3 says nothing should.
+**Settings stay where they are**, in this computer's own file, whichever
+library is open. The app keeps a second connection to that file while an
+organization's library is open, and records which library is open there.
+The engine and the AI-assistant process read that record, so they follow a
+switch (and an engine restart) without being told. There's no settings
+migration. The cost is that nothing can show two libraries at once, and
+decision 3 says nothing should.
 
 ## Getting an existing library into the organization
 
@@ -151,7 +154,7 @@ says a different server must be buildable from the spec.
 
 ### What the app needs
 
-- Settings moved to `settings.db`; libraries opened by path; a switcher.
+- Libraries opened by path; a switcher. Settings stay in the home file. (Step A: done.)
 - In each organization's library file: `outbox`, `sync_state` (the last change
   number), and `server_version` on each synced record. Services and items gain
   `updated_at` (they don't have it today), and deletes write tombstones.
@@ -175,7 +178,7 @@ says a different server must be buildable from the spec.
 
 | Step | Builds | Done when |
 | --- | --- | --- |
-| A | Settings move out; libraries are files; the switcher (no server) | Today's app behaves the same; a second empty library can be made and switched to in a dev build; every app test passes |
+| A | Libraries are files; the switcher (no server). **Built 2026-11-18** | Today's app behaves the same; a second empty library can be made and switched to in a dev build; every app test passes |
 | B | Protocol spec + server push/pull/poke + revisions | Server tests: two simulated devices, offline edits on both, no loss, words revision kept, role matrix refuses set-leader song edits |
 | C | App sync client + organization library download | Two laptops (or two app instances), offline edits on both, reconnect: no loss, conflict revision kept, this computer's own library never leaves it |
 | D | "Use this computer's library" move, the look in the library, learned timing sync, history view for revisions, status pill | An owner with a real library creates an organization, and a second computer gets all of it |

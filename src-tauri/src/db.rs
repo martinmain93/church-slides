@@ -5,7 +5,7 @@
 //! time and applied idempotently on every launch.
 
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{Mutex, MutexGuard};
 
 use anyhow::{Context, Result};
 use rusqlite::{params, Connection};
@@ -29,37 +29,119 @@ const MIGRATIONS: &[(i32, &str)] = &[
 ];
 
 /// Thread-safe handle to the SQLite database.
+///
+/// Each library is its own file (docs/roadmap/LIBRARIES_AND_SYNC.md). `conn`
+/// is the library that's open; every song, setlist and service query goes
+/// there. This computer's own library file (`home_path`) also holds its
+/// settings, so settings always go to that file whichever library is open:
+/// `home` keeps a connection to it while another library is open, and is
+/// `None` while it's the open one (then `conn` is it).
 pub struct Db {
     conn: Mutex<Connection>,
+    home: Mutex<Option<Connection>>,
+    home_path: PathBuf,
+    open_path: Mutex<PathBuf>,
 }
 
-impl Db {
-    /// Expose the inner connection for sibling modules (settings, export, …).
-    pub fn conn(&self) -> &Mutex<Connection> {
-        &self.conn
+/// A lock on this computer's own library file, for settings.
+pub enum HomeConn<'a> {
+    /// Another library is open; this is the home file's own connection.
+    Kept(MutexGuard<'a, Option<Connection>>),
+    /// The home library is the open one. The `home` guard is held too, so a
+    /// switch can't happen underneath.
+    Open(
+        #[allow(dead_code)] MutexGuard<'a, Option<Connection>>,
+        MutexGuard<'a, Connection>,
+    ),
+}
+
+impl std::ops::Deref for HomeConn<'_> {
+    type Target = Connection;
+    fn deref(&self) -> &Connection {
+        match self {
+            HomeConn::Kept(g) => g.as_ref().expect("kept home connection"),
+            HomeConn::Open(_, g) => g,
+        }
     }
 }
 
 impl Db {
-    /// Open (or create) the database at `path`, run pending migrations, and
-    /// seed the library with the example hymns if it's empty.
-    pub fn open(path: &Path) -> Result<Self> {
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent)
-                .with_context(|| format!("creating db parent dir {}", parent.display()))?;
+    /// Expose the open library's connection for sibling modules (export, …).
+    pub fn conn(&self) -> &Mutex<Connection> {
+        &self.conn
+    }
+
+    /// This computer's own library file, where settings live.
+    pub fn home(&self) -> HomeConn<'_> {
+        let home = self.home.lock().unwrap();
+        if home.is_some() {
+            HomeConn::Kept(home)
+        } else {
+            let open = self.conn.lock().unwrap();
+            HomeConn::Open(home, open)
         }
-        let mut conn = Connection::open(path)
-            .with_context(|| format!("opening sqlite at {}", path.display()))?;
-        // busy_timeout: an AI assistant's `--mcp` process may be writing too.
-        conn.execute_batch(
-            "PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;",
-        )?;
+    }
 
-        run_migrations(&mut conn)?;
+    pub fn home_path(&self) -> &Path {
+        &self.home_path
+    }
+
+    /// The file of the library that's open.
+    pub fn open_path(&self) -> PathBuf {
+        self.open_path.lock().unwrap().clone()
+    }
+
+    /// Open the library at `path` in place of the one that's open. The home
+    /// library is `home_path()`; any other file is created and migrated if
+    /// new, and starts empty (no example hymns: its songs come from its
+    /// organization).
+    pub fn switch_to(&self, path: &Path) -> Result<()> {
+        let mut home = self.home.lock().unwrap();
+        let mut conn = self.conn.lock().unwrap();
+        let mut open = self.open_path.lock().unwrap();
+        if *open == path {
+            return Ok(());
+        }
+        if path == self.home_path {
+            *conn = home.take().expect("home kept while another library is open");
+        } else {
+            let other = open_library_file(path)?;
+            let previous = std::mem::replace(&mut *conn, other);
+            if home.is_none() {
+                *home = Some(previous);
+            }
+        }
+        *open = path.to_path_buf();
+        Ok(())
+    }
+}
+
+pub fn open_library_file(path: &Path) -> Result<Connection> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .with_context(|| format!("creating db parent dir {}", parent.display()))?;
+    }
+    let mut conn = Connection::open(path)
+        .with_context(|| format!("opening sqlite at {}", path.display()))?;
+    // busy_timeout: an AI assistant's `--mcp` process may be writing too.
+    conn.execute_batch(
+        "PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;",
+    )?;
+    run_migrations(&mut conn)?;
+    Ok(conn)
+}
+
+impl Db {
+    /// Open (or create) this computer's own library at `path`, run pending
+    /// migrations, and seed it with the example hymns if it's empty.
+    pub fn open(path: &Path) -> Result<Self> {
+        let conn = open_library_file(path)?;
         seed_if_empty(&conn)?;
-
         Ok(Self {
             conn: Mutex::new(conn),
+            home: Mutex::new(None),
+            home_path: path.to_path_buf(),
+            open_path: Mutex::new(path.to_path_buf()),
         })
     }
 
