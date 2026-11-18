@@ -10,6 +10,13 @@ refuses to release a version that has no entry here.
 
 ## Unreleased
 
+- Changed: **adding songs to a setlist no longer shuffles the list.** A song you add stays where it is, with a tick, so the next click lands on the song you meant. Click it again to add a reprise.
+- Changed: **a new setlist you leave empty is tidied away** however you leave it, not only with the back button, so Home doesn't fill with empty "New setlist" entries.
+- Changed: "Start from last service" is now **"Copy last service"**, so it doesn't read like "Continue last service".
+- Changed: the projector's look has one name everywhere, **"Display look"** (it was "Lyrics style" in some places and "Display" in Settings). The look is now kept in the library too, so it travels with a library backup.
+- Fixed: **the app could freeze when macOS asked for Keychain access** (after an update, for the online room's sign-in). It now waits for the answer without freezing, even mid-service.
+- Fixed: the band page only connects to the official Church Slides servers and to http(s) addresses on your own network, so a crafted link can't point band members' screens somewhere else.
+
 ## 0.2.2 — 16 November 2026
 
 - Fixed: **slides changing before the last line was sung.** The AI now waits to hear a slide's last words (or the next slide's first) before moving on. On the test services it left a slide early about a third as often, and the line being sung was off screen about a sixth less.
