@@ -214,7 +214,7 @@ export function ScriptureSettingsPanel() {
         <DisplayLookDialog
           onClose={() => setStyling(false)}
           override={{
-            title: "Scripture style",
+            title: "Scripture look",
             description:
               "How a Bible passage looks on screen, in every service on this computer. A song's or passage's own style in a setlist still wins.",
             value: scriptureLook ?? defaultLook,

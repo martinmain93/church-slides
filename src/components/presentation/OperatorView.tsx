@@ -797,7 +797,7 @@ function ProjectionBar({
         <BandScreensButton band={band} align="right" hideButton openSignal={bandSignal} />
         <Menu label="More options">
           <MoreItem icon={<Palette />} onSelect={() => setLookOpen(true)}>
-            Lyrics style…
+            Display look…
           </MoreItem>
           <MenuSeparator />
           <MoreItem

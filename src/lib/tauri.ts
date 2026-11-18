@@ -302,7 +302,7 @@ export async function setSetlistItemContent(
   await invoke<void>("set_setlist_item_content", { setlistId, itemId, content: JSON.stringify(content) });
 }
 
-/** A new setlist holding a copy of another's items ("Start from last service"). */
+/** A new setlist holding a copy of another's items ("Copy last service"). */
 export async function duplicateSetlist(sourceId: string, name: string): Promise<string> {
   return invoke<string>("duplicate_setlist", { sourceId, name });
 }
