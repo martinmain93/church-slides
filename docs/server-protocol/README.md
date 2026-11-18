@@ -363,6 +363,7 @@ Send local changes, oldest first.
 
 ```json
 {
+  "device": "mac-01J…",
   "changes": [
     { "op": "op_01J…", "type": "song", "id": "s1", "base": 41,
       "set": { "title": "…", "body_text": "…" } },
@@ -371,6 +372,8 @@ Send local changes, oldest first.
 }
 ```
 
+- `device` is a stable id for this computer's copy of the library. A
+  computer's own back-to-back edits are never a conflict with each other.
 - `op` is a unique id for the change, made by the client. Sending the same
   `op` again (a retry after a lost reply) returns the first result and
   changes nothing.
