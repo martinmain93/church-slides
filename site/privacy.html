@@ -55,7 +55,7 @@
 <main>
   <p class="small"><a href="./">← Church Slides</a></p>
   <h1>Privacy</h1>
-  <p class="small">Last updated 21 October 2026</p>
+  <p class="small">Last updated 18 November 2026</p>
 
   <p>
     Church Slides is made by Martin Main, an individual developer in Nova Scotia, Canada. This page
@@ -66,7 +66,7 @@
 
   <div class="summary">
     <ul>
-      <li>Your songs, setlists, logs and any service recordings stay on your computer. The only exception is the short log extract in an error report (see below).</li>
+      <li>Your songs, setlists, logs and any service recordings stay on your computer. The exceptions are the short log extract in an error report, and anything your church chooses to share through a Church Slides account (see below).</li>
       <li>Audio from the microphone or sound desk is never sent to us.</li>
       <li>The app doesn’t record services unless you turn recording on.</li>
       <li>No advertising, no selling of data, and no cookies or tracking on this website.</li>
@@ -80,6 +80,12 @@
     and why, so we are responsible for them. Everything else (your library, setlists, settings, the
     app’s log, and any recordings) is held only on your church’s computers. Your church is
     responsible for that, and we don’t receive it, apart from the log extract in an error report.
+  </p>
+  <p>
+    If your church uses a Church Slides account, we also hold your account details, for which we are
+    responsible, and what your church shares through its organization (its live set, and its library
+    once that’s shared). That content is your church’s: it decides what goes in and who sees it,
+    and we store it and pass it on for the church.
   </p>
 
   <h2>What the app sends</h2>
@@ -161,11 +167,46 @@
       stored unencrypted in the app’s folder on your computer.</li>
     <li><strong>AI assistants.</strong> If you connect Claude or another assistant to your library,
       the songs and setlists it reads go to that assistant’s provider under your own account.</li>
-    <li><strong>Online band screens.</strong> These run in your church’s own Cloudflare account,
-      not ours.</li>
+    <li><strong>Online band screens (your own relay).</strong> These run in your church’s own
+      Cloudflare account, not ours.</li>
     <li><strong>Band screens and setlist sharing on your network.</strong> These talk directly
       between computers on your church’s network and don’t go through us.</li>
   </ul>
+
+  <h2>Church Slides accounts (preview)</h2>
+  <p>
+    Accounts are new and being tried with a few churches. You don’t need one: without one, nothing
+    here applies. A church that uses one creates an <em>organization</em> and invites its team.
+  </p>
+  <ul>
+    <li><strong>Your account.</strong> When you sign in (with Google), we keep your email address,
+      your name as Google gives it, and Google’s identifier for your account, so the same person is
+      recognized next time. Google sees that you signed in to Church Slides. For each computer or
+      phone you’re signed in on, we keep when it was last used, so you can sign it out.</li>
+    <li><strong>Your organization.</strong> Its name and time zone, who is in it and their role, the
+      invites and band links made for it (each band link has the name it was given), and a record of
+      what was done and by whom (for example, who invited someone or changed a role), so a problem
+      can be traced.</li>
+    <li><strong>The live set.</strong> When a service goes live through your organization, the
+      service passes through our server to your band’s screens: the songs’ words and chords, the
+      service order and which slide is showing. It’s kept for up to six hours after the last screen
+      disconnects.</li>
+    <li><strong>A shared library</strong> (when your church turns it on). Your organization’s songs,
+      chords and keys, services, the record of what was sung when, the display look, and the timing
+      the AI learned from your services are kept on our server so every computer in the team has
+      them. When two people change a song’s words at once, the earlier words are kept too, with the
+      name of the person whose change replaced them.</li>
+  </ul>
+  <p>
+    Everyone in an organization can see its library, its live set, and who is in it (names, email
+    addresses and roles). We don’t look at your church’s content except where needed to keep
+    the service running or when you ask us for help, and we never use it for anything else.
+  </p>
+  <p>
+    An organization’s owner can ask us to delete it, which removes its library, live set and records
+    from our server. To delete your account, email us; we’ll remove it and your sign-ins, and reply
+    within 30 days. Songs you added to an organization stay with that organization.
+  </p>
 
   <h2>This website and downloads</h2>
   <p>
@@ -185,6 +226,9 @@
     <li><strong>Usage statistics and download counts:</strong> our own server on
       <a href="https://www.cloudflare.com/privacypolicy/">Cloudflare</a>, under Cloudflare’s data
       processing terms. Kept for up to two years, then deleted automatically.</li>
+    <li><strong>Accounts, organizations, live sets and shared libraries:</strong> our own server on
+      Cloudflare, under the same terms. Kept while the account or organization exists, except the
+      live set (up to six hours after a service).</li>
   </ul>
   <p>
     This means some data is stored outside Canada, where it can be accessed by courts and
