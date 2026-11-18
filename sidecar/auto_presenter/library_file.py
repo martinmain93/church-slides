@@ -10,10 +10,12 @@ keeps an engine that restarted mid-week on the right library.
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from pathlib import Path
 
 OPEN_KEY = "open_library"
+_ORG_FILE = re.compile(r"orgs/(?!this-computer/)[A-Za-z0-9_-]+/library\.db")
 
 
 def open_library_path(home: Path | None) -> Path | None:
@@ -33,7 +35,9 @@ def open_library_path(home: Path | None) -> Path | None:
         rel = json.loads(row[0]) if row else ""
     except (TypeError, ValueError):
         return home
-    if not isinstance(rel, str) or not rel or ".." in rel:
+    # Only ever `orgs/<id>/library.db` (as `libraries.rs` writes it): an
+    # absolute path, `..` or a drive letter opens this computer's library.
+    if not isinstance(rel, str) or not _ORG_FILE.fullmatch(rel):
         return home
     path = home.parent / rel
     return path if path.exists() else home

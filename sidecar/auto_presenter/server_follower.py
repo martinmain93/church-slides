@@ -112,8 +112,9 @@ def onnx_scorer_dir() -> Path | None:
 
 
 def machine_verdict_path() -> Path | None:
-    """Where this computer's machine-check verdict is kept, beside the library."""
-    db = _state.library_db_path
+    """Where this computer's machine-check verdict is kept, beside this
+    computer's own library: it's about the computer, whichever library is open."""
+    db = _state.home_db_path
     return Path(db).parent / "machine-check.json" if db else None
 
 

@@ -111,11 +111,32 @@ async function s256(verifier: string): Promise<string> {
   return base64url(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier))));
 }
 
+/** Servers the website's band page will talk to: the official one, its
+ * staging copy, and one on this computer (development). A link naming any
+ * other server is ignored, so nobody can point the page (and a member's
+ * sign-in) at a server of their own. A self-hosted server serves its own
+ * band page. */
+const TRUSTED_SERVERS = ["https://api.churchslides.app", "https://church-slides-api-staging.martinmain93.workers.dev"];
+
+/** `url` as a server origin if this page may use it, else null. */
+export function trustedServer(url: string | null | undefined): string | null {
+  if (!url) return null;
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return null;
+  }
+  if (parsed.pathname.replace(/\/+$/, "") !== "" || parsed.search || parsed.hash || parsed.username || parsed.password) return null;
+  const local = parsed.protocol === "http:" && (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1");
+  return local || TRUSTED_SERVERS.includes(parsed.origin) ? parsed.origin : null;
+}
+
 /** Which account server this page signs in to. */
 export function memberServer(loc: Pick<Location, "search"> = window.location): string {
-  const fromUrl = new URLSearchParams(loc.search).get("server");
-  if (fromUrl && /^https?:\/\//.test(fromUrl)) return fromUrl.replace(/\/+$/, "");
-  return readJson<StoredSession>(localStorage, SESSION_KEY)?.server ?? DEFAULT_SERVER;
+  const fromUrl = trustedServer(new URLSearchParams(loc.search).get("server"));
+  if (fromUrl) return fromUrl;
+  return trustedServer(readJson<StoredSession>(localStorage, SESSION_KEY)?.server) ?? DEFAULT_SERVER;
 }
 
 /** Go to the server's sign-in page; it comes back here with a code. */
@@ -150,7 +171,8 @@ export class MemberSession {
   /** The session kept in this browser, if any. */
   static stored(): MemberSession | null {
     const s = readJson<StoredSession>(localStorage, SESSION_KEY);
-    return s?.clientId ? new MemberSession(s.server, s.clientId, s.refreshToken) : null;
+    const server = trustedServer(s?.server);
+    return s?.clientId && server ? new MemberSession(server, s.clientId, s.refreshToken) : null;
   }
 
   /** Back from the sign-in page (`?code=…&state=…`): trade the code for

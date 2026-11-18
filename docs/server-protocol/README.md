@@ -354,12 +354,18 @@ Every member can read every record.
 - **References keep records alive.** A record may list what it uses in a
   `refs` field: `["song:abc", …]`. Deleting a record that a live record
   refers to is refused (`in_use`). A change whose `refs` names a deleted
-  record brings that record back. So a song added to a service on one
-  computer while another computer deleted it is undeleted, not lost.
+  record brings that record back, whoever makes it: a set leader who adds a
+  song to a service while an operator deletes it gets the song back, not a
+  service with a hole in it. History (`service`, `performance`) can refer to
+  songs but never keeps one from being deleted.
+- **Limits:** 50,000 records per library, 20 kept versions per song's words
+  (older ones go), and about two sync calls a second per person
+  (`rate_limited` beyond that).
 
 ### `POST {api}/orgs/{orgId}/sync/push`
 
-Send local changes, oldest first.
+Send local changes, oldest first. Members, who may change nothing, are
+refused (`forbidden`).
 
 ```json
 {
@@ -375,13 +381,15 @@ Send local changes, oldest first.
 - `device` is a stable id for this computer's copy of the library. A
   computer's own back-to-back edits are never a conflict with each other.
 - `op` is a unique id for the change, made by the client. Sending the same
-  `op` again (a retry after a lost reply) returns the first result and
-  changes nothing.
+  `op` from the same person and `device` again (a retry after a lost reply)
+  returns the first result and changes nothing. Ops are remembered for 90
+  days.
 - `base` is the change number of the record the client last had (`0` for a
   record it made).
 - `set` names only the fields that changed. A field set to `null` is
   removed. A change has `set` or `"delete": true`, not both.
-- At most 500 changes and 4 MB in one push. A record is at most 512 KB.
+- At most 500 changes, 20,000 `refs` and 4 MB in one push. A record is at
+  most 512 KB.
 
 Response:
 
@@ -416,14 +424,18 @@ Every record changed after `seq`, in change order, each as it is now:
 ```
 
 A page holds up to 500 records or about 4 MB. When `more` is `true`, pull
-again after `seq`. A new computer pulls from `0`, which downloads the whole
+again after `seq`. When it's `false`, `seq` is the server's latest change
+number. A `seq` lower than the `after` you sent means the library was reset
+(or this copy came from elsewhere): pull again from `0`. A new computer pulls from `0`, which downloads the whole
 library. The client replaces its copy of each record with the server's, then
 applies its own unsent changes on top.
 
 ### `GET {api}/orgs/{orgId}/sync/revisions?type=song&id={id}`
 
-The kept versions of a record's words, newest first:
-`{ "revisions": [{ "id": 3, "field": "body_text", "value": "…", "replacedAt": 1731900000000, "replacedBy": "Sam" }] }`.
+The kept versions of a record's words, newest first, without the words:
+`{ "revisions": [{ "id": 3, "field": "body_text", "replacedAt": 1731900000000, "replacedBy": "Sam" }] }`.
+Add `&revision=3` for one version with its words:
+`{ "revision": { "id": 3, "field": "body_text", "value": "…", … } }`.
 Bringing one back is an ordinary push that sets the field.
 
 ### Change notices
@@ -431,8 +443,9 @@ Bringing one back is an ordinary push that sets the field.
 `POST {api}/orgs/{orgId}/sync/ticket` (any member) returns
 `{ "url": "wss://…/sync?org=…&ticket=css_…" }`, a one-use ticket like the
 live set's. Over the socket the server sends `{ "type": "changed", "seq": 42 }`
-whenever a push changes something, and the client pulls. The socket is only a
-nudge: a client that missed one pulls when it reconnects. Either side may
+whenever a push changes something, and the client pulls. The first message,
+on connecting, carries the latest number. The socket is only a nudge: a
+client that missed one pulls when it reconnects. Either side may
 send `ping`; the server answers `pong`. Removing a member or changing their
 role closes it (`4001`).
 

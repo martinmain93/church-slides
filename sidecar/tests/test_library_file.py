@@ -44,6 +44,9 @@ def test_missing_or_escaping_paths_fall_back_home(tmp_path: Path) -> None:
     assert open_library_path(_home(tmp_path, "orgs/gone/library.db")) == tmp_path / "library.db"
     (tmp_path / "library.db").unlink()
     assert open_library_path(_home(tmp_path, "../elsewhere.db")) == tmp_path / "library.db"
+    for bad in ("/etc/library.db", "C:\\x\\library.db", "orgs/../library.db", "orgs/a/b/library.db"):
+        (tmp_path / "library.db").unlink()
+        assert open_library_path(_home(tmp_path, bad)) == tmp_path / "library.db", bad
     # Not a library file at all: still home.
     bogus = tmp_path / "nothing.db"
     assert open_library_path(bogus) == bogus

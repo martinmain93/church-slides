@@ -490,10 +490,24 @@ impl std::error::Error for SignedOut {}
 /// A valid access token, refreshing (and rotating the refresh token) when
 /// the one in memory has expired.
 async fn access_token(app_data: &Path, cfg: &AccountConfig) -> Result<String> {
-    if let Some((tok, until)) = ACCESS.lock().unwrap_or_else(|e| e.into_inner()).clone() {
-        if Instant::now() < until {
-            return Ok(tok);
-        }
+    let current = || {
+        ACCESS
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone()
+            .filter(|(_, until)| Instant::now() < *until)
+            .map(|(tok, _)| tok)
+    };
+    if let Some(tok) = current() {
+        return Ok(tok);
+    }
+    // One refresh at a time: refresh tokens rotate, so two calls racing with
+    // the same one would leave the keychain holding a spent token. Whoever
+    // waited finds the fresh access token the first one got.
+    static REFRESHING: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+    let _one = REFRESHING.lock().await;
+    if let Some(tok) = current() {
+        return Ok(tok);
     }
     let refresh = secrets().get()?.ok_or(SignedOut)?;
     let resp = client()?

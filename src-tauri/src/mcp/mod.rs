@@ -15,7 +15,7 @@ pub mod app_link;
 pub mod install;
 mod matching;
 mod server;
-mod tools;
+pub(crate) mod tools;
 
 use std::path::PathBuf;
 use std::sync::Arc;

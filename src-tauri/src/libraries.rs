@@ -85,7 +85,11 @@ pub fn remembered_path(home_path: &Path) -> PathBuf {
 }
 
 fn resolve(home_path: &Path, rel: &str) -> PathBuf {
-    if rel.is_empty() || rel.contains("..") {
+    // Only ever `orgs/<id>/library.db`: anything else (absolute, `..`, a
+    // drive letter) opens this computer's own library.
+    let parts: Vec<&str> = rel.split('/').collect();
+    let well_formed = matches!(parts.as_slice(), ["orgs", id, "library.db"] if org_path(home_path, id).is_ok());
+    if !well_formed {
         return home_path.to_path_buf();
     }
     let path = home_path.parent().unwrap_or(Path::new("")).join(rel);
@@ -182,8 +186,14 @@ fn path_for(db: &Db, id: &str) -> Result<PathBuf> {
 /// Open library `id` and remember it for next time.
 pub fn open(db: &Db, id: &str) -> Result<()> {
     let path = path_for(db, id)?;
-    db.switch_to(&path)?;
+    let previous = relative(db.home_path(), &db.open_path());
+    // Recorded first: the engine and the assistant read it, so the app must
+    // never show a library they don't.
     remember(&db.home(), &relative(db.home_path(), &path))?;
+    if let Err(e) = db.switch_to(&path) {
+        let _ = remember(&db.home(), &previous);
+        return Err(e);
+    }
     log::info!("opened library at {}", path.display());
     Ok(())
 }
@@ -227,6 +237,12 @@ pub async fn open_library(
     state: tauri::State<'_, Arc<Db>>,
     id: String,
 ) -> Result<(), String> {
+    use tauri::Manager;
+    // A service reads the open library all the way through (edits, history,
+    // the leader's song list, the engine's search): it can't change under it.
+    if app.state::<crate::keep_awake::KeepAwake>().presenting() {
+        return Err("Finish the service before switching libraries.".into());
+    }
     open(&state, &id).map_err(|e| e.to_string())?;
     let _ = app.emit(crate::library_watch::LIBRARY_CHANGED_EVENT, ());
     Ok(())
@@ -320,12 +336,32 @@ mod tests {
     }
 
     #[test]
+    fn an_assistant_is_told_when_the_app_switches_library() {
+        let dir = tempfile::tempdir().unwrap();
+        let home = dir.path().join("library.db");
+        let app = Db::open(&home).unwrap();
+        create(&app, "org-1", "Grace Church").unwrap();
+        let assistant = crate::mcp::tools::Library::new(Arc::new(Db::open(&home).unwrap()), None);
+        let args = serde_json::json!({});
+        assert!(assistant.call("list_setlists", &args).is_ok());
+
+        open(&app, "org-1").unwrap();
+        let err = assistant.call("list_setlists", &args).unwrap_err().to_string();
+        assert!(err.contains("switched to another library"), "{err}");
+        // Told once; after that it works on the library that's open.
+        assert!(assistant.call("list_setlists", &args).is_ok());
+    }
+
+    #[test]
     fn library_ids_never_become_other_paths() {
         let home = Path::new("/data/library.db");
         for bad in ["", "..", "../x", "a/b", "this-computer", "a b"] {
             assert!(org_path(home, bad).is_err(), "{bad:?}");
         }
         assert_eq!(resolve(home, "../../etc/passwd"), home);
+        assert_eq!(resolve(home, "/etc/library.db"), home);
+        assert_eq!(resolve(home, "C:\\x\\library.db"), home);
+        assert_eq!(resolve(home, "orgs/../x/library.db"), home);
         assert_eq!(resolve(home, "orgs/gone/library.db"), home, "a missing file opens home");
     }
 }

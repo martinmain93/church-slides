@@ -19,6 +19,7 @@ import { ChevronDown, Monitor, MonitorOff } from "lucide-react";
 import {
   bandInviteUrl,
   hostedLink,
+  safeLanUrl,
   type MemberSource,
   useBandConnection,
   type BandConnection,
@@ -198,7 +199,8 @@ function NetworkFallback({ conn, hosted }: { conn: BandConnection; hosted: boole
         type="button"
         className="shrink-0 rounded-md border border-border px-3 py-1"
         onClick={() => {
-          window.location.href = `${lanUrl}#back=${encodeURIComponent(window.location.href)}`;
+          const safe = safeLanUrl(lanUrl);
+          if (safe) window.location.href = `${safe.split("#")[0]}#back=${encodeURIComponent(window.location.href)}`;
         }}
       >
         Connect directly

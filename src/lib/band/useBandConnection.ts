@@ -13,6 +13,7 @@
  *    the server, so there's nothing to get out of sync.
  */
 
+import { trustedServer } from "@/lib/band/memberSignIn";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { LibrarySong } from "@/lib/band/librarySearch";
@@ -74,8 +75,22 @@ export function hostedLink(loc: Pick<Location, "hash"> = window.location): { ser
   const params = new URLSearchParams((loc.hash ?? "").replace(/^#/, ""));
   const server = params.get("s");
   const token = params.get("t");
-  if (!server || !token || !/^https?:\/\//.test(server)) return null;
-  return { server: server.replace(/\/+$/, ""), token };
+  const trusted = trustedServer(server);
+  if (!trusted || !token) return null;
+  return { server: trusted, token };
+}
+
+/** The slides computer's address on the building's network, only if it's a
+ * plain web address: the page navigates to it, so anything else (a
+ * `javascript:` URL from a hostile room) is dropped. */
+export function safeLanUrl(url: unknown): string | null {
+  if (typeof url !== "string" || url.length > 500) return null;
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "http:" || parsed.protocol === "https:" ? parsed.href : null;
+  } catch {
+    return null;
+  }
 }
 
 /** Whether this band page has something to connect to: a hosted band link,
@@ -260,7 +275,7 @@ export function useBandConnection(role: "band" | "leader", pin: string | null, m
             setLastError(msg.message);
             break;
           case "lan":
-            setLanUrl(msg.url);
+            setLanUrl(safeLanUrl(msg.url));
             break;
           case "hosted":
             setHostedLive(msg.live);

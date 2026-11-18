@@ -38,23 +38,27 @@ class FakeSocket {
   }
 }
 
-const LINK = "https://churchslides.app/live/#s=https%3A%2F%2Fapi.example.org&t=csb_secret";
+const LINK = "https://churchslides.app/live/#s=https%3A%2F%2Fapi.churchslides.app&t=csb_secret";
 
 describe("hosted band links", () => {
   it("reads the server and token from the fragment, never the query", () => {
     const loc = new URL(LINK);
-    expect(hostedLink(loc)).toEqual({ server: "https://api.example.org", token: "csb_secret" });
-    expect(bandSocketUrl(loc as unknown as Location)).toBe("wss://api.example.org/band/v1/live");
+    expect(hostedLink(loc)).toEqual({ server: "https://api.churchslides.app", token: "csb_secret" });
+    expect(bandSocketUrl(loc as unknown as Location)).toBe("wss://api.churchslides.app/band/v1/live");
     expect(bandInviteUrl(loc as unknown as Location)).toBe(LINK);
     expect(hostedLink(new URL("https://churchslides.app/live/?s=https://x&t=y"))).toBeNull();
     expect(hostedLink(new URL("https://churchslides.app/live/#s=javascript:alert(1)&t=y"))).toBeNull();
+    // Only servers the page trusts: a link can't point it at someone else's.
+    expect(hostedLink(new URL("https://churchslides.app/live/#s=https%3A%2F%2Fevil.example&t=y"))).toBeNull();
+    expect(hostedLink(new URL("https://churchslides.app/live/#s=https%3A%2F%2Fapi.churchslides.app.evil.example&t=y"))).toBeNull();
+    expect(hostedLink(new URL("https://churchslides.app/live/#s=http%3A%2F%2Flocalhost%3A8787&t=y"))).toEqual({ server: "http://localhost:8787", token: "y" });
   });
 });
 
 describe("a band page with no link", () => {
   it("is only the website's bare /live/", () => {
     expect(bandPageHasLink({ hash: "", pathname: "/live/" })).toBe(false);
-    expect(bandPageHasLink({ hash: "#s=https://api.example&t=csb_x", pathname: "/live/" })).toBe(true);
+    expect(bandPageHasLink({ hash: "#s=https://api.churchslides.app&t=csb_x", pathname: "/live/" })).toBe(true);
     expect(bandPageHasLink({ hash: "", pathname: "/r/abc123/band" })).toBe(true);
   });
 });
@@ -63,7 +67,7 @@ describe("the band page in a hosted room", () => {
   beforeEach(() => {
     FakeSocket.all = [];
     vi.stubGlobal("WebSocket", FakeSocket);
-    window.history.replaceState(null, "", "/live/#s=https%3A%2F%2Fapi.example.org&t=csb_secret");
+    window.history.replaceState(null, "", "/live/#s=https%3A%2F%2Fapi.churchslides.app&t=csb_secret");
   });
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -73,7 +77,7 @@ describe("the band page in a hosted room", () => {
   it("sends the token as a subprotocol, asks for leader controls, and learns the local address", () => {
     const { result } = renderHook(() => useBandConnection("leader", null));
     const sock = FakeSocket.all[0]!;
-    expect(sock.url).toBe("wss://api.example.org/band/v1/live");
+    expect(sock.url).toBe("wss://api.churchslides.app/band/v1/live");
     expect(sock.protocols).toEqual(["csb", "csb_secret"]);
     act(() => sock.open());
     expect(JSON.parse(sock.sent[0]!)).toEqual({ type: "hello", role: "leader" });
@@ -84,6 +88,9 @@ describe("the band page in a hosted room", () => {
 
     act(() => sock.deliver({ type: "lan", url: "http://192.168.1.5:7777/band" }));
     expect(result.current.lanUrl).toBe("http://192.168.1.5:7777/band");
+    // A room can't make the page run a script through "Connect directly".
+    act(() => sock.deliver({ type: "lan", url: "javascript:alert(document.domain)//" }));
+    expect(result.current.lanUrl).toBeNull();
   });
 
   it("stops and says so when its link was removed", async () => {
@@ -93,7 +100,7 @@ describe("the band page in a hosted room", () => {
     const sock = FakeSocket.all[0]!;
     act(() => sock.open());
     await act(async () => sock.close(4001));
-    expect(fetchMock).toHaveBeenCalledWith("https://api.example.org/band/v1/me", { headers: { Authorization: "Bearer csb_secret" } });
+    expect(fetchMock).toHaveBeenCalledWith("https://api.churchslides.app/band/v1/me", { headers: { Authorization: "Bearer csb_secret" } });
     expect(result.current.linkRemoved).toBe(true);
     await act(async () => new Promise((r) => setTimeout(r, 500)));
     expect(FakeSocket.all).toHaveLength(1);
@@ -123,11 +130,11 @@ describe("a signed-in member on the band page", () => {
 
   it("connects with a fresh address each time and asks for leader controls", async () => {
     let n = 0;
-    const source = { socketUrl: vi.fn(async () => `wss://api.example.org/live/member?ticket=${++n}`) };
+    const source = { socketUrl: vi.fn(async () => `wss://api.churchslides.app/live/member?ticket=${++n}`) };
     renderHook(() => useBandConnection("leader", null, source));
     await act(async () => undefined);
     const first = FakeSocket.all[0]!;
-    expect(first.url).toBe("wss://api.example.org/live/member?ticket=1");
+    expect(first.url).toBe("wss://api.churchslides.app/live/member?ticket=1");
     act(() => first.open());
     expect(JSON.parse(first.sent[0]!)).toEqual({ type: "hello", role: "leader" });
     vi.useFakeTimers();
@@ -137,7 +144,7 @@ describe("a signed-in member on the band page", () => {
     } finally {
       vi.useRealTimers();
     }
-    expect(FakeSocket.all[1]?.url).toBe("wss://api.example.org/live/member?ticket=2");
+    expect(FakeSocket.all[1]?.url).toBe("wss://api.churchslides.app/live/member?ticket=2");
   });
 
   it("stops when the person can't join any more", async () => {
