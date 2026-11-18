@@ -21,6 +21,12 @@ export function LibrarySwitcher({ onSwitched }: { onSwitched: () => void }) {
   }, []);
   useEffect(load, [load]);
   useLibraryChanged(load);
+  // Libraries can come and go outside the app (a folder removed, another
+  // computer's sync): check again whenever the window comes back.
+  useEffect(() => {
+    window.addEventListener("focus", load);
+    return () => window.removeEventListener("focus", load);
+  }, [load]);
 
   if (libraries.length < 2) return null;
   const open = libraries.find((l) => l.open);
