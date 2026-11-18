@@ -166,14 +166,24 @@ function sorted(rows: SongRow[], sort: SortKey): SongRow[] {
 // Account sign-in, faked: "signs in" instantly as a member of one organization.
 const signedOutAccount = {
   signedIn: false,
+  userId: null,
   email: null,
   displayName: null,
   memberships: [],
   server: "https://api.churchslides.app",
   serverIsDefault: true,
 };
+type MockMember = { userId: string; displayName: string | null; email: string; role: string; joinedAt: number };
+const mockOrgsStart = (): Record<string, MockMember[]> => ({
+  o1: [
+    { userId: "u-pat", displayName: "Pat", email: "pat@example.org", role: "owner", joinedAt: 0 },
+    { userId: "u-ada", displayName: "Ada", email: "ada@example.org", role: "operator", joinedAt: 0 },
+  ],
+  o2: [{ userId: "u-sam", displayName: "Sam", email: "sam@example.org", role: "owner", joinedAt: 0 }],
+});
+let mockOrgs = mockOrgsStart();
 let mockAccount: typeof signedOutAccount | {
-  signedIn: boolean; email: string; displayName: string;
+  signedIn: boolean; userId: string; email: string; displayName: string;
   memberships: { orgId: string; orgName: string; role: string }[];
   server: string; serverIsDefault: boolean;
 } = signedOutAccount;
@@ -185,12 +195,16 @@ export const mockTauri = {
   async account_refresh() {
     return mockAccount;
   },
-  async account_sign_in() {
+  async account_sign_in(args?: { invite?: string | null }) {
+    mockOrgs = mockOrgsStart();
+    const memberships = [{ orgId: "o1", orgName: "Grace Chapel", role: "operator" }];
+    if (args?.invite) memberships.push({ orgId: "o2", orgName: "Hope Church", role: "member" });
     mockAccount = {
       signedIn: true,
+      userId: "u-ada",
       email: "ada@example.org",
       displayName: "Ada",
-      memberships: [{ orgId: "o1", orgName: "Grace Chapel", role: "operator" }],
+      memberships,
       server: "https://api.churchslides.app",
       serverIsDefault: true,
     };
@@ -203,6 +217,54 @@ export const mockTauri = {
   async account_sign_out_everywhere() {
     mockAccount = signedOutAccount;
     return mockAccount;
+  },
+  /** The organization API, enough to click through Settings → Account. */
+  async account_api({ method, path, body }: { method: string; path: string; body: Record<string, unknown> | null }) {
+    if (!mockAccount.signedIn) throw new Error("This computer was signed out. Sign in again to continue.");
+    const me = mockAccount as Exclude<typeof mockAccount, typeof signedOutAccount>;
+    const parts = path.split("/").filter(Boolean).map(decodeURIComponent);
+    if (method === "POST" && path === "/orgs") {
+      const id = `o${Date.now()}`;
+      mockOrgs[id] = [{ userId: me.userId, displayName: me.displayName, email: me.email, role: "owner", joinedAt: Date.now() }];
+      me.memberships = [...me.memberships, { orgId: id, orgName: String(body?.name), role: "owner" }];
+      return { org: { id, name: body?.name }, role: "owner" };
+    }
+    if (method === "POST" && path === "/invites/accept") {
+      if (!String(body?.invite).includes("csi_")) throw new Error("This invite has expired or been withdrawn. Ask for a new one.");
+      const already = me.memberships.find((m) => m.orgId === "o2");
+      if (!already) me.memberships = [...me.memberships, { orgId: "o2", orgName: "Hope Church", role: "member" }];
+      return { membership: { orgId: "o2", orgName: "Hope Church", role: already?.role ?? "member" }, joined: !already };
+    }
+    const [, orgId, what, id] = parts;
+    const members = mockOrgs[orgId ?? ""];
+    if (!members) throw new Error("No such organization.");
+    if (what === "members" && method === "GET") {
+      const mine = me.memberships.find((m) => m.orgId === orgId)?.role;
+      const manage = mine === "owner" || mine === "admin";
+      return { members: members.map((m) => ({ ...m, email: manage || m.userId === me.userId ? m.email : undefined })) };
+    }
+    if (what === "members" && method === "PATCH") {
+      const m = members.find((x) => x.userId === id);
+      if (m) m.role = String(body?.role);
+      return null;
+    }
+    if (what === "members" && method === "DELETE") {
+      mockOrgs[orgId!] = members.filter((x) => x.userId !== id);
+      if (id === me.userId) me.memberships = me.memberships.filter((m) => m.orgId !== orgId);
+      return null;
+    }
+    if (what === "invites" && method === "POST") {
+      return { url: "https://api.churchslides.app/join/csi_mockInviteCode0123456789", code: "csi_mockInviteCode0123456789" };
+    }
+    if (what === "band-devices" && method === "POST") {
+      const token = `csb_mock${body?.canLead ? "Leader" : "Band"}${Date.now()}`;
+      return { device: { id: `d${Date.now()}`, name: body?.name, canLead: Boolean(body?.canLead) }, token, url: `https://churchslides.app/live/#s=https%3A%2F%2Fapi.churchslides.app&t=${token}` };
+    }
+    if (what === "live" && id === "ticket" && method === "POST") {
+      // No hosted room in the browser preview: the socket fails and retries.
+      return { url: "ws://127.0.0.1:9/live/host?ticket=cst_mock" };
+    }
+    throw new Error(`mock: ${method} ${path} isn't mocked`);
   },
   async get_sidecar_port(): Promise<number> {
     // No sidecar in browser dev mode — surface as connection failure so
@@ -366,6 +428,25 @@ export const mockTauri = {
       songs_replaced: replaced,
     };
   },
+
+  // --- Libraries ----------------------------------------------------------
+
+  async get_library_look() {
+    return null;
+  },
+  async set_library_look() {},
+  async can_move_library() {
+    return false;
+  },
+  async library_sync_status() {
+    return { org_id: null, state: "off", waiting: 0, message: null };
+  },
+  async library_sync_now() {},
+  async list_libraries() {
+    return [{ id: "this-computer", name: "This computer", kind: "computer", open: true }];
+  },
+
+  async open_library() {},
 
   // --- Setlists -----------------------------------------------------------
 

@@ -50,4 +50,54 @@ describe("Settings → Account", () => {
     fireEvent.click(buttons[buttons.length - 1]!);
     expect(await screen.findByRole("button", { name: "Sign in" })).toBeInTheDocument();
   });
+
+  it("joins through an invite link while signing in", async () => {
+    renderAccount();
+    fireEvent.click(await screen.findByRole("button", { name: "Join with an invite" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Join with an invite" }), {
+      target: { value: "https://api.churchslides.app/join/csi_abc" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Join" }));
+    expect(await screen.findByText("Hope Church")).toBeInTheDocument();
+  });
+
+  it("creates an organization and invites people to it", async () => {
+    await mockTauri.account_sign_in();
+    renderAccount();
+    fireEvent.click(await screen.findByRole("button", { name: "New organization" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "New organization" }), { target: { value: "New Life" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create" }));
+    // In two organizations now. Where services go live isn't a setting: it's
+    // whichever organization's library is open.
+    expect(await screen.findByText("New Life")).toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Services go live at" })).toBeNull();
+
+    const teams = screen.getAllByRole("button", { name: "Team" });
+    fireEvent.click(teams[teams.length - 1]!);
+    expect(await screen.findByText("(you)")).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("combobox", { name: "Role for new people" }), { target: { value: "operator" } });
+    fireEvent.click(screen.getByRole("button", { name: "Invite people" }));
+    expect(await screen.findByRole("textbox", { name: "Invite link" })).toHaveValue(
+      "https://api.churchslides.app/join/csi_mockInviteCode0123456789",
+    );
+    expect(screen.getByText(/join as operator for the next 14 days/)).toBeInTheDocument();
+    // The owner can't leave; that needs a transfer first.
+    expect(screen.queryByRole("button", { name: /^Leave/ })).toBeNull();
+  });
+
+  it("shows an operator their team without managing it, and lets them leave", async () => {
+    await mockTauri.account_sign_in();
+    renderAccount();
+    fireEvent.click(await screen.findByRole("button", { name: "Team" }));
+    expect(await screen.findByText("Pat")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Invite people" })).toBeNull();
+    expect(screen.queryByRole("combobox", { name: /Role for/ })).toBeNull();
+    // Other people's emails are for owners and admins.
+    expect(screen.queryByText("pat@example.org")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Leave Grace Chapel" }));
+    const leave = await screen.findAllByRole("button", { name: "Leave" });
+    fireEvent.click(leave[leave.length - 1]!);
+    expect(await screen.findByText(/not in an organization yet/)).toBeInTheDocument();
+  });
 });

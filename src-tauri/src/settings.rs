@@ -129,7 +129,7 @@ impl Default for Settings {
 }
 
 pub fn get(db: &Arc<Db>) -> Result<Settings> {
-    let conn = db.conn().lock().unwrap();
+    let conn = db.home();
     let mut stmt = conn.prepare("SELECT value FROM settings WHERE key = ?1")?;
     let mut rows = stmt.query(params![SETTINGS_KEY])?;
     if let Some(row) = rows.next()? {
@@ -224,7 +224,7 @@ pub fn report_choice(db_path: &Path) -> bool {
 pub fn set(db: &Arc<Db>, settings: &Settings) -> Result<()> {
     let json = serde_json::to_string(settings).context("serializing settings")?;
     let now = unix_ms();
-    let conn = db.conn().lock().unwrap();
+    let conn = db.home();
     conn.execute(
         "INSERT INTO settings (key, value, updated_at) VALUES (?1, ?2, ?3) \
          ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",

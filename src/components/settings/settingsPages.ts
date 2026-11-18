@@ -22,7 +22,7 @@ export interface SettingsPageInfo {
 const ALL: SettingsPageInfo[] = [
   { id: "audio", label: "Audio", description: "What the AI listens to." },
   { id: "ai", label: "AI", description: "Following the songs, and AI assistants." },
-  { id: "display", label: "Display", description: "How lyrics look on the projector." },
+  { id: "display", label: "Display look", description: "How lyrics look on the projector." },
   { id: "scripture", label: "Scripture", description: "Bible translations and how passages look." },
   { id: "account", label: "Account", description: "Sign in to work with your team." },
   { id: "other", label: "Other", description: "Privacy, updates and developer tools." },

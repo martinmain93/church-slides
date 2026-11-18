@@ -17,6 +17,7 @@ import { CSS } from "@dnd-kit/utilities";
 import {
   ArrowLeft,
   BookOpen,
+  Check,
   Music,
   Palette,
   PanelRightClose,
@@ -320,6 +321,31 @@ export function SetlistBuilder({
     }
   }
 
+  // Leaving another way (the sidebar, say) gets the same tidy-up as the back
+  // button: an untouched new setlist goes, and a half-typed name is kept.
+  const leftByButton = useRef(false);
+  const onLeave = useRef<() => void>(() => undefined);
+  onLeave.current = () => {
+    if (leftByButton.current) return;
+    if (shouldDiscardOnBack({ justCreated, renamed: renamed.current, hadSongs: everHadSongs.current })) {
+      void deleteSetlist(setlistId).catch(() => undefined);
+    } else if (nameDirty.current) {
+      void persistName();
+    }
+  };
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      // StrictMode unmounts and remounts at once in development; only a
+      // builder still gone a moment later has really been left.
+      setTimeout(() => {
+        if (!mounted.current) onLeave.current();
+      }, 0);
+    };
+  }, []);
+
   async function refresh() {
     const d = await getSetlist(setlistId);
     if (d) setDetail(d);
@@ -491,11 +517,13 @@ export function SetlistBuilder({
 
   async function handleEditSong(songId: string) {
     // Leaving unmounts the builder, which would drop a pending rename.
+    leftByButton.current = true;
     if (nameDirty.current) await persistName();
     onEditSong?.(songId);
   }
 
   async function handleBack() {
+    leftByButton.current = true;
     // "New setlist" then straight back out leaves nothing worth keeping, so
     // Home doesn't fill with empty drafts.
     if (shouldDiscardOnBack({ justCreated, renamed: renamed.current, hadSongs: everHadSongs.current })) {
@@ -509,7 +537,7 @@ export function SetlistBuilder({
   const itemSongIds = new Set(detail.items.map((i) => i.song_id));
   const visibleSongs =
     searchQuery.trim() === ""
-      ? suggested.filter((s) => !itemSongIds.has(s.id))
+      ? suggested // added songs stay put (ticked), so the next click lands where aimed
       : (found?.songs ?? []);
   const q = searchQuery.trim().toLowerCase();
   const visibleReadings = readings.filter(
@@ -589,7 +617,7 @@ export function SetlistBuilder({
               Band screens…
             </MenuItem>
             <MenuItem icon={<Palette />} onSelect={() => setLookOpen(true)}>
-              Lyrics style…
+              Display look…
             </MenuItem>
             <MenuItem icon={<Radio />} onSelect={() => setPeerSignal((n) => n + 1)}>
               Send or get a setlist…
@@ -821,11 +849,8 @@ export function SetlistBuilder({
                           <KeyBadge songKey={songKey} className="size-5 text-[10px]" />
                         )}
                         {alreadyIn ? (
-                          <span
-                            className="rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground"
-                            title="Already in setlist — click to add again (reprise)"
-                          >
-                            in setlist
+                          <span title="In the setlist — click to add it again (a reprise)">
+                            <Check aria-label="In the setlist" className="size-4 shrink-0 text-primary" />
                           </span>
                         ) : (
                           <Plus className="size-4 shrink-0 text-muted-foreground transition-colors group-hover:text-foreground" />

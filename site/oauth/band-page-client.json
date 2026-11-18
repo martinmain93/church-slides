@@ -1,0 +1,10 @@
+{
+  "client_id": "https://churchslides.app/oauth/band-page-client.json",
+  "client_name": "Church Slides band screen",
+  "client_uri": "https://churchslides.app",
+  "application_type": "web",
+  "redirect_uris": ["https://churchslides.app/live/"],
+  "grant_types": ["authorization_code", "refresh_token"],
+  "response_types": ["code"],
+  "token_endpoint_auth_method": "none"
+}

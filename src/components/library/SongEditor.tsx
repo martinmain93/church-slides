@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
+  History,
   Check,
   Code2,
   FileUp,
@@ -20,6 +21,7 @@ import {
   getSong,
   getSongCharts,
   importCharts,
+  listLibraries,
   saveSongReference,
   updateSong,
   type NewSongInput,
@@ -28,6 +30,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Menu, MenuItem } from "@/components/ui/Menu";
+import { SongHistoryDialog } from "@/components/library/SongHistoryDialog";
 import { Textarea } from "@/components/ui/textarea";
 import { SongPreview, type ChordDisplayMode } from "@/components/library/SongPreview";
 import { parseSong, sectionLabel, sectionLabelClass, type ParsedSection } from "@/lib/parseSong";
@@ -115,6 +118,19 @@ const TIME_SIGNATURES = ["4/4", "3/4", "6/8", "12/8", "2/4", "2/2", "5/4", "9/8"
 export function SongEditor({ songId, onClose, backLabel = "Library" }: Props) {
   const toast = useToast();
   const confirm = useConfirm();
+  // Earlier words are kept for an organization's library (its server keeps them).
+  const [inOrgLibrary, setInOrgLibrary] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  useEffect(() => {
+    let live = true;
+    listLibraries().then(
+      (l) => live && setInOrgLibrary(l.find((x) => x.open)?.kind === "organization"),
+      () => undefined,
+    );
+    return () => {
+      live = false;
+    };
+  }, []);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [author, setAuthor] = useState("");
@@ -1045,6 +1061,11 @@ export function SongEditor({ songId, onClose, backLabel = "Library" }: Props) {
           <SaveIndicator state={saveState} />
           {idRef.current !== null && (
             <Menu label="More options">
+              {inOrgLibrary && (
+                <MenuItem icon={<History />} onSelect={() => setHistoryOpen(true)}>
+                  Earlier words…
+                </MenuItem>
+              )}
               <MenuItem icon={<Trash2 />} onSelect={() => void handleDelete()} destructive>
                 Delete song…
               </MenuItem>
@@ -1052,6 +1073,18 @@ export function SongEditor({ songId, onClose, backLabel = "Library" }: Props) {
           )}
         </div>
       </header>
+
+      {historyOpen && idRef.current && (
+        <SongHistoryDialog
+          songId={idRef.current}
+          onClose={() => setHistoryOpen(false)}
+          onRestore={(words) => {
+            setBody(words);
+            setChordText(toChordText(words, chart));
+            markDirty();
+          }}
+        />
+      )}
 
       {errorMsg && (
         <div className="border-b border-destructive/40 bg-destructive/10 px-6 py-2 text-xs text-destructive">

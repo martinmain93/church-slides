@@ -8,14 +8,22 @@
 //! is released the moment the presentation closes (or the app quits: the OS
 //! drops assertions with the process).
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 
 #[derive(Default)]
-pub struct KeepAwake(Mutex<Option<keepawake::KeepAwake>>);
+pub struct KeepAwake(Mutex<Option<keepawake::KeepAwake>>, AtomicBool);
 
 impl KeepAwake {
+    /// Whether a service is being presented (held from start to end, even if
+    /// the OS refused the assertion). Switching libraries waits for it.
+    pub fn presenting(&self) -> bool {
+        self.1.load(Ordering::SeqCst)
+    }
+
     /// Hold or release the assertion. Idempotent both ways.
     pub fn set(&self, on: bool) -> Result<(), String> {
+        self.1.store(on, Ordering::SeqCst);
         let mut held = self.0.lock().unwrap();
         if !on {
             *held = None; // dropping releases it

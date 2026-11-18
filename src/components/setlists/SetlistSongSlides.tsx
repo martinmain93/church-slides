@@ -515,7 +515,7 @@ export function SetlistSongSlides({
           <button
             type="button"
             onClick={() => setStyling(true)}
-            title={ownLook ? "Style for this setlist (its own)" : "Give this a style of its own in this setlist"}
+            title={ownLook ? "Look for this setlist (its own)" : "Give this a look of its own in this setlist"}
             aria-label="Style"
             data-own-style={ownLook ? "true" : undefined}
             className={`rounded p-1 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover/song:opacity-100 ${
@@ -542,8 +542,8 @@ export function SetlistSongSlides({
         <DisplayLookDialog
           onClose={() => setStyling(false)}
           override={{
-            title: `Style for “${item.song?.title ?? "this item"}”`,
-            description: "Only in this setlist. Everything else keeps its style.",
+            title: `Look for “${item.song?.title ?? "this item"}”`,
+            description: "Only in this setlist. Everything else keeps its look.",
             value: look,
             onChange: (next) => void saveOwnLook(next),
             onUseDefault: parseLook(ownLook)

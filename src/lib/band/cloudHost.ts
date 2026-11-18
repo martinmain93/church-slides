@@ -1,7 +1,7 @@
 /**
- * The slides computer's side of the online relay (`relay/src`): one socket to
- * this service's room, kept alive, publishing the same snapshots the local
- * band server gets.
+ * The slides computer's side of an online room: the self-hosted relay
+ * (`relay/src`) or an organization's hosted live room. One socket, kept
+ * alive, publishing the same snapshots the local band server gets.
  *
  * Robustness mirrors the band devices':
  *  - reconnect forever with back-off, and re-send the latest setlist and
@@ -48,17 +48,23 @@ export function libraryParts(songs: LibrarySong[], limit = LIBRARY_PART_CHARS): 
   return parts;
 }
 
+/** Snapshots re-sent on every (re)connect. `lan` (hosted rooms only) says
+ * where devices can reach this computer on the church's network. */
+export type HostSnapshot = "setlist" | "position" | "lan";
+
 export class CloudHost {
   private sock: WebSocket | null = null;
-  private latest: Record<"setlist" | "position", unknown> = { setlist: null, position: null };
+  private latest: Record<HostSnapshot, unknown> = { setlist: null, position: null, lan: null };
   private attempt = 0;
   private retryTimer: ReturnType<typeof setTimeout> | undefined;
   private pinger: ReturnType<typeof setInterval> | undefined;
   private watchdog: ReturnType<typeof setTimeout> | undefined;
   private closed = false;
 
+  /** `url` may be fetched fresh for every connection (a hosted room's
+   * one-use ticket). */
   constructor(
-    private url: string,
+    private url: string | (() => Promise<string>),
     private handlers: CloudHostHandlers,
   ) {}
 
@@ -66,9 +72,21 @@ export class CloudHost {
     if (this.closed) return;
     clearTimeout(this.retryTimer);
     this.handlers.onConnection(this.attempt === 0 ? "connecting" : "reconnecting");
+    if (typeof this.url === "string") {
+      this.open(this.url);
+      return;
+    }
+    this.url().then(
+      (url) => this.open(url),
+      () => this.scheduleRetry(),
+    );
+  }
+
+  private open(url: string): void {
+    if (this.closed) return;
     let sock: WebSocket;
     try {
-      sock = new WebSocket(this.url);
+      sock = new WebSocket(url);
     } catch {
       this.scheduleRetry();
       return;
@@ -79,7 +97,7 @@ export class CloudHost {
       this.attempt = 0;
       this.handlers.onConnection("live");
       this.armWatchdog(sock);
-      for (const kind of ["setlist", "position"] as const) {
+      for (const kind of ["setlist", "position", "lan"] as const) {
         if (this.latest[kind] !== null) sock.send(JSON.stringify({ type: kind, data: this.latest[kind] }));
       }
       clearInterval(this.pinger);
@@ -126,7 +144,7 @@ export class CloudHost {
   }
 
   /** Remember and send a snapshot. Remembered ones are re-sent on reconnect. */
-  publish(kind: "setlist" | "position", data: unknown): void {
+  publish(kind: HostSnapshot, data: unknown): void {
     this.latest[kind] = data;
     if (this.sock?.readyState === WebSocket.OPEN) this.sock.send(JSON.stringify({ type: kind, data }));
   }
@@ -136,7 +154,7 @@ export class CloudHost {
    * snapshots here and in the room, and devices go back to waiting.
    */
   idle(): void {
-    this.latest = { setlist: null, position: null };
+    this.latest = { ...this.latest, setlist: null, position: null };
     if (this.sock?.readyState === WebSocket.OPEN) this.sock.send(JSON.stringify({ type: "idle" }));
   }
 

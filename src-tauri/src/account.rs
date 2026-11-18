@@ -70,6 +70,7 @@ pub struct Membership {
 #[serde(rename_all = "camelCase")]
 pub struct AccountStatus {
     pub signed_in: bool,
+    pub user_id: Option<String>,
     pub email: Option<String>,
     pub display_name: Option<String>,
     pub memberships: Vec<Membership>,
@@ -99,14 +100,21 @@ pub fn status(app_data: &Path) -> AccountStatus {
     match load(app_data) {
         Some(cfg) if matches!(secrets().get(), Ok(Some(_))) => AccountStatus {
             signed_in: true,
+            user_id: Some(cfg.user_id.clone()),
             email: Some(cfg.email),
             display_name: cfg.display_name,
             memberships: cfg.memberships,
             server: cfg.server.clone(),
             server_is_default: cfg.server == DEFAULT_SERVER,
         },
-        _ => AccountStatus { signed_in: false, email: None, display_name: None, memberships: vec![], server, server_is_default },
+        _ => AccountStatus { signed_in: false, user_id: None, email: None, display_name: None, memberships: vec![], server, server_is_default },
     }
+}
+
+/// The organizations this computer's account is in, as last heard from the
+/// server. Reads no secret, so it never waits on the keychain.
+pub fn memberships(app_data: &Path) -> Vec<Membership> {
+    load(app_data).map(|c| c.memberships).unwrap_or_default()
 }
 
 /// Forget everything local about the account. Never fails halfway: a keychain
@@ -119,8 +127,20 @@ fn clear(app_data: &Path) {
 
 // --- Keychain -------------------------------------------------------------------
 
+/// The keychain item's service: `<app identifier>.account`, so a copy of the
+/// app with its own identifier (a test build) never touches the real
+/// sign-in. The released app's is `com.churchslides.app.account`.
+static KEYCHAIN_SERVICE: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+
+/// Set once at startup from the app's identifier.
+pub fn set_app_identifier(identifier: &str) {
+    let _ = KEYCHAIN_SERVICE.set(format!("{identifier}.account"));
+}
+
 #[cfg_attr(test, allow(dead_code))]
-const KEYCHAIN_SERVICE: &str = "com.churchslides.app.account";
+fn keychain_service() -> &'static str {
+    KEYCHAIN_SERVICE.get().map(String::as_str).unwrap_or("com.churchslides.app.account")
+}
 #[cfg_attr(test, allow(dead_code))]
 const KEYCHAIN_USER: &str = "refresh-token";
 
@@ -135,19 +155,19 @@ struct Keychain;
 
 impl SecretStore for Keychain {
     fn get(&self) -> Result<Option<String>> {
-        match keyring::Entry::new(KEYCHAIN_SERVICE, KEYCHAIN_USER)?.get_password() {
+        match keyring::Entry::new(keychain_service(), KEYCHAIN_USER)?.get_password() {
             Ok(s) => Ok(Some(s)),
             Err(keyring::Error::NoEntry) => Ok(None),
             Err(e) => Err(anyhow!("Couldn't read the sign-in from the keychain: {e}")),
         }
     }
     fn set(&self, secret: &str) -> Result<()> {
-        keyring::Entry::new(KEYCHAIN_SERVICE, KEYCHAIN_USER)?
+        keyring::Entry::new(keychain_service(), KEYCHAIN_USER)?
             .set_password(secret)
             .map_err(|e| anyhow!("Couldn't save the sign-in to the keychain: {e}"))
     }
     fn delete(&self) -> Result<()> {
-        match keyring::Entry::new(KEYCHAIN_SERVICE, KEYCHAIN_USER)?.delete_credential() {
+        match keyring::Entry::new(keychain_service(), KEYCHAIN_USER)?.delete_credential() {
             Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
             Err(e) => Err(anyhow!("Couldn't remove the sign-in from the keychain: {e}")),
         }
@@ -373,7 +393,10 @@ fn remember_access(resp: &Value) -> Result<String> {
 
 /// Sign in through the browser. `open_browser` opens the authorization URL
 /// (the system browser in the app; a scripted client in tests).
-pub async fn sign_in(app_data: &Path, open_browser: impl FnOnce(&str) -> Result<()>) -> Result<AccountStatus> {
+/// Sign in through the system browser. With an `invite` (a code or link),
+/// the server lets a new person in without the pilot passcode and adds them
+/// to that organization.
+pub async fn sign_in(app_data: &Path, invite: Option<&str>, open_browser: impl FnOnce(&str) -> Result<()>) -> Result<AccountStatus> {
     let server = server_url();
     let info = discover(&server).await?;
 
@@ -393,6 +416,9 @@ pub async fn sign_in(app_data: &Path, open_browser: impl FnOnce(&str) -> Result<
         .append_pair("code_challenge", &challenge)
         .append_pair("code_challenge_method", "S256")
         .append_pair("resource", &info.resource);
+    if let Some(invite) = invite.map(str::trim).filter(|i| !i.is_empty()) {
+        url.query_pairs_mut().append_pair("invite", invite);
+    }
     open_browser(url.as_str())?;
 
     let code = tokio::time::timeout(Duration::from_secs(300), await_code(listener, &state, &info.issuer))
@@ -442,6 +468,7 @@ pub async fn sign_in(app_data: &Path, open_browser: impl FnOnce(&str) -> Result<
 fn status_of(cfg: &AccountConfig) -> AccountStatus {
     AccountStatus {
         signed_in: true,
+        user_id: Some(cfg.user_id.clone()),
         email: Some(cfg.email.clone()),
         display_name: cfg.display_name.clone(),
         memberships: cfg.memberships.clone(),
@@ -481,10 +508,24 @@ impl std::error::Error for SignedOut {}
 /// A valid access token, refreshing (and rotating the refresh token) when
 /// the one in memory has expired.
 async fn access_token(app_data: &Path, cfg: &AccountConfig) -> Result<String> {
-    if let Some((tok, until)) = ACCESS.lock().unwrap_or_else(|e| e.into_inner()).clone() {
-        if Instant::now() < until {
-            return Ok(tok);
-        }
+    let current = || {
+        ACCESS
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone()
+            .filter(|(_, until)| Instant::now() < *until)
+            .map(|(tok, _)| tok)
+    };
+    if let Some(tok) = current() {
+        return Ok(tok);
+    }
+    // One refresh at a time: refresh tokens rotate, so two calls racing with
+    // the same one would leave the keychain holding a spent token. Whoever
+    // waited finds the fresh access token the first one got.
+    static REFRESHING: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+    let _one = REFRESHING.lock().await;
+    if let Some(tok) = current() {
+        return Ok(tok);
     }
     let refresh = secrets().get()?.ok_or(SignedOut)?;
     let resp = client()?
@@ -534,6 +575,46 @@ pub async fn refresh_status(app_data: &Path) -> Result<AccountStatus> {
         // Offline or the server is down: keep showing what we know.
         Err(_) => Ok(status(app_data)),
     }
+}
+
+/// Call the signed-in API at `path` (under the server's API root, e.g.
+/// `/orgs/{id}/members`). An expired access token is refreshed and the call
+/// retried once. A server error comes back as its readable message.
+pub async fn api(app_data: &Path, method: &str, path: &str, body: Option<Value>) -> Result<Value> {
+    if !path.starts_with('/') || path.contains("..") || path.contains("//") {
+        bail!("Not an API path: {path}");
+    }
+    let method = match method {
+        "GET" => reqwest::Method::GET,
+        "POST" => reqwest::Method::POST,
+        "PATCH" => reqwest::Method::PATCH,
+        "DELETE" => reqwest::Method::DELETE,
+        other => bail!("Unsupported method {other}"),
+    };
+    let cfg = load(app_data).ok_or(SignedOut)?;
+    for attempt in 0..2 {
+        let access = access_token(app_data, &cfg).await?;
+        let mut req = client()?.request(method.clone(), format!("{}{}{}", cfg.server, cfg.api, path)).bearer_auth(access);
+        if let Some(b) = &body {
+            req = req.json(b);
+        }
+        let resp = req.send().await.context("Couldn't reach the server")?;
+        let status = resp.status();
+        if status == reqwest::StatusCode::UNAUTHORIZED && attempt == 0 {
+            // The access token was refused before it expired (the server
+            // restarted its keys, or it was revoked): get a new one.
+            *ACCESS.lock().unwrap_or_else(|e| e.into_inner()) = None;
+            continue;
+        }
+        let text = resp.text().await.unwrap_or_default();
+        let value: Value = if text.is_empty() { Value::Null } else { serde_json::from_str(&text).unwrap_or(Value::Null) };
+        if !status.is_success() {
+            let message = value.pointer("/error/message").and_then(Value::as_str).map(String::from);
+            bail!(message.unwrap_or_else(|| format!("The server replied {status}")));
+        }
+        return Ok(value);
+    }
+    Err(SignedOut.into())
 }
 
 /// Sign this computer out: revoke its refresh token (best effort) and forget it.
@@ -594,6 +675,7 @@ mod tests {
         refresh: Option<String>,
         revoked: Vec<String>,
         signed_out_everywhere: bool,
+        invite: Option<String>,
     }
     type S = Arc<StdMutex<Fake>>;
 
@@ -637,6 +719,7 @@ mod tests {
                     assert_eq!(q["code_challenge_method"], "S256");
                     assert_eq!(q["resource"], format!("{}/v1", f.base));
                     f.codes.insert("code-1".into(), (q["redirect_uri"].clone(), q["code_challenge"].clone()));
+                    f.invite = q.get("invite").cloned();
                     let to = format!("{}?code=code-1&state={}&iss={}", q["redirect_uri"], q["state"], f.base);
                     Redirect::to(&to)
                 }),
@@ -682,6 +765,25 @@ mod tests {
                 }),
             )
             .route(
+                "/v1/orgs",
+                post(|headers: axum::http::HeaderMap, Json(body): Json<Value>| async move {
+                    if headers.get("authorization").and_then(|v| v.to_str().ok()) != Some("Bearer access-1") {
+                        return axum::http::StatusCode::UNAUTHORIZED.into_response();
+                    }
+                    (axum::http::StatusCode::CREATED, Json(json!({ "org": { "id": "o2", "name": body["name"] }, "role": "owner" })))
+                        .into_response()
+                }),
+            )
+            .route(
+                "/v1/orgs/o1",
+                axum::routing::delete(|| async {
+                    (
+                        axum::http::StatusCode::FORBIDDEN,
+                        Json(json!({ "error": { "code": "forbidden", "message": "Your role in this organization doesn't allow that." } })),
+                    )
+                }),
+            )
+            .route(
                 "/v1/me/sign-out-everywhere",
                 post(|State(s): State<S>| async move {
                     s.lock().unwrap().signed_out_everywhere = true;
@@ -719,7 +821,7 @@ mod tests {
         std::env::set_var("CHURCH_SLIDES_SERVER", &base);
         let dir = tempfile::tempdir().unwrap();
 
-        let st = sign_in(dir.path(), browser).await.unwrap();
+        let st = sign_in(dir.path(), None, browser).await.unwrap();
         assert!(st.signed_in);
         assert_eq!(st.email.as_deref(), Some("ada@example.org"));
         assert_eq!(st.memberships[0].org_name, "Grace Chapel");
@@ -748,13 +850,49 @@ mod tests {
 
     #[tokio::test]
     #[allow(clippy::await_holding_lock)]
+    async fn passes_an_invite_to_the_sign_in_page() {
+        let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        reset();
+        let (base, fake) = fake_server(true).await;
+        std::env::set_var("CHURCH_SLIDES_SERVER", &base);
+        let dir = tempfile::tempdir().unwrap();
+        sign_in(dir.path(), Some("  https://api.example/join/csi_abc  "), browser).await.unwrap();
+        assert_eq!(fake.lock().unwrap().invite.as_deref(), Some("https://api.example/join/csi_abc"));
+    }
+
+    #[tokio::test]
+    #[allow(clippy::await_holding_lock)]
+    async fn calls_the_api_and_reports_its_errors_plainly() {
+        let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        reset();
+        let (base, _fake) = fake_server(true).await;
+        std::env::set_var("CHURCH_SLIDES_SERVER", &base);
+        let dir = tempfile::tempdir().unwrap();
+        sign_in(dir.path(), None, browser).await.unwrap();
+
+        // A token the server no longer accepts, though it hasn't expired:
+        // refreshed and retried once.
+        *ACCESS.lock().unwrap() = Some(("stale".into(), Instant::now() + Duration::from_secs(600)));
+        let created = api(dir.path(), "POST", "/orgs", Some(json!({ "name": "Grace" }))).await.unwrap();
+        assert_eq!(created["org"]["name"], "Grace");
+
+        let err = api(dir.path(), "DELETE", "/orgs/o1", None).await.unwrap_err();
+        assert_eq!(err.to_string(), "Your role in this organization doesn't allow that.");
+
+        assert!(api(dir.path(), "GET", "https://elsewhere.example/x", None).await.is_err());
+        assert!(api(dir.path(), "GET", "/../oauth/token", None).await.is_err());
+        assert!(api(dir.path(), "PUT", "/orgs", None).await.is_err());
+    }
+
+    #[tokio::test]
+    #[allow(clippy::await_holding_lock)]
     async fn registers_dynamically_when_the_server_needs_it() {
         let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
         reset();
         let (base, fake) = fake_server(false).await;
         std::env::set_var("CHURCH_SLIDES_SERVER", &base);
         let dir = tempfile::tempdir().unwrap();
-        let st = sign_in(dir.path(), browser).await.unwrap();
+        let st = sign_in(dir.path(), None, browser).await.unwrap();
         assert!(st.signed_in);
         let reg = fake.lock().unwrap().registered[0].clone();
         assert_eq!(reg["token_endpoint_auth_method"], "none");
@@ -769,7 +907,7 @@ mod tests {
         let (base, _fake) = fake_server(true).await;
         std::env::set_var("CHURCH_SLIDES_SERVER", &base);
         let dir = tempfile::tempdir().unwrap();
-        sign_in(dir.path(), browser).await.unwrap();
+        sign_in(dir.path(), None, browser).await.unwrap();
         let st = sign_out_everywhere(dir.path()).await.unwrap();
         assert!(!st.signed_in);
         assert!(TEST_SECRET.lock().unwrap().is_none());
@@ -783,7 +921,7 @@ mod tests {
         let (base, fake) = fake_server(true).await;
         std::env::set_var("CHURCH_SLIDES_SERVER", &base);
         let dir = tempfile::tempdir().unwrap();
-        sign_in(dir.path(), browser).await.unwrap();
+        sign_in(dir.path(), None, browser).await.unwrap();
         // Another device chose "Sign out everywhere".
         fake.lock().unwrap().signed_out_everywhere = true;
         *ACCESS.lock().unwrap() = None;
@@ -800,7 +938,7 @@ mod tests {
         let (base, _fake) = fake_server(true).await;
         std::env::set_var("CHURCH_SLIDES_SERVER", &base);
         let dir = tempfile::tempdir().unwrap();
-        sign_in(dir.path(), browser).await.unwrap();
+        sign_in(dir.path(), None, browser).await.unwrap();
         // Point the saved account at a server that isn't there.
         let mut cfg = load(dir.path()).unwrap();
         cfg.token_endpoint = "http://127.0.0.1:9/oauth/token".into();

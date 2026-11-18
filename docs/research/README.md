@@ -24,3 +24,4 @@ public repo.
 | [MUSIC_MODELS_2026](MUSIC_MODELS_2026.md) | Which beat, downbeat and chord models to use | Review; BTC chosen |
 | [CHORD_DOWNBEAT](CHORD_DOWNBEAT.md) | Chord charts as a position signal | +2–3% at best; chords shipped as a diagnostic, later used by the follower |
 | [MUSIC_ONLY_MATCHING](MUSIC_ONLY_MATCHING.md) | Find the song and place from music alone | Works offline; led to the score follower |
+| [DECISION_MODELS_2026_11](DECISION_MODELS_2026_11.md) | Do the new small decision / tool-calling models belong in the app? | Not as decision models; the offline spoken-request fallback (20/45) needs re-picking |

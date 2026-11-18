@@ -15,6 +15,9 @@
 
 import { createContext, useContext, useEffect, useMemo, useState, type CSSProperties } from "react";
 
+import { isInTauri } from "@/lib/invoke";
+import { getLibraryLook, listLibraries, setLibraryLook } from "@/lib/tauri";
+
 // Google Fonts, bundled through fontsource so they work offline. Only the
 // weights `FONT_WEIGHTS` uses; a browser only fetches a file once text
 // actually renders in it.
@@ -203,13 +206,19 @@ export function loadDisplayLook(): DisplayLook {
   }
 }
 
-export function saveDisplayLook(look: DisplayLook): void {
+function cacheDisplayLook(look: DisplayLook): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(look));
   } catch {
     // Non-critical — the listeners below still switch this session.
   }
   for (const fn of listeners) fn(look);
+}
+
+/** Change the open library's look (it syncs with an organization's). */
+export function saveDisplayLook(look: DisplayLook): void {
+  cacheDisplayLook(look);
+  void storeInLibrary();
 }
 
 export function useDisplayLook(): DisplayLook {
@@ -252,8 +261,7 @@ export function loadScriptureLook(): DisplayLook | null {
   }
 }
 
-/** Scripture's own look, or `null` to use the default style again. */
-export function saveScriptureLook(look: DisplayLook | null): void {
+function cacheScriptureLook(look: DisplayLook | null): void {
   try {
     if (look) localStorage.setItem(SCRIPTURE_KEY, JSON.stringify(look));
     else localStorage.removeItem(SCRIPTURE_KEY);
@@ -261,6 +269,52 @@ export function saveScriptureLook(look: DisplayLook | null): void {
     // Non-critical — the listeners below still switch this session.
   }
   for (const fn of scriptureListeners) fn(look);
+}
+
+/** Scripture's own look, or `null` to use the default style again. */
+export function saveScriptureLook(look: DisplayLook | null): void {
+  cacheScriptureLook(look);
+  void storeInLibrary();
+}
+
+// --- the library's copy --------------------------------------------------------
+//
+// The look belongs to the open library (migration 013), so everyone showing
+// an organization's library projects the same one. This window keeps a copy
+// in local storage so the first frame draws in it before the library answers.
+
+async function storeInLibrary(): Promise<void> {
+  if (!isInTauri()) return;
+  const scripture = loadScriptureLook();
+  await setLibraryLook(JSON.stringify(loadDisplayLook()), scripture ? JSON.stringify(scripture) : null).catch(
+    () => undefined,
+  );
+}
+
+/**
+ * Take the open library's look (on start, and after a switch or a sync).
+ * A library with no look yet: this computer's own takes the look this window
+ * already had; an organization's shows the defaults until someone sets one,
+ * so a newcomer's first download never overwrites the team's.
+ */
+export async function loadLibraryLook(): Promise<void> {
+  if (!isInTauri()) return;
+  let stored: Awaited<ReturnType<typeof getLibraryLook>>;
+  let libraries: Awaited<ReturnType<typeof listLibraries>>;
+  try {
+    [stored, libraries] = await Promise.all([getLibraryLook(), listLibraries()]);
+  } catch {
+    return;
+  }
+  if (stored) {
+    cacheDisplayLook(parseLook(stored.display) ?? DEFAULT_LOOK);
+    cacheScriptureLook(parseLook(stored.scripture));
+  } else if (libraries.find((l) => l.open)?.kind === "organization") {
+    cacheDisplayLook(DEFAULT_LOOK);
+    cacheScriptureLook(null);
+  } else {
+    await storeInLibrary();
+  }
 }
 
 export function useScriptureLook(): DisplayLook | null {

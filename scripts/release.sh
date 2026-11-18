@@ -62,6 +62,11 @@ build_site() {
   local version="$1"
   rm -rf "$SITE_OUT" && mkdir -p "$SITE_OUT"
   rsync -a --exclude README.md site/ "$SITE_OUT/"
+  # The band page for hosted live rooms (/live/): the same band screen the
+  # relay serves, built from this version of the app.
+  pnpm -s exec vite build --config relay/vite.band.config.ts --logLevel warn \
+    || die "couldn't build the band page"
+  cp relay/dist/band/band.js relay/dist/band/band.css "$SITE_OUT/live/"
   # The touch icon comes from the app's own icons, so a new icon reaches the page.
   # The favicon is the bare window (site/favicon.*), not the app icon's square.
   cp src-tauri/icons/128x128@2x.png "$SITE_OUT/icon.png"

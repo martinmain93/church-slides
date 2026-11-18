@@ -112,7 +112,7 @@ describe("App", () => {
     // Assistants live on the AI page; the display look is inline on Display.
     fireEvent.click(screen.getByRole("button", { name: "AI" }));
     expect(await screen.findByRole("heading", { name: "AI assistants" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Display" }));
+    fireEvent.click(screen.getByRole("button", { name: "Display look" }));
     expect(await screen.findByRole("radiogroup", { name: "Colours" })).toBeInTheDocument();
 
     // Leaving settings folds the list away again.

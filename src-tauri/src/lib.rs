@@ -8,6 +8,9 @@ mod db;
 mod diagnostics;
 mod feedback;
 mod keep_awake;
+mod libraries;
+mod library_look;
+mod library_sync;
 mod library_export;
 mod library_watch;
 mod mcp;
@@ -379,11 +382,20 @@ pub fn run() {
                 .path()
                 .app_data_dir()
                 .expect("app_data_dir resolves on supported platforms");
+            account::set_app_identifier(&app.config().identifier);
             let db_path = db::default_db_path(&app_data_dir);
             let db = Arc::new(
                 Db::open(&db_path)
                     .unwrap_or_else(|e| panic!("failed to open db at {db_path:?}: {e:#}")),
             );
+            // The library that was open last (this computer's own, or an
+            // organization's).
+            let open_path = libraries::remembered_path(&db_path);
+            if open_path != db_path {
+                if let Err(e) = db.switch_to(&open_path) {
+                    log::warn!("couldn't open {}; using this computer's library: {e:#}", open_path.display());
+                }
+            }
             // The user's choice about error reports, from here on.
             match settings::get(&db) {
                 Ok(s) => {
@@ -407,13 +419,16 @@ pub fn run() {
                 .start(app.handle().clone(), &app_data_dir);
             // Announce this operator on the LAN and watch for others.
             let sync = peer_sync::PeerSync::new(app.handle().clone(), &db);
+            log::info!("opened library at {}", db.open_path().display());
+            let library_sync = Arc::new(library_sync::LibrarySync::default());
+            library_sync.start(app.handle().clone(), db.clone(), app_data_dir.clone());
+            app.manage(library_sync);
             app.manage(db);
             app.manage(sync);
             let handle_for_sync = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 handle_for_sync.state::<peer_sync::PeerSync>().start().await;
             });
-            log::info!("opened library at {}", db_path.display());
 
             let handle = app.handle().clone();
             let db_path_for_sidecar = db_path.clone();
@@ -447,6 +462,18 @@ pub fn run() {
             feedback::send_feedback,
             feedback::open_link,
             read_third_party_notices,
+            libraries::list_libraries,
+            libraries::open_library,
+            libraries::create_library,
+            library_look::get_library_look,
+            library_look::set_library_look,
+            libraries::can_move_library,
+            libraries::move_library_into,
+            library_sync::library_song_revisions,
+            library_sync::library_song_revision,
+            library_sync::library_sync_status,
+            library_sync::library_sync_now,
+            library_sync::library_sync_ticket,
             open_audience_window,
             close_audience_window,
             toggle_audience_fullscreen,
@@ -512,6 +539,7 @@ pub fn run() {
             commands::account_refresh,
             commands::account_sign_in,
             commands::account_sign_out,
+            commands::account_api,
             commands::account_sign_out_everywhere,
             commands::cloud_relay_status,
             commands::cloud_relay_setup_token,

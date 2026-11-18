@@ -10,7 +10,7 @@
  * AI's override handling) and the operator grid follows it like any click.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import { parseStoredChart, type ChordChart } from "@/lib/chords/chart";
 import { semitonesToKey, transposeKey } from "@/lib/chords/chord";
@@ -26,6 +26,9 @@ import {
 } from "@/lib/band/protocol";
 import type { BlankMode, PresentationContext } from "@/lib/presentation/state";
 import { onlineRoom } from "@/lib/band/onlineRoom";
+import { hostedRoom, type HostedRoomState } from "@/lib/band/hostedRoom";
+import { accountStatus, liveOrganization, type Membership } from "@/lib/account";
+import { FEATURES } from "@/lib/features";
 import { useOnlineRoom, type OnlineRoomApi } from "@/lib/band/useOnlineRoom";
 import {
   bandClear,
@@ -33,6 +36,7 @@ import {
   bandPublish,
   bandStart,
   getSongCharts,
+  listLibraries,
   type BandInfo,
 } from "@/lib/tauri";
 
@@ -82,11 +86,14 @@ export interface BandHostApi {
   /** Null until band screens are switched on. */
   info: BandInfo | null;
   clients: number;
-  start: () => Promise<void>;
+  /** Switch the local band server on; `remember` (default) brings it back next launch. */
+  start: (remember?: boolean) => Promise<void>;
   error: string | null;
   /** The online room: for when devices can't reach this computer. App-wide,
    * so one started in the setlist editor carries on into the service. */
   online?: OnlineRoomApi;
+  /** The organization's hosted live room, when this computer is signed in to one. */
+  hosted?: HostedRoomState;
 }
 
 /**
@@ -160,13 +167,13 @@ export function useBandServer(): BandHostApi {
   const [error, setError] = useState<string | null>(null);
   const running = info !== null;
 
-  const start = useCallback(async () => {
+  const start = useCallback(async (remember = true) => {
     try {
       const i = await bandStart();
       setInfo(i);
       setClients(i.clients);
       setError(null);
-      writeAutostart(true);
+      if (remember) writeAutostart(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -232,10 +239,42 @@ export function useBandHost(opts: BandHostOptions): BandHostApi {
     onlineRoom.setCommandHandler((c) => applyCommandRef.current(c));
     return () => onlineRoom.setCommandHandler(null);
   }, []);
+  // Signed in to an organization that runs the live set: its hosted room
+  // opens on its own, with the local band server alongside as the fallback.
+  const [liveOrg, setLiveOrg] = useState<Membership | null>(null);
+  useEffect(() => {
+    // Outside the app (browser preview) this is the mock account.
+    if (!FEATURES.account) return;
+    let live = true;
+    // The open library decides: a service goes live where its songs are.
+    Promise.all([accountStatus(), listLibraries().catch(() => [])]).then(
+      ([s, libraries]) => live && setLiveOrg(liveOrganization(s, libraries.find((l) => l.open)?.id)),
+      () => undefined,
+    );
+    return () => {
+      live = false;
+    };
+  }, []);
+  const hosted = useSyncExternalStore(hostedRoom.subscribe, hostedRoom.getState);
+  const startServer = server.start;
+  useEffect(() => {
+    if (!liveOrg) return;
+    hostedRoom.start({ orgId: liveOrg.orgId, orgName: liveOrg.orgName });
+    if (!info) void startServer(false);
+    // `info` is checked only when the organization is picked: the server
+    // stays on once started.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveOrg, startServer]);
+  useEffect(() => {
+    hostedRoom.setCommandHandler((c) => applyCommandRef.current(c));
+    return () => hostedRoom.setCommandHandler(null);
+  }, []);
+
   const localRunning = info !== null;
   const onlineActive = online.room !== null;
-  // Publishing (and fetching charts) while either path is on.
-  const running = localRunning || onlineActive;
+  const hostedActive = hosted.org !== null;
+  // Publishing (and fetching charts) while any path is on.
+  const running = localRunning || onlineActive || hostedActive;
 
   // Charts for the songs in the service.
   const songIdsKey = useMemo(() => [...new Set(ctx.items.map((it) => it.song.id))].sort().join(","), [ctx.items]);
@@ -263,14 +302,33 @@ export function useBandHost(opts: BandHostOptions): BandHostApi {
   useEffect(() => {
     if (localRunning) void bandPublish("setlist", setlist).catch(() => undefined);
     if (onlineActive) onlineRoom.publish("setlist", setlist);
-  }, [localRunning, onlineActive, setlist]);
+    if (hostedActive) hostedRoom.publish("setlist", setlist);
+  }, [localRunning, onlineActive, hostedActive, setlist]);
 
   const itemId = ctx.items[itemIdx]?.itemId ?? null;
   useEffect(() => {
     const position: BandPosition = { itemIdx, slideIdx, itemId, blankMode };
     if (localRunning) void bandPublish("position", position).catch(() => undefined);
     if (onlineActive) onlineRoom.publish("position", position);
-  }, [localRunning, onlineActive, itemIdx, slideIdx, itemId, blankMode]);
+    if (hostedActive) hostedRoom.publish("position", position);
+  }, [localRunning, onlineActive, hostedActive, itemIdx, slideIdx, itemId, blankMode]);
+
+  // Where devices in the hosted room can reach this computer if the room
+  // can't be reached; the leader's address carries the local PIN.
+  const lanBase = info?.urls[0] ?? null;
+  const lanPin = info?.pin ?? null;
+  useEffect(() => {
+    if (hostedActive && lanBase && lanPin) {
+      hostedRoom.publish("lan", { band: `${lanBase}/band`, leader: `${lanBase}/leader?pin=${lanPin}` });
+    }
+  }, [hostedActive, lanBase, lanPin]);
+
+  // Devices that fell back to this computer go back to the hosted room as
+  // soon as it's reachable again.
+  const hostedLive = hosted.connection === "live";
+  useEffect(() => {
+    if (localRunning && hostedActive) void bandPublish("hosted", { live: hostedLive }).catch(() => undefined);
+  }, [localRunning, hostedActive, hostedLive]);
 
   // Leader commands. Refs so the listener is registered once, not per render.
   const ctxRef = useRef(ctx);
@@ -353,8 +411,9 @@ export function useBandHost(opts: BandHostOptions): BandHostApi {
     return () => {
       if (isInTauri()) void bandClear().catch(() => undefined);
       onlineRoom.idle();
+      hostedRoom.idle();
     };
   }, []);
 
-  return server;
+  return useMemo(() => ({ ...server, hosted: hostedActive ? hosted : undefined }), [server, hosted, hostedActive]);
 }

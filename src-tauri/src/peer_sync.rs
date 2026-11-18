@@ -629,7 +629,7 @@ fn emit_peers(inner: &Inner) {
 /// woke from sleep) is recognised as the same one.
 fn instance_id(db: &Db) -> String {
     const KEY: &str = "peer_instance_id";
-    let conn = db.conn().lock().unwrap();
+    let conn = db.home();
     let existing = conn
         .query_row("SELECT value FROM settings WHERE key = ?1", params![KEY], |r| r.get::<_, String>(0))
         .optional()

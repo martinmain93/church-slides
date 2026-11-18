@@ -233,6 +233,90 @@ export async function importLibrary(json: string, mode: ImportMode): Promise<Imp
 
 // --- Setlists --------------------------------------------------------------
 
+// --- Libraries --------------------------------------------------------------
+
+/** One library on this computer: its own, or an organization's. */
+export interface LibraryInfo {
+  id: string;
+  name: string;
+  kind: "computer" | "organization";
+  open: boolean;
+}
+
+export async function listLibraries(): Promise<LibraryInfo[]> {
+  return invoke<LibraryInfo[]>("list_libraries");
+}
+
+/** Switch libraries; every view reloads on the `library-changed` event. */
+export async function openLibrary(id: string): Promise<void> {
+  return invoke<void>("open_library", { id });
+}
+
+/** The open library's display look (JSON strings), or null if it has none. */
+export async function getLibraryLook(): Promise<{ display: string | null; scripture: string | null } | null> {
+  return invoke("get_library_look");
+}
+
+export async function setLibraryLook(display: string | null, scripture: string | null): Promise<void> {
+  return invoke<void>("set_library_look", { display, scripture });
+}
+
+/** Whether to offer moving this computer's library into `orgId` (its owner,
+ * songs here, the organization's library still empty). */
+export async function canMoveLibrary(orgId: string): Promise<boolean> {
+  return invoke<boolean>("can_move_library", { orgId });
+}
+
+/** Move this computer's library into an organization, and open it there. */
+export async function moveLibraryInto(orgId: string): Promise<void> {
+  return invoke<void>("move_library_into", { orgId });
+}
+
+export interface SongRevision {
+  id: number;
+  field: string;
+  replacedAt: number;
+  replacedBy: string | null;
+  value?: string;
+}
+
+/** Earlier words of a song in an organization's library, newest first. */
+export async function songRevisions(songId: string): Promise<SongRevision[]> {
+  const r = await invoke<{ revisions: SongRevision[] }>("library_song_revisions", { songId });
+  return r.revisions ?? [];
+}
+
+export async function songRevision(songId: string, revision: number): Promise<SongRevision> {
+  const r = await invoke<{ revision: SongRevision }>("library_song_revision", { songId, revision });
+  return r.revision;
+}
+
+/** How the open organization library's sync stands. Shown only when
+ * something's waiting or wrong. */
+export interface LibrarySyncStatus {
+  org_id: string | null;
+  state: "off" | "syncing" | "ok" | "offline" | "signed_out" | "error";
+  /** Changes made here that haven't gone up yet. */
+  waiting: number;
+  message: string | null;
+}
+
+export const LIBRARY_SYNC_EVENT = "library-sync";
+
+export async function librarySyncStatus(): Promise<LibrarySyncStatus> {
+  return invoke<LibrarySyncStatus>("library_sync_status");
+}
+
+/** Pull now: a change notice arrived. */
+export async function librarySyncNow(): Promise<void> {
+  return invoke<void>("library_sync_now");
+}
+
+/** A one-use websocket address for an organization's change notices. */
+export async function librarySyncTicket(orgId: string): Promise<string> {
+  return invoke<string>("library_sync_ticket", { orgId });
+}
+
 export async function listSetlists(): Promise<SetlistRow[]> {
   return invoke<SetlistRow[]>("list_setlists");
 }
@@ -283,7 +367,7 @@ export async function setSetlistItemContent(
   await invoke<void>("set_setlist_item_content", { setlistId, itemId, content: JSON.stringify(content) });
 }
 
-/** A new setlist holding a copy of another's items ("Start from last service"). */
+/** A new setlist holding a copy of another's items ("Copy last service"). */
 export async function duplicateSetlist(sourceId: string, name: string): Promise<string> {
   return invoke<string>("duplicate_setlist", { sourceId, name });
 }
@@ -476,7 +560,7 @@ export async function bandInfo(): Promise<BandInfo | null> {
   return invoke<BandInfo | null>("band_info");
 }
 
-export async function bandPublish(kind: "setlist" | "position", payload: unknown): Promise<void> {
+export async function bandPublish(kind: "setlist" | "position" | "hosted", payload: unknown): Promise<void> {
   await invoke<void>("band_publish", { kind, payload });
 }
 

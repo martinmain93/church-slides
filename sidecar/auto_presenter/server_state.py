@@ -34,6 +34,7 @@ from auto_presenter.decision.library_recovery import OffSetlistWatcher
 from auto_presenter.decision.singing import SingingDetector
 from auto_presenter.music.band import BandPresence
 from auto_presenter.index.fingerprint import FingerprintIndex
+from auto_presenter.library_file import open_library_path
 from auto_presenter.music.analyser import MusicAnalyser
 from auto_presenter.pipeline.audio_session import AudioSession
 from auto_presenter.pipeline.stage_cost import StageCost
@@ -54,6 +55,16 @@ class _ServerState:
     passes via `--db-path`.
     """
 
+    @property
+    def library_db_path(self) -> Path | None:
+        """The open library's file, so off-setlist recovery, the follower and
+        library search read the songs the operator is working with."""
+        return open_library_path(self.home_db_path)
+
+    @library_db_path.setter
+    def library_db_path(self, value: Path | None) -> None:
+        self.home_db_path = value
+
     def __init__(self) -> None:
         self.clients: set[ServerConnection] = set()
         self.audio_session: AudioSession | None = None
@@ -64,9 +75,10 @@ class _ServerState:
         self.whisper_backend: WhisperBackend | None = None
         self.whisper_model_size: str | None = None
         self.recordings_root: Path | None = None
-        #: Path to Tauri's `library.db`, so off-setlist recovery can read
-        #: songs the UI never pushed. None in tests that don't pass `--db-path`.
-        self.library_db_path: Path | None = None
+        #: This computer's own `library.db` (`--db-path`). The library that's
+        #: open may be another file: see `library_db_path`. None in tests
+        #: that don't pass `--db-path`.
+        self.home_db_path: Path | None = None
         #: The delayed library-search index warm-up (server_library_search).
         self.library_search_warmup: asyncio.Task[None] | None = None
         self.library_index: FingerprintIndex | None = None

@@ -20,7 +20,7 @@ const RECENT_LIMIT = 6;
 interface Props {
   reloadKey?: number;
   onCreateSetlist: () => void;
-  /** A new setlist starting as a copy of this one ("Start from last service"). */
+  /** A new setlist starting as a copy of this one ("Copy last service"). */
   onCopySetlist: (id: string) => void;
   onOpenSetlist: (id: string) => void;
   onContinueService: (
@@ -165,7 +165,7 @@ export function HomeScreen({
                   title={`A new setlist with everything in "${lastService.name}" — songs, readings and edits — to change from there`}
                 >
                   <Copy className="size-4" />
-                  Start from last service
+                  Copy last service
                 </Button>
               )}
               <Button onClick={onCreateSetlist} size="sm">

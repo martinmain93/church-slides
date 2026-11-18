@@ -3,7 +3,7 @@
  * to join (a QR code to scan, the address to type, the leader PIN).
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ArrowLeft, Cloud, MonitorUp, Music } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -12,14 +12,39 @@ import { closeBandWindows, countBandWindows, openBandWindow } from "@/lib/tauri"
 import { OnlineRoomPanel } from "@/components/band/OnlineRoomPanel";
 import type { OnlineRoomApi } from "@/lib/band/useOnlineRoom";
 import { QrCode } from "@/components/band/QrCode";
+import { BandLinkMaker } from "@/components/band/BandLinkMaker";
 import { cn } from "@/lib/utils";
 
 /** Under the "⋯" menu's "Band screens…" item: how many devices are on band
  * screens once they're on, since there's no top-bar button to say so. */
 export function bandScreensMenuHint(band: BandHostApi): string | undefined {
-  if (!band.info && !band.online?.room) return undefined;
-  const n = band.clients + (band.online?.clients ?? 0);
-  return `On · ${n} device${n === 1 ? "" : "s"} connected`;
+  if (!band.info && !band.online?.room && !band.hosted) return undefined;
+  const n = band.clients + (band.online?.clients ?? 0) + (band.hosted?.clients ?? 0);
+  const devices = `${n} device${n === 1 ? "" : "s"} connected`;
+  if (band.hosted) return `Live at ${band.hosted.org?.orgName ?? "your organization"} · ${devices}`;
+  return `On · ${devices}`;
+}
+
+/** Signed in to an organization: where the service is going, and the band links that follow it. */
+function HostedRoomNote({ hosted }: { hosted: NonNullable<BandHostApi["hosted"]> }) {
+  const live = hosted.connection === "live";
+  return (
+    <div className="rounded-md border border-border p-3 text-sm" data-testid="hosted-room-note">
+      <p>
+        {live ? "Live at " : "Connecting to "}
+        <span className="font-medium">{hosted.org?.orgName}</span>
+        {live && ` · ${hosted.clients} device${hosted.clients === 1 ? "" : "s"}`}
+      </p>
+      <p className="text-xs text-muted-foreground">
+        Phones and tablets open a band link once and follow every service from then on, from anywhere.
+      </p>
+      {hosted.org && (
+        <div className="mt-2">
+          <BandLinkMaker orgId={hosted.org.orgId} />
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function BandScreensButton({
@@ -51,7 +76,10 @@ export function BandScreensButton({
   // The online room's setup and links take over the whole panel. Once the
   // church has set it up, that's what they came for: open straight onto it.
   const [view, setView] = useState<"main" | "online">("main");
-  const onlineReady = Boolean(band.online?.status?.configured || band.online?.room);
+  // Signed in to an organization, its hosted room replaces the church's own
+  // online relay: don't offer both.
+  const online = band.hosted ? undefined : band.online;
+  const onlineReady = Boolean(online?.status?.configured || online?.room);
   const chose = useRef(false);
   // Closed the online room while the panel's been open: don't reopen it by
   // itself; show Open / Disconnect until the panel is opened again.
@@ -75,6 +103,22 @@ export function BandScreensButton({
   };
   const [urlIdx, setUrlIdx] = useState(0);
   const panelRef = useRef<HTMLDivElement | null>(null);
+  // Never taller than the room between the button and the window's edge: it
+  // scrolls instead of running off the top (opening upward) or the bottom.
+  const [maxHeight, setMaxHeight] = useState<number | undefined>(undefined);
+  useLayoutEffect(() => {
+    if (!open || !panelRef.current) return;
+    const measure = () => {
+      // The wrapper is the button's box; the panel's near edge is 2.5rem
+      // (40px) in from the wrapper's far edge ("bottom-10" / "top-10").
+      const r = panelRef.current!.getBoundingClientRect();
+      const room = placement === "above" ? r.bottom - 40 - 16 : window.innerHeight - (r.top + 40) - 16;
+      setMaxHeight(Math.max(200, Math.floor(room)));
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [open, placement]);
 
   useEffect(() => {
     if (!open) return;
@@ -173,9 +217,10 @@ export function BandScreensButton({
             placement === "above" ? "bottom-10" : "top-10",
             align === "right" ? "right-0" : "left-0",
           )}
+          style={maxHeight ? { maxHeight } : undefined}
           data-testid="band-panel"
         >
-          {view === "online" && band.online ? (
+          {view === "online" && online ? (
             <div className="flex flex-col gap-3 text-sm">
               <div className="flex items-center gap-2">
                 <button
@@ -193,13 +238,15 @@ export function BandScreensButton({
                   Online room
                 </span>
               </div>
-              <OnlineRoomPanel online={band.online} autoStart={!closedRoom} onClosed={() => setClosedRoom(true)} />
+              <OnlineRoomPanel online={online} autoStart={!closedRoom} onClosed={() => setClosedRoom(true)} />
             </div>
           ) : !info ? (
             <div className="flex flex-col gap-3 text-sm">
+              {band.hosted && <HostedRoomNote hosted={band.hosted} />}
               <p>
-                Show lyrics and chords on the band&rsquo;s own phones and tablets, following the slides. Everything
-                stays on this building&rsquo;s network — no internet needed.
+                {band.hosted
+                  ? "Devices on this building’s Wi-Fi can also follow without the internet."
+                  : "Show lyrics and chords on the band’s own phones and tablets, following the slides. Everything stays on this building’s network — no internet needed."}
               </p>
               <p className="text-muted-foreground">
                 The first time, your computer may ask whether Church Slides can accept incoming network connections —
@@ -210,10 +257,14 @@ export function BandScreensButton({
                 Turn on band screens
               </Button>
               {localButton}
-              {band.online && <OnlineRoomEntry online={band.online} onOpen={() => goTo("online")} />}
+              {online && <OnlineRoomEntry online={online} onOpen={() => goTo("online")} />}
             </div>
           ) : (
             <div className="flex flex-col gap-3 text-sm">
+              {band.hosted && <HostedRoomNote hosted={band.hosted} />}
+              {band.hosted && (
+                <p className="text-xs text-muted-foreground">Or, on this building&rsquo;s Wi-Fi without the internet:</p>
+              )}
               <div className="flex justify-around">
                 <QrCode text={`${base}/band`} label="Band" />
                 <QrCode text={`${base}/leader?pin=${info.pin}`} label="Worship leader" />
@@ -248,7 +299,7 @@ export function BandScreensButton({
                 each other — if nothing connects, use the staff network or a small dedicated router for the band.
               </p>
               {localButton}
-              {band.online && <OnlineRoomEntry online={band.online} onOpen={() => goTo("online")} />}
+              {online && <OnlineRoomEntry online={online} onOpen={() => goTo("online")} />}
             </div>
           )}
         </div>

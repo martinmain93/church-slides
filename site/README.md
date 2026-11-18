@@ -1,5 +1,9 @@
 # Church Slides download page
 
+`live/` is the band page for an organization's hosted live room (band links
+from Settings → Account open it); its `band.js` and `band.css` are built from the
+app on each release.
+
 Two static pages: `index.html` (download buttons, system requirements, a short
 description) and `changelog.html` (what's new in each version, with downloads of
 older ones; its release list is filled from `CHANGELOG.md` by `scripts/changelog.py`).

@@ -13,6 +13,7 @@
  *    the server, so there's nothing to get out of sync.
  */
 
+import { trustedServer } from "@/lib/band/memberSignIn";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { LibrarySong } from "@/lib/band/librarySearch";
@@ -28,6 +29,12 @@ export type ConnectionStatus = "connecting" | "live" | "reconnecting";
 
 export interface BandConnection {
   status: ConnectionStatus;
+  /** Hosted room: the slides computer's address on the church's network. */
+  lanUrl: string | null;
+  /** Local band server: the hosted room is reachable again. */
+  hostedLive: boolean;
+  /** Hosted room: this band link was removed (or never worked); retrying won't help. */
+  linkRemoved: boolean;
   setlist: BandSetlist | null;
   position: BandPosition | null;
   /** Server says no service is running. */
@@ -46,13 +53,61 @@ export interface BandConnection {
 }
 
 const SILENCE_LIMIT_MS = 12_000;
+
+/** Whether the server refuses this band link (removed, or its organization
+ * deleted). `false` when it can't be asked: offline isn't removed. */
+export async function bandLinkRefused(link: { server: string; token: string }): Promise<boolean> {
+  try {
+    const res = await fetch(`${link.server}/band/v1/me`, { headers: { Authorization: `Bearer ${link.token}` } });
+    return res.status === 401;
+  } catch {
+    return false;
+  }
+}
 const PING_EVERY_MS = 10_000;
 
 /**
+ * A band link to an organization's hosted live room:
+ * `https://churchslides.app/live/#s=<server>&t=<band link token>`. The token
+ * stays in the fragment, which browsers never send to a server.
+ */
+export function hostedLink(loc: Pick<Location, "hash"> = window.location): { server: string; token: string } | null {
+  const params = new URLSearchParams((loc.hash ?? "").replace(/^#/, ""));
+  const server = params.get("s");
+  const token = params.get("t");
+  const trusted = trustedServer(server);
+  if (!trusted || !token) return null;
+  return { server: trusted, token };
+}
+
+/** The slides computer's address on the building's network, only if it's a
+ * plain web address: the page navigates to it, so anything else (a
+ * `javascript:` URL from a hostile room) is dropped. */
+export function safeLanUrl(url: unknown): string | null {
+  if (typeof url !== "string" || url.length > 500) return null;
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "http:" || parsed.protocol === "https:" ? parsed.href : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Whether this band page has something to connect to: a hosted band link,
+ * an online relay room, or (anywhere else) the slides computer serving it.
+ * Only the website's `/live/` can be opened with none. */
+export function bandPageHasLink(loc: Pick<Location, "hash" | "pathname"> = window.location): boolean {
+  return hostedLink(loc) !== null || /^\/r\/[a-z0-9]+\/(band|leader)$/.test(loc.pathname);
+}
+
+/**
  * Where the socket lives: same origin normally; the band port in dev (served
- * by Vite); `/r/<room>/ws?k=<key>` on the online relay.
+ * by Vite); `/r/<room>/ws?k=<key>` on the online relay; the server's
+ * `/band/v1/live` for a hosted room.
  */
 export function bandSocketUrl(loc: Location = window.location): string {
+  const hosted = hostedLink(loc);
+  if (hosted) return `${hosted.server.replace(/^http/, "ws")}/band/v1/live`;
   const params = new URLSearchParams(loc.search);
   const devPort = params.get("bandPort");
   const proto = loc.protocol === "https:" ? "wss:" : "ws:";
@@ -67,13 +122,23 @@ export function bandSocketUrl(loc: Location = window.location): string {
  * online relay. Never the leader link — that carries the PIN.
  */
 export function bandInviteUrl(loc: Location = window.location): string {
+  // A hosted band link is the invite (a leader link never shows this).
+  if (hostedLink(loc)) return loc.href;
   const params = new URLSearchParams(loc.search);
   const room = /^\/r\/([a-z0-9]+)\/(band|leader)$/.exec(loc.pathname);
   if (room) return `${loc.origin}/r/${room[1]}/band?k=${encodeURIComponent(params.get("k") ?? "")}`;
   return `${loc.origin}/band`;
 }
 
-export function useBandConnection(role: "band" | "leader", pin: string | null): BandConnection {
+/** A signed-in member's way into an organization's live room (the band page
+ * on the website): each connection needs a fresh one-use address. */
+export interface MemberSource {
+  /** Resolves to the socket address; rejects with `removed: true` when
+   * the person can't join any more (signed out, no longer a member). */
+  socketUrl: () => Promise<string>;
+}
+
+export function useBandConnection(role: "band" | "leader", pin: string | null, member?: MemberSource): BandConnection {
   const [status, setStatus] = useState<ConnectionStatus>("connecting");
   const [setlist, setSetlist] = useState<BandSetlist | null>(null);
   const [position, setPosition] = useState<BandPosition | null>(null);
@@ -83,6 +148,9 @@ export function useBandConnection(role: "band" | "leader", pin: string | null): 
   const [tooManyTries, setTooManyTries] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
   const [library, setLibrary] = useState<LibrarySong[] | null>(null);
+  const [lanUrl, setLanUrl] = useState<string | null>(null);
+  const [hostedLive, setHostedLive] = useState(false);
+  const [linkRemoved, setLinkRemoved] = useState(false);
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectNow = useRef<() => void>(() => undefined);
 
@@ -117,9 +185,33 @@ export function useBandConnection(role: "band" | "leader", pin: string | null): 
     const connect = () => {
       if (disposed) return;
       clearTimeout(retryTimer);
+      if (!member) {
+        openSocket(null);
+        return;
+      }
+      member.socketUrl().then(
+        (url) => {
+          if (!disposed) openSocket(url);
+        },
+        (err: unknown) => {
+          if (disposed) return;
+          if ((err as { removed?: boolean })?.removed) setLinkRemoved(true);
+          else scheduleRetry();
+        },
+      );
+    };
+
+    const openSocket = (memberUrl: string | null) => {
       let sock: WebSocket;
       try {
-        sock = new WebSocket(bandSocketUrl());
+        const hosted = hostedLink();
+        // The band link's token goes as a subprotocol: browsers can't set
+        // headers on a WebSocket, and this keeps it out of the URL.
+        sock = memberUrl
+          ? new WebSocket(memberUrl)
+          : hosted
+            ? new WebSocket(bandSocketUrl(), ["csb", hosted.token])
+            : new WebSocket(bandSocketUrl());
       } catch {
         scheduleRetry();
         return;
@@ -127,15 +219,23 @@ export function useBandConnection(role: "band" | "leader", pin: string | null): 
       socketRef.current = sock;
       armWatchdog(sock);
 
+      let opened = false;
       sock.onopen = () => {
         if (socketRef.current !== sock) return;
+        opened = true;
         attempt = 0;
         setStatus("live");
         clearInterval(pinger);
         pinger = setInterval(() => {
           if (sock.readyState === WebSocket.OPEN) sock.send("ping");
         }, PING_EVERY_MS);
-        const hello: ClientMessage = role === "leader" && pin ? { type: "hello", role, pin } : { type: "hello", role: "band" };
+        // In a hosted room the link decides: ask for leader controls and the
+        // room grants them to a leader link.
+        const hello: ClientMessage = memberUrl || hostedLink()
+          ? { type: "hello", role: "leader" }
+          : role === "leader" && pin
+            ? { type: "hello", role, pin }
+            : { type: "hello", role: "band" };
         sock.send(JSON.stringify(hello));
       };
       sock.onmessage = (ev) => {
@@ -174,6 +274,12 @@ export function useBandConnection(role: "band" | "leader", pin: string | null): 
           case "error":
             setLastError(msg.message);
             break;
+          case "lan":
+            setLanUrl(safeLanUrl(msg.url));
+            break;
+          case "hosted":
+            setHostedLive(msg.live);
+            break;
           case "library": {
             const parts = msg.parts ?? 1;
             const part = msg.part ?? 0;
@@ -184,16 +290,26 @@ export function useBandConnection(role: "band" | "leader", pin: string | null): 
           }
         }
       };
-      sock.onclose = () => {
+      sock.onclose = (ev) => {
         // Only the current socket's death means "reconnect".
         if (socketRef.current !== sock) return;
         clearTimeout(watchdog);
         clearInterval(pinger);
         socketRef.current = null;
-        if (!disposed) {
-          setStatus("reconnecting");
-          scheduleRetry();
+        if (disposed) return;
+        setStatus("reconnecting");
+        // A hosted room drops a removed link (4001) and refuses it at the
+        // door after that. Ask once, then stop rather than retry forever.
+        const hosted = hostedLink();
+        if (hosted && (ev.code === 4001 || !opened)) {
+          void bandLinkRefused(hosted).then((refused) => {
+            if (disposed) return;
+            if (refused) setLinkRemoved(true);
+            else scheduleRetry();
+          });
+          return;
         }
+        scheduleRetry();
       };
       // Close once: closing a socket that never opened can fire `error` again
       // straight away in some engines, recursing.
@@ -238,7 +354,7 @@ export function useBandConnection(role: "band" | "leader", pin: string | null): 
       socketRef.current = null;
       retire(last);
     };
-  }, [role, pin]);
+  }, [role, pin, member]);
 
   const send = useCallback((command: BandCommand) => {
     const sock = socketRef.current;
@@ -255,5 +371,20 @@ export function useBandConnection(role: "band" | "leader", pin: string | null): 
     sock.send(JSON.stringify(msg));
   }, []);
 
-  return { status, setlist, position, idle, isLeader, pinRejected, tooManyTries, lastError, send, library, requestLibrary };
+  return {
+    status,
+    lanUrl,
+    hostedLive,
+    linkRemoved,
+    setlist,
+    position,
+    idle,
+    isLeader,
+    pinRejected,
+    tooManyTries,
+    lastError,
+    send,
+    library,
+    requestLibrary,
+  };
 }

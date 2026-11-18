@@ -67,6 +67,11 @@ export type ServerMessage =
   | { type: "tick" }
   | { type: "welcome"; role: "band" | "leader"; pinRejected?: boolean; tooManyTries?: boolean }
   | { type: "error"; message: string }
+  /** Hosted room only: where this device can reach the slides computer on
+   * the church's network if the hosted room can't be reached. */
+  | { type: "lan"; url: string }
+  /** Local band server only: whether the hosted room is reachable again. */
+  | { type: "hosted"; live: boolean }
   /** The library, whole or (through the online relay) in parts 0…parts-1. */
   | { type: "library"; data: LibrarySong[]; part?: number; parts?: number };
 

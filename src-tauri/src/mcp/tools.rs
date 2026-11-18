@@ -43,6 +43,8 @@ pub struct Library {
     backup: Mutex<Option<(PathBuf, Instant)>>,
     /// The running app's data folder, for work handed to the app (imports).
     app_data_dir: Option<PathBuf>,
+    /// Tool calls so far, so a library switch before the first isn't an error.
+    calls: std::sync::atomic::AtomicUsize,
 }
 
 impl Library {
@@ -52,6 +54,7 @@ impl Library {
             backup_dir,
             backup: Mutex::new(None),
             app_data_dir: None,
+            calls: std::sync::atomic::AtomicUsize::new(0),
         }
     }
 
@@ -63,6 +66,23 @@ impl Library {
     /// Run a tool. `Err` is a failed call the model should see and recover
     /// from (bad id, missing field) — the server reports it as `isError`.
     pub fn call(&self, name: &str, args: &Value) -> Result<Value> {
+        // Work on whichever library the app has open now: the person may
+        // have switched since this assistant session started.
+        let open = crate::libraries::remembered_path(self.db.home_path());
+        if open != self.db.open_path() {
+            self.db.switch_to(&open)?;
+            // A snapshot of the other library doesn't cover this one.
+            *self.backup.lock().unwrap() = None;
+            // Ids from earlier calls belong to the other library: say so
+            // rather than carry on and mix the two.
+            if self.calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst) > 0 {
+                bail!(
+                    "The app switched to another library since your last step. Look songs and setlists up again before changing anything."
+                );
+            }
+        } else {
+            self.calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        }
         let args = args.as_object().cloned().unwrap_or_default();
         match name {
             "list_songs" => self.list_songs(&args),
@@ -714,7 +734,14 @@ impl Library {
         }
         std::fs::create_dir_all(dir)
             .with_context(|| format!("creating {}", dir.display()))?;
-        let path = dir.join(format!("library-before-ai-{}.db", timestamp_slug()));
+        // Named for the library, so copies of two libraries can't be mixed up.
+        let open = self.db.open_path();
+        let which = if open == self.db.home_path() {
+            crate::libraries::HOME_ID.to_string()
+        } else {
+            open.parent().and_then(|p| p.file_name()).map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()
+        };
+        let path = dir.join(format!("library-before-ai-{which}-{}.db", timestamp_slug()));
         {
             let conn = self.db.conn().lock().unwrap();
             conn.execute("VACUUM INTO ?1", params![path.to_string_lossy()])

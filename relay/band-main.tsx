@@ -6,10 +6,16 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 
 import { BandView } from "@/components/band/BandView";
+import { MemberBandPage } from "@/components/band/MemberBandPage";
+import { bandPageHasLink } from "@/lib/band/useBandConnection";
 import "@/styles/globals.css";
+
+// A hosted band link lives in the fragment, and opening another link in the
+// same tab changes only the fragment: start again with the new one.
+window.addEventListener("hashchange", () => window.location.reload());
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <BandView />
+    {bandPageHasLink() ? <BandView /> : <MemberBandPage />}
   </React.StrictMode>,
 );

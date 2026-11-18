@@ -16,7 +16,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, Monitor, MonitorOff } from "lucide-react";
 
-import { bandInviteUrl, useBandConnection, type ConnectionStatus } from "@/lib/band/useBandConnection";
+import {
+  bandInviteUrl,
+  hostedLink,
+  safeLanUrl,
+  type MemberSource,
+  useBandConnection,
+  type BandConnection,
+  type ConnectionStatus,
+} from "@/lib/band/useBandConnection";
 import { clampTranspose, type BandSong } from "@/lib/band/protocol";
 import {
   alignSlides,
@@ -153,10 +161,69 @@ function initialPin(): string | null {
 
 // --- view -------------------------------------------------------------------------
 
-export function BandView() {
-  const role = useMemo(initialRole, []);
-  const [pin, setPin] = useState<string | null>(() => (role === "leader" ? initialPin() : null));
-  const conn = useBandConnection(role, pin);
+/** How long the hosted room can be out of reach before offering the church's network. */
+const FALLBACK_AFTER_MS = 10_000;
+
+/**
+ * Between the hosted room and the slides computer's own band server.
+ *
+ * A page from the website (https) can't open a socket to the slides
+ * computer on the church's network (http): browsers block that. So when the
+ * hosted room is out of reach, offer to *go* to the slides computer's band
+ * page, remembering the way back; that page comes straight back here as soon
+ * as the slides computer says the hosted room is reachable again.
+ */
+function NetworkFallback({ conn, hosted }: { conn: BandConnection; hosted: boolean }) {
+  const [offer, setOffer] = useState(false);
+  const { status, lanUrl, hostedLive } = conn;
+
+  useEffect(() => {
+    if (!hosted || status === "live" || !lanUrl) {
+      setOffer(false);
+      return;
+    }
+    const t = setTimeout(() => setOffer(true), FALLBACK_AFTER_MS);
+    return () => clearTimeout(t);
+  }, [hosted, status, lanUrl]);
+
+  const back = useMemo(() => (hosted ? null : new URLSearchParams(window.location.hash.slice(1)).get("back")), [hosted]);
+  useEffect(() => {
+    if (back && hostedLive && /^https:\/\//.test(back)) window.location.replace(back);
+  }, [back, hostedLive]);
+
+  if (!offer || !lanUrl) return null;
+  return (
+    <div className="flex items-center justify-between gap-3 border-b border-border bg-muted px-4 py-2 text-sm">
+      <span>Can&apos;t reach the internet. On the church&apos;s Wi-Fi?</span>
+      <button
+        type="button"
+        className="shrink-0 rounded-md border border-border px-3 py-1"
+        onClick={() => {
+          const safe = safeLanUrl(lanUrl);
+          if (safe) window.location.href = `${safe.split("#")[0]}#back=${encodeURIComponent(window.location.href)}`;
+        }}
+      >
+        Connect directly
+      </button>
+    </div>
+  );
+}
+
+/** Signed in on the website's band page instead of opening a band link. */
+export interface MemberView {
+  source: MemberSource;
+  orgName: string;
+  onSignOut: () => void;
+}
+
+export function BandView({ member }: { member?: MemberView } = {}) {
+  // A hosted band link, or a signed-in member: the room says whether this
+  // device gets leader controls.
+  const hosted = useMemo(() => member !== undefined || hostedLink() !== null, [member]);
+  const requestedRole = useMemo(initialRole, []);
+  const [pin, setPin] = useState<string | null>(() => (!hosted && requestedRole === "leader" ? initialPin() : null));
+  const conn = useBandConnection(hosted ? "leader" : requestedRole, pin, member?.source);
+  const role: "band" | "leader" = hosted ? (conn.isLeader ? "leader" : "band") : requestedRole;
   const [prefs, setPrefs] = usePrefs();
   const [showSettings, setShowSettings] = useState(false);
   const [sheet, setSheet] = useState<"set" | "library" | null>(null);
@@ -211,11 +278,33 @@ export function BandView() {
     document.title = song ? `${song.title} — Band` : "Band screen";
   }, [song]);
 
+  if (conn.linkRemoved) {
+    return (
+      <div className="flex h-screen flex-col items-center justify-center gap-2 bg-background p-6 text-center text-foreground supports-[height:100dvh]:h-[100dvh]">
+        {member ? (
+          <>
+            <p className="text-lg font-medium">You can&apos;t follow {member.orgName} any more</p>
+            <p className="text-sm text-muted-foreground">You were signed out, or you&apos;re no longer in this organization.</p>
+            <button type="button" className="mt-2 rounded-md border border-border px-3 py-1.5 text-sm" onClick={member.onSignOut}>
+              Sign in again
+            </button>
+          </>
+        ) : (
+          <>
+            <p className="text-lg font-medium">This band link no longer works</p>
+            <p className="text-sm text-muted-foreground">Ask whoever runs the slides for a new one.</p>
+          </>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div
       className="flex h-screen flex-col bg-background text-foreground supports-[height:100dvh]:h-[100dvh]"
       style={{ fontSize: `${16 * prefs.scale}px` }}
     >
+      <NetworkFallback conn={conn} hosted={hosted} />
       <Header
         song={song}
         nextSong={nextSong}
@@ -270,6 +359,8 @@ export function BandView() {
           wakeLock={wakeLock}
           role={role}
           isLeader={conn.isLeader}
+          hosted={hosted}
+          member={member}
         />
       )}
       {role === "leader" && !conn.isLeader && (
@@ -297,7 +388,7 @@ export function BandView() {
       )}
       <main className="min-h-0 flex-1 overflow-y-auto px-4 pb-24 pt-3">
         {conn.idle || !setlist ? (
-          <Waiting status={conn.status} idle={conn.idle} />
+          <Waiting status={conn.status} idle={conn.idle} hosted={hosted} />
         ) : song && position ? (
           <SongChart
             key={song.itemId}
@@ -311,7 +402,7 @@ export function BandView() {
             }
           />
         ) : (
-          <Waiting status={conn.status} idle={false} />
+          <Waiting status={conn.status} idle={false} hosted={hosted} />
         )}
       </main>
       {conn.lastError && (
@@ -538,12 +629,16 @@ function Settings({
   wakeLock,
   role,
   isLeader,
+  hosted,
+  member,
 }: {
   prefs: DevicePrefs;
   onChange: (p: Partial<DevicePrefs>) => void;
   wakeLock: boolean;
   role: "band" | "leader";
   isLeader: boolean;
+  hosted: boolean;
+  member?: MemberView;
 }) {
   const btn = "rounded-md border border-border px-3 py-1.5 text-sm";
   const local = localBandWindowLabel() !== null;
@@ -569,7 +664,12 @@ function Settings({
         </button>
       )}
       {/* The operator's own windows share the QR codes on its Band screens panel. */}
-      {!local && (
+      {member && (
+        <button type="button" className={btn} onClick={member.onSignOut} data-testid="band-sign-out">
+          Sign out
+        </button>
+      )}
+      {!local && !member && (
         <button type="button" className={btn} onClick={() => setInviting((v) => !v)} aria-pressed={inviting} data-testid="band-invite">
           Invite
         </button>
@@ -586,7 +686,7 @@ function Settings({
           A band screen on this computer. Full screen (or F) on its monitor; each one keeps its own text size and capo.
         </span>
       )}
-      {role === "band" && !local && (
+      {role === "band" && !local && !hosted && (
         <span className="basis-full text-xs text-muted-foreground">
           Leading worship? Open <code>/leader</code> on this address for the song palette.
         </span>
@@ -735,15 +835,23 @@ function LeaderPalette({
   );
 }
 
-function Waiting({ status, idle }: { status: ConnectionStatus; idle: boolean }) {
+function Waiting({ status, idle, hosted }: { status: ConnectionStatus; idle: boolean; hosted: boolean }) {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-muted-foreground">
       <div className="text-[1.2em]">
-        {status !== "live" ? "Looking for the slides computer…" : idle ? "Waiting for the service to start" : "Waiting for the first slide"}
+        {status !== "live"
+          ? hosted
+            ? "Connecting…"
+            : "Looking for the slides computer…"
+          : idle
+            ? "Waiting for the service to start"
+            : "Waiting for the first slide"}
       </div>
       {status !== "live" && (
         <div className="max-w-sm text-sm">
-          Make sure this device is on the same Wi-Fi as the slides computer. This page reconnects by itself.
+          {hosted
+            ? "Check this device is online. This page reconnects by itself."
+            : "Make sure this device is on the same Wi-Fi as the slides computer. This page reconnects by itself."}
         </div>
       )}
     </div>

@@ -67,6 +67,7 @@ import { buildContext } from "@/lib/presentation/state";
 import { useAudienceProjection } from "@/lib/presentation/useProjection";
 import { useBandHost, type BandHostApi } from "@/lib/band/useBandHost";
 import { BandScreensButton, bandScreensMenuHint } from "@/components/band/BandScreensButton";
+import { LiveSetStatus } from "@/components/band/LiveSetStatus";
 import { PeerSyncButton } from "@/components/peerSync/PeerSyncButton";
 import { useKeepAwake } from "@/lib/presentation/useKeepAwake";
 import {
@@ -789,13 +790,14 @@ function ProjectionBar({
             Recording
           </span>
         )}
+        <LiveSetStatus hosted={band.hosted} />
         <AIStatusPill operator />
         {aiListening && <AudioWaveformIndicator />}
         {peerSync(peerSignal)}
         <BandScreensButton band={band} align="right" hideButton openSignal={bandSignal} />
         <Menu label="More options">
           <MoreItem icon={<Palette />} onSelect={() => setLookOpen(true)}>
-            Lyrics style…
+            Display look…
           </MoreItem>
           <MenuSeparator />
           <MoreItem

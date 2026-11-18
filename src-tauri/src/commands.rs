@@ -393,9 +393,12 @@ fn app_data(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
 
 // --- Account (optional sign-in to a Church Slides server) ----------------------
 
+/// Off the main thread: the first read of the sign-in can wait on a macOS
+/// Keychain prompt, and on the main thread that froze every window.
 #[tauri::command]
-pub fn account_status(app: tauri::AppHandle) -> Result<crate::account::AccountStatus, String> {
-    Ok(crate::account::status(&app_data(&app)?))
+pub async fn account_status(app: tauri::AppHandle) -> Result<crate::account::AccountStatus, String> {
+    let dir = app_data(&app)?;
+    off_main(move || Ok(crate::account::status(&dir))).await
 }
 
 /// Check the sign-in with the server; offline, returns what's known.
@@ -405,14 +408,25 @@ pub async fn account_refresh(app: tauri::AppHandle) -> Result<crate::account::Ac
 }
 
 #[tauri::command]
-pub async fn account_sign_in(app: tauri::AppHandle) -> Result<crate::account::AccountStatus, String> {
+pub async fn account_sign_in(app: tauri::AppHandle, invite: Option<String>) -> Result<crate::account::AccountStatus, String> {
     use tauri_plugin_shell::ShellExt;
     let shell = app.shell();
     // Same opener as the Cloudflare sign-in; moving both to tauri-plugin-opener is separate work.
     #[allow(deprecated)]
-    crate::account::sign_in(&app_data(&app)?, |url| shell.open(url, None).map_err(|e| anyhow::anyhow!("{e}")))
+    crate::account::sign_in(&app_data(&app)?, invite.as_deref(), |url| shell.open(url, None).map_err(|e| anyhow::anyhow!("{e}")))
         .await
         .map_err(|e| format!("{e:#}"))
+}
+
+/// A call to the signed-in API (organizations, members, invites).
+#[tauri::command]
+pub async fn account_api(
+    app: tauri::AppHandle,
+    method: String,
+    path: String,
+    body: Option<serde_json::Value>,
+) -> Result<serde_json::Value, String> {
+    crate::account::api(&app_data(&app)?, &method, &path, body).await.map_err(|e| format!("{e:#}"))
 }
 
 #[tauri::command]
@@ -425,9 +439,12 @@ pub async fn account_sign_out_everywhere(app: tauri::AppHandle) -> Result<crate:
     crate::account::sign_out_everywhere(&app_data(&app)?).await.map_err(|e| format!("{e:#}"))
 }
 
+// The relay's commands read its keys from the Keychain, which can wait on a
+// prompt: never on the main thread (see `account_status`).
 #[tauri::command]
-pub fn cloud_relay_status(app: tauri::AppHandle) -> Result<crate::cloud::CloudStatus, String> {
-    Ok(crate::cloud::status(&app_data(&app)?))
+pub async fn cloud_relay_status(app: tauri::AppHandle) -> Result<crate::cloud::CloudStatus, String> {
+    let dir = app_data(&app)?;
+    off_main(move || Ok(crate::cloud::status(&dir))).await
 }
 
 /// Set up with an API token the operator pasted (Cloudflare's "Edit
@@ -471,20 +488,28 @@ pub async fn cloud_relay_health(app: tauri::AppHandle) -> Result<bool, String> {
 }
 
 #[tauri::command]
-pub fn cloud_relay_forget(app: tauri::AppHandle) -> Result<(), String> {
-    crate::cloud::forget(&app_data(&app)?).map_err(|e| e.to_string())
+pub async fn cloud_relay_forget(app: tauri::AppHandle) -> Result<(), String> {
+    let dir = app_data(&app)?;
+    off_main(move || crate::cloud::forget(&dir).map_err(|e| e.to_string())).await
 }
 
 /// Replace this computer's room: old QR codes and bookmarks stop working.
 #[tauri::command]
-pub fn cloud_relay_new_links(app: tauri::AppHandle) -> Result<(), String> {
-    crate::cloud::new_links(&app_data(&app)?).map_err(|e| e.to_string())
+pub async fn cloud_relay_new_links(app: tauri::AppHandle) -> Result<(), String> {
+    let dir = app_data(&app)?;
+    off_main(move || crate::cloud::new_links(&dir).map_err(|e| e.to_string())).await
 }
 
 /// This computer's room (the same one each time it's opened).
 #[tauri::command]
-pub fn cloud_relay_new_room(app: tauri::AppHandle, pin: String) -> Result<crate::cloud::CloudRoom, String> {
-    crate::cloud::new_room(&app_data(&app)?, &pin).map_err(|e| e.to_string())
+pub async fn cloud_relay_new_room(app: tauri::AppHandle, pin: String) -> Result<crate::cloud::CloudRoom, String> {
+    let dir = app_data(&app)?;
+    off_main(move || crate::cloud::new_room(&dir, &pin).map_err(|e| e.to_string())).await
+}
+
+/// Run blocking work (the Keychain) on a worker thread.
+async fn off_main<T: Send + 'static>(work: impl FnOnce() -> Result<T, String> + Send + 'static) -> Result<T, String> {
+    tauri::async_runtime::spawn_blocking(work).await.map_err(|e| e.to_string())?
 }
 
 /// The library index the leader's search screen uses — the slides computer
