@@ -78,6 +78,13 @@ export function hostedLink(loc: Pick<Location, "hash"> = window.location): { ser
   return { server: server.replace(/\/+$/, ""), token };
 }
 
+/** Whether this band page has something to connect to: a hosted band link,
+ * an online relay room, or (anywhere else) the slides computer serving it.
+ * Only the website's `/live/` can be opened with none. */
+export function bandPageHasLink(loc: Pick<Location, "hash" | "pathname"> = window.location): boolean {
+  return hostedLink(loc) !== null || /^\/r\/[a-z0-9]+\/(band|leader)$/.test(loc.pathname);
+}
+
 /**
  * Where the socket lives: same origin normally; the band port in dev (served
  * by Vite); `/r/<room>/ws?k=<key>` on the online relay; the server's
@@ -108,7 +115,15 @@ export function bandInviteUrl(loc: Location = window.location): string {
   return `${loc.origin}/band`;
 }
 
-export function useBandConnection(role: "band" | "leader", pin: string | null): BandConnection {
+/** A signed-in member's way into an organization's live room (the band page
+ * on the website): each connection needs a fresh one-use address. */
+export interface MemberSource {
+  /** Resolves to the socket address; rejects with `removed: true` when
+   * the person can't join any more (signed out, no longer a member). */
+  socketUrl: () => Promise<string>;
+}
+
+export function useBandConnection(role: "band" | "leader", pin: string | null, member?: MemberSource): BandConnection {
   const [status, setStatus] = useState<ConnectionStatus>("connecting");
   const [setlist, setSetlist] = useState<BandSetlist | null>(null);
   const [position, setPosition] = useState<BandPosition | null>(null);
@@ -155,12 +170,33 @@ export function useBandConnection(role: "band" | "leader", pin: string | null): 
     const connect = () => {
       if (disposed) return;
       clearTimeout(retryTimer);
+      if (!member) {
+        openSocket(null);
+        return;
+      }
+      member.socketUrl().then(
+        (url) => {
+          if (!disposed) openSocket(url);
+        },
+        (err: unknown) => {
+          if (disposed) return;
+          if ((err as { removed?: boolean })?.removed) setLinkRemoved(true);
+          else scheduleRetry();
+        },
+      );
+    };
+
+    const openSocket = (memberUrl: string | null) => {
       let sock: WebSocket;
       try {
         const hosted = hostedLink();
         // The band link's token goes as a subprotocol: browsers can't set
         // headers on a WebSocket, and this keeps it out of the URL.
-        sock = hosted ? new WebSocket(bandSocketUrl(), ["csb", hosted.token]) : new WebSocket(bandSocketUrl());
+        sock = memberUrl
+          ? new WebSocket(memberUrl)
+          : hosted
+            ? new WebSocket(bandSocketUrl(), ["csb", hosted.token])
+            : new WebSocket(bandSocketUrl());
       } catch {
         scheduleRetry();
         return;
@@ -180,7 +216,7 @@ export function useBandConnection(role: "band" | "leader", pin: string | null): 
         }, PING_EVERY_MS);
         // In a hosted room the link decides: ask for leader controls and the
         // room grants them to a leader link.
-        const hello: ClientMessage = hostedLink()
+        const hello: ClientMessage = memberUrl || hostedLink()
           ? { type: "hello", role: "leader" }
           : role === "leader" && pin
             ? { type: "hello", role, pin }
@@ -303,7 +339,7 @@ export function useBandConnection(role: "band" | "leader", pin: string | null): 
       socketRef.current = null;
       retire(last);
     };
-  }, [role, pin]);
+  }, [role, pin, member]);
 
   const send = useCallback((command: BandCommand) => {
     const sock = socketRef.current;

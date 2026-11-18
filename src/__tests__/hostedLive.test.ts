@@ -3,7 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { liveOrganization, setLiveOrganization, type AccountStatus } from "@/lib/account";
 import { CloudHost } from "@/lib/band/cloudHost";
-import { bandInviteUrl, bandSocketUrl, hostedLink, useBandConnection } from "@/lib/band/useBandConnection";
+import { pickOrganization } from "@/lib/band/memberSignIn";
+import { bandInviteUrl, bandPageHasLink, bandSocketUrl, hostedLink, useBandConnection } from "@/lib/band/useBandConnection";
 
 class FakeSocket {
   static OPEN = 1;
@@ -47,6 +48,14 @@ describe("hosted band links", () => {
     expect(bandInviteUrl(loc as unknown as Location)).toBe(LINK);
     expect(hostedLink(new URL("https://churchslides.app/live/?s=https://x&t=y"))).toBeNull();
     expect(hostedLink(new URL("https://churchslides.app/live/#s=javascript:alert(1)&t=y"))).toBeNull();
+  });
+});
+
+describe("a band page with no link", () => {
+  it("is only the website's bare /live/", () => {
+    expect(bandPageHasLink({ hash: "", pathname: "/live/" })).toBe(false);
+    expect(bandPageHasLink({ hash: "#s=https://api.example&t=csb_x", pathname: "/live/" })).toBe(true);
+    expect(bandPageHasLink({ hash: "", pathname: "/r/abc123/band" })).toBe(true);
   });
 });
 
@@ -102,6 +111,52 @@ describe("the band page in a hosted room", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("a signed-in member on the band page", () => {
+  beforeEach(() => {
+    FakeSocket.all = [];
+    vi.stubGlobal("WebSocket", FakeSocket);
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("connects with a fresh address each time and asks for leader controls", async () => {
+    let n = 0;
+    const source = { socketUrl: vi.fn(async () => `wss://api.example.org/live/member?ticket=${++n}`) };
+    renderHook(() => useBandConnection("leader", null, source));
+    await act(async () => undefined);
+    const first = FakeSocket.all[0]!;
+    expect(first.url).toBe("wss://api.example.org/live/member?ticket=1");
+    act(() => first.open());
+    expect(JSON.parse(first.sent[0]!)).toEqual({ type: "hello", role: "leader" });
+    vi.useFakeTimers();
+    try {
+      await act(async () => first.close(4001));
+      await act(async () => vi.advanceTimersByTimeAsync(1000));
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(FakeSocket.all[1]?.url).toBe("wss://api.example.org/live/member?ticket=2");
+  });
+
+  it("stops when the person can't join any more", async () => {
+    const source = { socketUrl: vi.fn(async () => Promise.reject(Object.assign(new Error("gone"), { removed: true }))) };
+    const { result } = renderHook(() => useBandConnection("leader", null, source));
+    await act(async () => undefined);
+    expect(result.current.linkRemoved).toBe(true);
+    expect(FakeSocket.all).toHaveLength(0);
+  });
+
+  it("goes straight to the organization with a service running", () => {
+    const a = { orgId: "a", orgName: "Grace", role: "member" };
+    const b = { orgId: "b", orgName: "Hope", role: "operator" };
+    expect(pickOrganization([a, b], { b: true }, null)).toBe(b);
+    expect(pickOrganization([a], {}, null)).toBe(a);
+    expect(pickOrganization([a, b], {}, "a")).toBe(a);
+    expect(pickOrganization([a, b], {}, null)).toBeNull();
+    // Two running at once: the person picks.
+    expect(pickOrganization([a, b], { a: true, b: true }, "a")).toBeNull();
   });
 });
 

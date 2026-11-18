@@ -19,6 +19,7 @@ import { ChevronDown, Monitor, MonitorOff } from "lucide-react";
 import {
   bandInviteUrl,
   hostedLink,
+  type MemberSource,
   useBandConnection,
   type BandConnection,
   type ConnectionStatus,
@@ -206,12 +207,20 @@ function NetworkFallback({ conn, hosted }: { conn: BandConnection; hosted: boole
   );
 }
 
-export function BandView() {
-  // A hosted band link: the room says whether it's a leader link.
-  const hosted = useMemo(() => hostedLink() !== null, []);
+/** Signed in on the website's band page instead of opening a band link. */
+export interface MemberView {
+  source: MemberSource;
+  orgName: string;
+  onSignOut: () => void;
+}
+
+export function BandView({ member }: { member?: MemberView } = {}) {
+  // A hosted band link, or a signed-in member: the room says whether this
+  // device gets leader controls.
+  const hosted = useMemo(() => member !== undefined || hostedLink() !== null, [member]);
   const requestedRole = useMemo(initialRole, []);
   const [pin, setPin] = useState<string | null>(() => (!hosted && requestedRole === "leader" ? initialPin() : null));
-  const conn = useBandConnection(hosted ? "leader" : requestedRole, pin);
+  const conn = useBandConnection(hosted ? "leader" : requestedRole, pin, member?.source);
   const role: "band" | "leader" = hosted ? (conn.isLeader ? "leader" : "band") : requestedRole;
   const [prefs, setPrefs] = usePrefs();
   const [showSettings, setShowSettings] = useState(false);
@@ -270,8 +279,20 @@ export function BandView() {
   if (conn.linkRemoved) {
     return (
       <div className="flex h-screen flex-col items-center justify-center gap-2 bg-background p-6 text-center text-foreground supports-[height:100dvh]:h-[100dvh]">
-        <p className="text-lg font-medium">This band link no longer works</p>
-        <p className="text-sm text-muted-foreground">Ask whoever runs the slides for a new one.</p>
+        {member ? (
+          <>
+            <p className="text-lg font-medium">You can&apos;t follow {member.orgName} any more</p>
+            <p className="text-sm text-muted-foreground">You were signed out, or you&apos;re no longer in this organization.</p>
+            <button type="button" className="mt-2 rounded-md border border-border px-3 py-1.5 text-sm" onClick={member.onSignOut}>
+              Sign in again
+            </button>
+          </>
+        ) : (
+          <>
+            <p className="text-lg font-medium">This band link no longer works</p>
+            <p className="text-sm text-muted-foreground">Ask whoever runs the slides for a new one.</p>
+          </>
+        )}
       </div>
     );
   }
@@ -336,6 +357,8 @@ export function BandView() {
           wakeLock={wakeLock}
           role={role}
           isLeader={conn.isLeader}
+          hosted={hosted}
+          member={member}
         />
       )}
       {role === "leader" && !conn.isLeader && (
@@ -363,7 +386,7 @@ export function BandView() {
       )}
       <main className="min-h-0 flex-1 overflow-y-auto px-4 pb-24 pt-3">
         {conn.idle || !setlist ? (
-          <Waiting status={conn.status} idle={conn.idle} />
+          <Waiting status={conn.status} idle={conn.idle} hosted={hosted} />
         ) : song && position ? (
           <SongChart
             key={song.itemId}
@@ -377,7 +400,7 @@ export function BandView() {
             }
           />
         ) : (
-          <Waiting status={conn.status} idle={false} />
+          <Waiting status={conn.status} idle={false} hosted={hosted} />
         )}
       </main>
       {conn.lastError && (
@@ -604,12 +627,16 @@ function Settings({
   wakeLock,
   role,
   isLeader,
+  hosted,
+  member,
 }: {
   prefs: DevicePrefs;
   onChange: (p: Partial<DevicePrefs>) => void;
   wakeLock: boolean;
   role: "band" | "leader";
   isLeader: boolean;
+  hosted: boolean;
+  member?: MemberView;
 }) {
   const btn = "rounded-md border border-border px-3 py-1.5 text-sm";
   const local = localBandWindowLabel() !== null;
@@ -635,7 +662,12 @@ function Settings({
         </button>
       )}
       {/* The operator's own windows share the QR codes on its Band screens panel. */}
-      {!local && (
+      {member && (
+        <button type="button" className={btn} onClick={member.onSignOut} data-testid="band-sign-out">
+          Sign out
+        </button>
+      )}
+      {!local && !member && (
         <button type="button" className={btn} onClick={() => setInviting((v) => !v)} aria-pressed={inviting} data-testid="band-invite">
           Invite
         </button>
@@ -652,7 +684,7 @@ function Settings({
           A band screen on this computer. Full screen (or F) on its monitor; each one keeps its own text size and capo.
         </span>
       )}
-      {role === "band" && !local && (
+      {role === "band" && !local && !hosted && (
         <span className="basis-full text-xs text-muted-foreground">
           Leading worship? Open <code>/leader</code> on this address for the song palette.
         </span>
@@ -801,15 +833,23 @@ function LeaderPalette({
   );
 }
 
-function Waiting({ status, idle }: { status: ConnectionStatus; idle: boolean }) {
+function Waiting({ status, idle, hosted }: { status: ConnectionStatus; idle: boolean; hosted: boolean }) {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-muted-foreground">
       <div className="text-[1.2em]">
-        {status !== "live" ? "Looking for the slides computer…" : idle ? "Waiting for the service to start" : "Waiting for the first slide"}
+        {status !== "live"
+          ? hosted
+            ? "Connecting…"
+            : "Looking for the slides computer…"
+          : idle
+            ? "Waiting for the service to start"
+            : "Waiting for the first slide"}
       </div>
       {status !== "live" && (
         <div className="max-w-sm text-sm">
-          Make sure this device is on the same Wi-Fi as the slides computer. This page reconnects by itself.
+          {hosted
+            ? "Check this device is online. This page reconnects by itself."
+            : "Make sure this device is on the same Wi-Fi as the slides computer. This page reconnects by itself."}
         </div>
       )}
     </div>

@@ -342,6 +342,21 @@ A band link's `url` is a band page:
 `https://churchslides.app/live/#s={server}&t={token}`. Both go in the fragment,
 which browsers never send to a server.
 
+### Signed-in members
+
+A member can follow without a band link by signing in on the band page
+(`https://churchslides.app/live/`, a public OAuth client identified by
+`https://churchslides.app/oauth/band-page-client.json`, or registered at
+`registration_endpoint` where client metadata documents aren't supported).
+
+1. `POST {api}/orgs/{orgId}/live/member-ticket` (any member) returns
+   `{ "url": "wss://…/live/member?org=…&ticket=cst_…", "canLead": true }`.
+   Like the host's, the ticket works once, within two minutes.
+2. Open a WebSocket to `url` and talk to the room as a band device. The
+   person's role decides leader controls (`canLead`): owners, admins,
+   operators and set leaders get them. A role change or removal closes the
+   socket (`4001`); the next ticket reflects the new role.
+
 ### Messages
 
 JSON text frames. Either side may send the text `ping`; the server answers
