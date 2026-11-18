@@ -19,7 +19,7 @@ covers the rest.
 | [Account](#account) | v0 |
 | [Organizations](#organizations) | v0 |
 | [Band devices](#band-devices) | v0 |
-| Sync of organization libraries | Not yet specified |
+| [Sync of organization libraries](#sync) | v0 draft |
 | [Live set](#live-set) | v0 |
 | AI assistants (MCP) | Not yet specified |
 
@@ -311,6 +311,127 @@ tokens, and `{api}` doesn't accept device tokens.
 ```json
 { "device": { "id": "…", "name": "Keys iPad", "canLead": false }, "org": { "id": "…", "name": "Grace Chapel" } }
 ```
+
+## Sync
+
+An organization's library (songs, services, readings, its display look,
+service history and learned song timing) is kept on every member's computer
+and synced through the server. Each computer works offline and sends its
+changes when it can, and the server puts every change in one order.
+
+### Records
+
+Everything syncs as **records**: `{ type, id, fields }`. `fields` is an
+object whose contents are the app's own (a song's words, its chart, a
+service's items). A server stores them as given, except for the few rules
+below. Ids are made by the client: 1–100 characters from
+`A-Z a-z 0-9 _ -`. Field names are 1–40 characters from `a-z 0-9 _`.
+
+| `type` | What | Who may change it |
+| --- | --- | --- |
+| `song` | A song with its chart, keys, scripture links and lead-sheet data | `edit_library`: owner, admin, operator |
+| `reading` | A prepared reading | `edit_library` |
+| `look` | The library's display look (id `default`) | `edit_library` |
+| `setlist` | A service and its items | `edit_services`: owner, admin, operator, set leader |
+| `service` | One service that took place: when, which songs (history) | `run_live`: owner, admin, operator. Can't be deleted |
+| `performance` | Timing the AI learned from one performance of a song | `run_live`. Can't be deleted |
+
+Every member can read every record.
+
+**Rules a server applies:**
+
+- **The last change applied wins, field by field.** A key changed on one
+  computer and words changed on another both survive.
+- **Song words are never lost.** If a change to a song's `body_text` was made
+  on top of an older version than the server holds (its `base` is older than
+  the last change to `body_text`), the server keeps the words it replaces as
+  a **revision** and reports `conflict: true`. Revisions can be listed and
+  brought back. Words edited on a song that was deleted meanwhile are kept as
+  a revision too.
+- **Deletes are tombstones.** A deleted record keeps its number in the change
+  order, so an offline computer learns of it. Its fields are kept, so it can
+  come back.
+- **References keep records alive.** A record may list what it uses in a
+  `refs` field: `["song:abc", …]`. Deleting a record that a live record
+  refers to is refused (`in_use`). A change whose `refs` names a deleted
+  record brings that record back. So a song added to a service on one
+  computer while another computer deleted it is undeleted, not lost.
+
+### `POST {api}/orgs/{orgId}/sync/push`
+
+Send local changes, oldest first.
+
+```json
+{
+  "changes": [
+    { "op": "op_01J…", "type": "song", "id": "s1", "base": 41,
+      "set": { "title": "…", "body_text": "…" } },
+    { "op": "op_01J…", "type": "setlist", "id": "l7", "base": 0, "delete": true }
+  ]
+}
+```
+
+- `op` is a unique id for the change, made by the client. Sending the same
+  `op` again (a retry after a lost reply) returns the first result and
+  changes nothing.
+- `base` is the change number of the record the client last had (`0` for a
+  record it made).
+- `set` names only the fields that changed. A field set to `null` is
+  removed. A change has `set` or `"delete": true`, not both.
+- At most 500 changes and 4 MB in one push. A record is at most 512 KB.
+
+Response:
+
+```json
+{
+  "results": [
+    { "op": "op_01J…", "status": "applied", "seq": 42, "conflict": true },
+    { "op": "op_01J…", "status": "refused", "code": "in_use", "message": "…" }
+  ],
+  "latest": 42
+}
+```
+
+`status` is `applied` (with the record's new `seq`) or `refused`, with a
+`code` of `forbidden`, `in_use`, `deleted`, `too_large` or `invalid`. A
+refused change is final: the client drops it and keeps the server's version
+(the next pull brings it). The push as a whole is refused (`bad_request`)
+only when it's malformed. The whole push is applied in one transaction.
+
+### `GET {api}/orgs/{orgId}/sync/pull?after={seq}`
+
+Every record changed after `seq`, in change order, each as it is now:
+
+```json
+{
+  "records": [
+    { "type": "song", "id": "s1", "seq": 42, "deleted": false, "fields": { … } }
+  ],
+  "seq": 42,
+  "more": false
+}
+```
+
+A page holds up to 500 records or about 4 MB. When `more` is `true`, pull
+again after `seq`. A new computer pulls from `0`, which downloads the whole
+library. The client replaces its copy of each record with the server's, then
+applies its own unsent changes on top.
+
+### `GET {api}/orgs/{orgId}/sync/revisions?type=song&id={id}`
+
+The kept versions of a record's words, newest first:
+`{ "revisions": [{ "id": 3, "field": "body_text", "value": "…", "replacedAt": 1731900000000, "replacedBy": "Sam" }] }`.
+Bringing one back is an ordinary push that sets the field.
+
+### Change notices
+
+`POST {api}/orgs/{orgId}/sync/ticket` (any member) returns
+`{ "url": "wss://…/sync?org=…&ticket=css_…" }`, a one-use ticket like the
+live set's. Over the socket the server sends `{ "type": "changed", "seq": 42 }`
+whenever a push changes something, and the client pulls. The socket is only a
+nudge: a client that missed one pulls when it reconnects. Either side may
+send `ping`; the server answers `pong`. Removing a member or changing their
+role closes it (`4001`).
 
 ## Live set
 
