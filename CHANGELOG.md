@@ -10,6 +10,8 @@ refuses to release a version that has no entry here.
 
 ## Unreleased
 
+## 0.2.3 — 18 November 2026
+
 - Changed: **adding songs to a setlist no longer shuffles the list.** A song you add stays where it is, with a tick, so the next click lands on the song you meant. Click it again to add a reprise.
 - Changed: **a new setlist you leave empty is tidied away** however you leave it, not only with the back button, so Home doesn't fill with empty "New setlist" entries.
 - Changed: "Start from last service" is now **"Copy last service"**, so it doesn't read like "Continue last service".
