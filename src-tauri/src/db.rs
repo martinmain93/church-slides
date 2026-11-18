@@ -26,6 +26,7 @@ const MIGRATIONS: &[(i32, &str)] = &[
     (10, include_str!("../migrations/010_search_credits.sql")),
     (11, include_str!("../migrations/011_setlist_item_look.sql")),
     (12, include_str!("../migrations/012_setlist_item_key.sql")),
+    (13, include_str!("../migrations/013_library_look.sql")),
 ];
 
 /// Thread-safe handle to the SQLite database.
@@ -515,7 +516,7 @@ fn seed_if_empty(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
-fn unix_ms() -> i64 {
+pub(crate) fn unix_ms() -> i64 {
     use std::time::{SystemTime, UNIX_EPOCH};
     SystemTime::now()
         .duration_since(UNIX_EPOCH)

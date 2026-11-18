@@ -431,6 +431,13 @@ export const mockTauri = {
 
   // --- Libraries ----------------------------------------------------------
 
+  async get_library_look() {
+    return null;
+  },
+  async set_library_look() {},
+  async can_move_library() {
+    return false;
+  },
   async library_sync_status() {
     return { org_id: null, state: "off", waiting: 0, message: null };
   },

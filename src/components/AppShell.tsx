@@ -29,6 +29,7 @@ import { UpdatePrompt } from "@/components/UpdatePrompt";
 import { SongEditor } from "@/components/library/SongEditor";
 import { useLibraryChanged } from "@/lib/assistantConnect";
 import { LibrarySwitcher } from "@/components/LibrarySwitcher";
+import { loadLibraryLook } from "@/lib/displayLook";
 import { useLibrarySync } from "@/lib/librarySync";
 import { useAssistantImport } from "@/lib/assistantImport";
 import { loadAudioInputPrefs } from "@/lib/audioInputPrefs";
@@ -131,6 +132,9 @@ function Inner() {
 
   // An AI assistant edited the library through the MCP server.
   useLibraryChanged(bumpReload);
+  // The display look belongs to the open library.
+  useEffect(() => void loadLibraryLook(), []);
+  useLibraryChanged(() => void loadLibraryLook());
   useAssistantImport((summary) => {
     toast.success(`AI assistant — ${summary}`);
     bumpReload();

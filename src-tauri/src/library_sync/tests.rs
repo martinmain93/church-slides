@@ -366,3 +366,93 @@ fn the_org_of_an_open_library_comes_from_its_path() {
     assert_eq!(super::org_of(home, home), None);
     assert_eq!(super::org_of(home, std::path::Path::new("/elsewhere/orgs/abc/library.db")), None);
 }
+
+#[test]
+fn the_library_look_syncs_like_a_record() {
+    let mut server = Server::default();
+    let (a, b) = (Computer::new(), Computer::new());
+    let look = crate::library_look::LibraryLook { display: Some(r#"{"theme":"light"}"#.into()), scripture: None };
+    crate::library_look::set(&a.db, &look).unwrap();
+    a.sync(&mut server);
+    b.sync(&mut server);
+    assert_eq!(crate::library_look::get(&b.db).unwrap(), Some(look));
+}
+
+fn learning_rows(path: &std::path::Path) -> Vec<String> {
+    let conn = rusqlite::Connection::open(path).unwrap();
+    let mut stmt = conn.prepare("SELECT id FROM performances ORDER BY id").unwrap();
+    stmt.query_map([], |r| r.get(0)).unwrap().map(Result::unwrap).collect()
+}
+
+#[test]
+fn learned_timing_goes_up_once_finished_and_comes_down_elsewhere() {
+    let mut server = Server::default();
+    let (a, b) = (Computer::new(), Computer::new());
+    let (la, lb) = (local::learning_path(&a.db.open_path()), local::learning_path(&b.db.open_path()));
+    {
+        // The engine's rows: one finished, one still being learned.
+        let conn = rusqlite::Connection::open(&la).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE performances (id TEXT PRIMARY KEY, song_id TEXT NOT NULL, started_at_ms INTEGER NOT NULL,
+               provenance TEXT NOT NULL, weight REAL NOT NULL, final INTEGER NOT NULL, data_json TEXT NOT NULL, updated_at_ms INTEGER NOT NULL);
+             INSERT INTO performances VALUES ('p1', 's1', 1, 'live', 1.0, 1, '{}', 1);
+             INSERT INTO performances VALUES ('p2', 's1', 2, 'live', 1.0, 0, '{}', 2);",
+        )
+        .unwrap();
+    }
+    let round = |c: &Computer, path: &std::path::Path, server: &mut Server| {
+        let conn = c.db.conn().lock().unwrap();
+        let device = local::device(&conn).unwrap();
+        let batch = local::with_learning(&conn, path, || local::prepare_performances(&conn, 200)).unwrap();
+        let results = server.push(&device, &batch);
+        local::apply_push(&conn, &batch, &results).unwrap();
+        let (records, seq) = server.pull(local::cursor(&conn).unwrap());
+        local::with_learning(&conn, path, || local::apply_pull(&conn, &records, seq)).unwrap();
+        batch.len()
+    };
+    assert_eq!(round(&a, &la, &mut server), 1, "only the finished one goes up");
+    assert_eq!(round(&a, &la, &mut server), 0, "and only once");
+    round(&b, &lb, &mut server);
+    assert_eq!(learning_rows(&lb), vec!["p1".to_string()]);
+    assert_eq!(round(&b, &lb, &mut server), 0, "a row that came down doesn't go back up");
+}
+
+#[test]
+fn moving_this_computers_library_into_an_organization() {
+    let dir = tempfile::tempdir().unwrap();
+    let db = Db::open(&dir.path().join("library.db")).unwrap();
+    let song = db.create_song(new_song("Our Song", "words")).unwrap();
+    let db = Arc::new(db);
+    let list = setlists::create_setlist(&db, "Sunday").unwrap();
+    setlists::add_setlist_item(&db, &list, &song).unwrap();
+    db.home()
+        .execute("INSERT INTO settings (key, value, updated_at) VALUES ('some_setting', '\"kept\"', 0)", [])
+        .unwrap();
+    std::fs::write(dir.path().join("learning.db"), b"").unwrap();
+    let songs_before: i64 = db.conn().lock().unwrap().query_row("SELECT COUNT(*) FROM songs", [], |r| r.get(0)).unwrap();
+
+    assert!(crate::libraries::can_move_here(&db, "o1"));
+    crate::libraries::move_home_into(&db, "o1", "Grace Chapel").unwrap();
+
+    // The organization's library is open, with everything, all waiting to go up.
+    assert_eq!(super::org_of(db.home_path(), &db.open_path()).as_deref(), Some("o1"));
+    assert!(db.get_song(&song).unwrap().is_some());
+    assert!(setlists::get_setlist(&db, &list).unwrap().is_some());
+    let waiting = local::waiting(&db.conn().lock().unwrap()).unwrap();
+    assert_eq!(waiting, songs_before + 1);
+    // This computer's library is empty but keeps its settings.
+    let home = db.home();
+    let left: i64 = home.query_row("SELECT COUNT(*) FROM songs", [], |r| r.get(0)).unwrap();
+    assert_eq!(left, 0);
+    let kept: String = home.query_row("SELECT value FROM settings WHERE key = 'some_setting'", [], |r| r.get(0)).unwrap();
+    assert_eq!(kept, "\"kept\"");
+    let org_settings: i64 = db.conn().lock().unwrap().query_row("SELECT COUNT(*) FROM settings WHERE key = 'some_setting'", [], |r| r.get(0)).unwrap();
+    assert_eq!(org_settings, 0, "settings don't go with the songs");
+    drop(home);
+    // Learned timing moved; a backup was kept.
+    assert!(dir.path().join("orgs/o1/learning.db").exists());
+    assert!(!dir.path().join("learning.db").exists());
+    assert!(std::fs::read_dir(dir.path()).unwrap().flatten().any(|e| e.file_name().to_string_lossy().starts_with("library-before-move-")));
+    // Only once: the organization has songs now.
+    assert!(!crate::libraries::can_move_here(&db, "o1"));
+}

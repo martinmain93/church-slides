@@ -180,6 +180,25 @@ async fn cycle(db: &Db, app_data: &Path, org: &str, changed: &(dyn Fn() + Sync))
             changed();
         }
     }
+    // Learned timing, a batch at a time.
+    let learning = local::learning_path(&db.open_path());
+    for _ in 0..20 {
+        let Some((device, batch)) =
+            on_org(db, org, |c| Ok((local::device(c)?, local::with_learning(c, &learning, || local::prepare_performances(c, 200))?)))?
+        else {
+            return Ok(None);
+        };
+        if batch.is_empty() {
+            break;
+        }
+        let body = json!({ "device": device, "changes": batch.iter().map(local::Pending::to_json).collect::<Vec<_>>() });
+        let resp = crate::account::api(app_data, "POST", &format!("/orgs/{org}/sync/push"), Some(body)).await?;
+        let results: Vec<local::PushResult> =
+            serde_json::from_value(resp.get("results").cloned().unwrap_or(Value::Null)).context("reading the server's reply")?;
+        if on_org(db, org, |c| local::apply_push(c, &batch, &results))?.is_none() {
+            return Ok(None);
+        }
+    }
     if conflicts > 0 {
         log::info!("library sync: {conflicts} song(s) changed on two computers; the other words were kept as a revision");
     }
@@ -196,7 +215,9 @@ async fn cycle(db: &Db, app_data: &Path, org: &str, changed: &(dyn Fn() + Sync))
         }
         let records: Vec<local::Pulled> =
             serde_json::from_value(page.get("records").cloned().unwrap_or(json!([]))).context("reading the server's records")?;
-        let Some(n) = on_org(db, org, |c| local::apply_pull(c, &records, seq))? else { return Ok(None) };
+        let Some(n) = on_org(db, org, |c| local::with_learning(c, &learning, || local::apply_pull(c, &records, seq)))? else {
+            return Ok(None);
+        };
         pulled += n;
         after = seq;
         if !page.get("more").and_then(Value::as_bool).unwrap_or(false) {
@@ -248,6 +269,46 @@ pub async fn library_sync_ticket(app: tauri::AppHandle, org_id: String) -> Resul
         .await
         .map_err(|e| format!("{e:#}"))?;
     resp.get("url").and_then(Value::as_str).map(String::from).ok_or_else(|| "The server sent no address.".into())
+}
+
+fn plain_id(id: &str) -> Result<(), String> {
+    if (1..=100).contains(&id.len()) && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') {
+        Ok(())
+    } else {
+        Err("Not an id.".into())
+    }
+}
+
+/// The open organization library's id, or an error for this computer's own.
+fn open_org(app: &tauri::AppHandle) -> Result<(String, PathBuf), String> {
+    let db = app.state::<Arc<Db>>();
+    let org = org_of(db.home_path(), &db.open_path()).ok_or("Song history is kept for an organization's library.")?;
+    Ok((org, app.path().app_data_dir().map_err(|e| e.to_string())?))
+}
+
+/// Earlier words of a song, newest first (without the words).
+#[tauri::command]
+pub async fn library_song_revisions(app: tauri::AppHandle, song_id: String) -> Result<Value, String> {
+    plain_id(&song_id)?;
+    let (org, app_data) = open_org(&app)?;
+    crate::account::api(&app_data, "GET", &format!("/orgs/{org}/sync/revisions?type=song&id={song_id}"), None)
+        .await
+        .map_err(|e| format!("{e:#}"))
+}
+
+/// One earlier version of a song's words.
+#[tauri::command]
+pub async fn library_song_revision(app: tauri::AppHandle, song_id: String, revision: i64) -> Result<Value, String> {
+    plain_id(&song_id)?;
+    let (org, app_data) = open_org(&app)?;
+    crate::account::api(
+        &app_data,
+        "GET",
+        &format!("/orgs/{org}/sync/revisions?type=song&id={song_id}&revision={revision}"),
+        None,
+    )
+    .await
+    .map_err(|e| format!("{e:#}"))
 }
 
 #[cfg(test)]

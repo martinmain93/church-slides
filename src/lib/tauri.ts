@@ -252,6 +252,45 @@ export async function openLibrary(id: string): Promise<void> {
   return invoke<void>("open_library", { id });
 }
 
+/** The open library's display look (JSON strings), or null if it has none. */
+export async function getLibraryLook(): Promise<{ display: string | null; scripture: string | null } | null> {
+  return invoke("get_library_look");
+}
+
+export async function setLibraryLook(display: string | null, scripture: string | null): Promise<void> {
+  return invoke<void>("set_library_look", { display, scripture });
+}
+
+/** Whether to offer moving this computer's library into `orgId` (its owner,
+ * songs here, the organization's library still empty). */
+export async function canMoveLibrary(orgId: string): Promise<boolean> {
+  return invoke<boolean>("can_move_library", { orgId });
+}
+
+/** Move this computer's library into an organization, and open it there. */
+export async function moveLibraryInto(orgId: string): Promise<void> {
+  return invoke<void>("move_library_into", { orgId });
+}
+
+export interface SongRevision {
+  id: number;
+  field: string;
+  replacedAt: number;
+  replacedBy: string | null;
+  value?: string;
+}
+
+/** Earlier words of a song in an organization's library, newest first. */
+export async function songRevisions(songId: string): Promise<SongRevision[]> {
+  const r = await invoke<{ revisions: SongRevision[] }>("library_song_revisions", { songId });
+  return r.revisions ?? [];
+}
+
+export async function songRevision(songId: string, revision: number): Promise<SongRevision> {
+  const r = await invoke<{ revision: SongRevision }>("library_song_revision", { songId, revision });
+  return r.revision;
+}
+
 /** How the open organization library's sync stands. Shown only when
  * something's waiting or wrong. */
 export interface LibrarySyncStatus {

@@ -9,6 +9,7 @@ mod diagnostics;
 mod feedback;
 mod keep_awake;
 mod libraries;
+mod library_look;
 mod library_sync;
 mod library_export;
 mod library_watch;
@@ -463,6 +464,12 @@ pub fn run() {
             libraries::list_libraries,
             libraries::open_library,
             libraries::create_library,
+            library_look::get_library_look,
+            library_look::set_library_look,
+            libraries::can_move_library,
+            libraries::move_library_into,
+            library_sync::library_song_revisions,
+            library_sync::library_song_revision,
             library_sync::library_sync_status,
             library_sync::library_sync_now,
             library_sync::library_sync_ticket,

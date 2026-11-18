@@ -239,6 +239,99 @@ pub fn create(db: &Db, id: &str, name: &str) -> Result<()> {
     Ok(())
 }
 
+// --- Moving this computer's library into an organization ----------------------
+//
+// Most churches already have their songs on the slides computer. Its owner
+// can make them the organization's, once: the library MOVES (songs, charts,
+// scripture links, services, history, its look and learned timing), and this
+// computer's own library starts empty. A backup of it is kept beside it.
+
+fn library_is_empty(path: &Path) -> bool {
+    if !path.exists() {
+        return true;
+    }
+    let Ok(conn) = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY) else { return false };
+    conn.query_row(
+        "SELECT NOT EXISTS(SELECT 1 FROM songs) AND NOT EXISTS(SELECT 1 FROM setlists) AND NOT EXISTS(SELECT 1 FROM readings)",
+        [],
+        |r| r.get::<_, bool>(0),
+    )
+    .unwrap_or(false)
+}
+
+/// What this computer can check by itself: it has songs of its own, and the
+/// organization's library here is empty.
+pub fn can_move_here(db: &Db, org_id: &str) -> bool {
+    org_path(db.home_path(), org_id).is_ok_and(|p| library_is_empty(&p)) && home_has_own_songs(db)
+}
+
+fn remove_db_files(path: &Path) {
+    for suffix in ["", "-wal", "-shm", "-journal"] {
+        let _ = std::fs::remove_file(format!("{}{suffix}", path.display()));
+    }
+}
+
+/// Move this computer's own library into organization `org_id` and open it.
+pub fn move_home_into(db: &Db, org_id: &str, name: &str) -> Result<()> {
+    let home_path = db.home_path().to_path_buf();
+    let dir = home_path.parent().context("library has no folder")?.to_path_buf();
+    let target = org_path(&home_path, org_id)?;
+    if !library_is_empty(&target) {
+        bail!("{name} already has songs on this computer.");
+    }
+    // The organization's (empty) file may be the one open: let it go.
+    open(db, HOME_ID)?;
+    let stamp = chrono_stamp();
+    let backup = dir.join(format!("library-before-move-{stamp}.db"));
+    let moving = target.with_file_name("library.db.moving");
+    std::fs::create_dir_all(target.parent().context("no folder")?)?;
+    let _ = std::fs::remove_file(&moving);
+    {
+        let home = db.home();
+        home.execute("VACUUM INTO ?1", [backup.to_string_lossy()])
+            .context("couldn't back up this computer's library")?;
+        home.execute("VACUUM INTO ?1", [moving.to_string_lossy()])?;
+    }
+    {
+        // This computer's settings stay with this computer.
+        let copy = Connection::open(&moving)?;
+        copy.execute("DELETE FROM settings", [])?;
+        copy.execute(
+            "INSERT INTO settings (key, value, updated_at) VALUES (?1, ?2, ?3)",
+            params![NAME_KEY, serde_json::to_string(name)?, unix_ms()],
+        )?;
+    }
+    remove_db_files(&target);
+    std::fs::rename(&moving, &target)?;
+    // Learned timing goes with the songs it was learned on.
+    let learning = dir.join("learning.db");
+    if learning.exists() {
+        let to = crate::library_sync::local::learning_path(&target);
+        remove_db_files(&to);
+        std::fs::rename(&learning, &to)?;
+    }
+    open(db, org_id)?;
+    let moved: i64 = db.conn().lock().unwrap().query_row("SELECT COUNT(*) FROM songs", [], |r| r.get(0))?;
+    let had: i64 = db.home().query_row("SELECT COUNT(*) FROM songs", [], |r| r.get(0))?;
+    if moved != had {
+        bail!("the move didn't copy every song ({moved} of {had}); this computer's library is unchanged");
+    }
+    db.home().execute_batch(
+        "BEGIN;
+         DELETE FROM setlist_items; DELETE FROM setlists;
+         DELETE FROM service_songs; DELETE FROM services;
+         DELETE FROM song_charts; DELETE FROM song_scriptures; DELETE FROM song_references;
+         DELETE FROM songs; DELETE FROM readings;
+         COMMIT;",
+    )?;
+    log::info!("moved this computer's library ({had} songs) into {org_id}; backup at {}", backup.display());
+    Ok(())
+}
+
+fn chrono_stamp() -> String {
+    format!("{}", unix_ms())
+}
+
 fn unix_ms() -> i64 {
     use std::time::{SystemTime, UNIX_EPOCH};
     SystemTime::now()
@@ -269,6 +362,61 @@ pub async fn open_library(
         return Err("Finish the service before switching libraries.".into());
     }
     open(&state, &id).map_err(|e| e.to_string())?;
+    let _ = app.emit(crate::library_watch::LIBRARY_CHANGED_EVENT, ());
+    app.state::<Arc<crate::library_sync::LibrarySync>>().kick();
+    Ok(())
+}
+
+/// The organization's role for this person, as last heard from the server.
+fn role_in(app: &tauri::AppHandle, org_id: &str) -> Option<String> {
+    use tauri::Manager;
+    let app_data = app.path().app_data_dir().ok()?;
+    crate::account::memberships(&app_data).into_iter().find(|m| m.org_id == org_id).map(|m| m.role)
+}
+
+/// Whether the server's copy of the organization's library is empty.
+async fn server_library_empty(app: &tauri::AppHandle, org_id: &str) -> Result<bool, String> {
+    use tauri::Manager;
+    let app_data = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let page = crate::account::api(&app_data, "GET", &format!("/orgs/{org_id}/sync/pull?after=0"), None)
+        .await
+        .map_err(|e| format!("{e:#}"))?;
+    Ok(page.get("records").and_then(serde_json::Value::as_array).is_some_and(|r| r.is_empty()))
+}
+
+/// Offer "Use this computer's library" for `org_id`: its owner, songs here,
+/// and nothing in the organization's library yet (here or on the server).
+#[tauri::command]
+pub async fn can_move_library(app: tauri::AppHandle, state: tauri::State<'_, Arc<Db>>, org_id: String) -> Result<bool, String> {
+    if role_in(&app, &org_id).as_deref() != Some("owner") || !can_move_here(&state, &org_id) {
+        return Ok(false);
+    }
+    Ok(server_library_empty(&app, &org_id).await.unwrap_or(false))
+}
+
+#[tauri::command]
+pub async fn move_library_into(app: tauri::AppHandle, state: tauri::State<'_, Arc<Db>>, org_id: String) -> Result<(), String> {
+    use tauri::Manager;
+    if app.state::<crate::keep_awake::KeepAwake>().presenting() {
+        return Err("Finish the service before moving the library.".into());
+    }
+    if role_in(&app, &org_id).as_deref() != Some("owner") {
+        return Err("Only the organization's owner can move a library into it.".into());
+    }
+    if !server_library_empty(&app, &org_id).await? {
+        return Err("The organization already has songs, so this library can't be moved into it.".into());
+    }
+    let app_data = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let name = crate::account::memberships(&app_data)
+        .into_iter()
+        .find(|m| m.org_id == org_id)
+        .map(|m| m.org_name)
+        .unwrap_or_else(|| "Organization".into());
+    let db = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || move_home_into(&db, &org_id, &name))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| format!("{e:#}"))?;
     let _ = app.emit(crate::library_watch::LIBRARY_CHANGED_EVENT, ());
     app.state::<Arc<crate::library_sync::LibrarySync>>().kick();
     Ok(())

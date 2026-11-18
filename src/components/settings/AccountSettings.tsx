@@ -14,6 +14,7 @@ import {
   type AccountStatus,
 } from "@/lib/account";
 import { useConfirm } from "@/lib/confirm";
+import { canMoveLibrary, moveLibraryInto } from "@/lib/tauri";
 import { useToast } from "@/lib/toast";
 
 /** A one-line form that opens from a text button: "New organization",
@@ -104,6 +105,41 @@ export function AccountSettings() {
     setBusy(kind);
     try {
       setStatus(await action());
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  // Organizations this computer's songs could move into (its owner, songs
+  // here, the organization's library still empty).
+  const [movable, setMovable] = useState<string[]>([]);
+  const owned = status?.memberships.filter((m) => m.role === "owner").map((m) => m.orgId).join(",") ?? "";
+  useEffect(() => {
+    let live = true;
+    const ids = owned ? owned.split(",") : [];
+    void Promise.all(ids.map((id) => canMoveLibrary(id).catch(() => false))).then(
+      (ok) => live && setMovable(ids.filter((_, i) => ok[i])),
+    );
+    return () => {
+      live = false;
+    };
+  }, [owned]);
+
+  /** The one-time offer: this computer's library becomes the organization's. */
+  async function offerMove(orgId: string, orgName: string) {
+    const ok = await confirm({
+      title: `Use this computer's library for ${orgName}?`,
+      message: `Its songs, charts, services, history and look move into ${orgName}, so everyone on the team gets them. This computer's own library starts empty (a backup is kept). This can only be done while ${orgName} has no songs.`,
+      confirmLabel: "Move the library",
+    });
+    if (!ok) return;
+    setBusy("org");
+    try {
+      await moveLibraryInto(orgId);
+      setMovable((m) => m.filter((id) => id !== orgId));
+      toast.success(`This computer's songs are now ${orgName}'s. They're going up now.`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : String(err));
     } finally {
@@ -212,6 +248,17 @@ export function AccountSettings() {
               <div className="flex items-center justify-between gap-4">
                 <span>{m.orgName}</span>
                 <span className="flex items-center gap-2">
+                  {movable.includes(m.orgId) && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={busy !== null}
+                      onClick={() => void offerMove(m.orgId, m.orgName)}
+                    >
+                      Use this computer&rsquo;s songs
+                    </Button>
+                  )}
                   <span className="text-muted-foreground">{roleLabel(m.role)}</span>
                   <Button
                     type="button"
@@ -244,7 +291,16 @@ export function AccountSettings() {
           placeholder="Name, e.g. Grace Chapel"
           submitLabel="Create"
           busy={busy !== null}
-          onSubmit={(name) => orgAction(() => createOrganization(name))}
+          onSubmit={async (name) => {
+            let made: { id: string; name: string } | null = null;
+            const done = await orgAction(async () => {
+              made = (await createOrganization(name)).org;
+            });
+            // A new organization on a computer with songs: offer them once.
+            const org = made as { id: string; name: string } | null;
+            if (done && org && (await canMoveLibrary(org.id).catch(() => false))) void offerMove(org.id, org.name);
+            return done;
+          }}
         />
         {joinForm}
       </div>

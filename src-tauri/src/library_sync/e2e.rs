@@ -107,3 +107,54 @@ async fn two_computers_through_a_local_server() {
         assert_eq!(super::local::waiting(&c.db.conn().lock().unwrap()).unwrap(), 0);
     }
 }
+
+#[tokio::test]
+#[ignore = "needs the server running locally: see the module comment"]
+async fn moving_a_library_in_reaches_a_second_computer() {
+    assert!(account::server_url().starts_with("http://localhost"), "set CHURCH_SLIDES_SERVER=http://localhost:8787");
+    let first = tempfile::tempdir().unwrap();
+    account::sign_in(first.path(), None, |url| {
+        let url = url.to_string();
+        tokio::spawn(async move {
+            let _ = reqwest::Client::new().get(url).send().await;
+        });
+        Ok(())
+    })
+    .await
+    .unwrap();
+    let made = account::api(first.path(), "POST", "/orgs", Some(json!({ "name": "Move test" }))).await.unwrap();
+    let org = made.pointer("/org/id").and_then(Value::as_str).unwrap().to_string();
+
+    // The slides computer: its own library, with a look and learned timing.
+    let slides = tempfile::tempdir().unwrap();
+    std::fs::copy(first.path().join("account.json"), slides.path().join("account.json")).unwrap();
+    let db = Arc::new(Db::open(&slides.path().join("library.db")).unwrap());
+    let ours = db.create_song(song("Our Song", "[Verse 1]\nours")).unwrap();
+    crate::library_look::set(&db, &crate::library_look::LibraryLook { display: Some(r#"{"theme":"light"}"#.into()), scripture: None }).unwrap();
+    {
+        let conn = rusqlite::Connection::open(slides.path().join("learning.db")).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE performances (id TEXT PRIMARY KEY, song_id TEXT NOT NULL, started_at_ms INTEGER NOT NULL,
+               provenance TEXT NOT NULL, weight REAL NOT NULL, final INTEGER NOT NULL, data_json TEXT NOT NULL, updated_at_ms INTEGER NOT NULL);",
+        )
+        .unwrap();
+        conn.execute("INSERT INTO performances VALUES ('perf1', ?1, 1, 'live', 1.0, 1, '{\"x\":1}', 1)", [&ours]).unwrap();
+    }
+    let songs: i64 = db.conn().lock().unwrap().query_row("SELECT COUNT(*) FROM songs", [], |r| r.get(0)).unwrap();
+    crate::libraries::move_home_into(&db, &org, "Move test").unwrap();
+    assert_eq!(super::cycle(&db, slides.path(), &org, &|| {}).await.unwrap(), None);
+    assert_eq!(super::local::waiting(&db.conn().lock().unwrap()).unwrap(), 0);
+
+    // A second computer gets all of it.
+    let b = Computer::new(&org, Some(first.path()));
+    b.sync(&org).await;
+    let got: i64 = b.db.conn().lock().unwrap().query_row("SELECT COUNT(*) FROM songs", [], |r| r.get(0)).unwrap();
+    assert_eq!(got, songs);
+    assert_eq!(b.words(&ours).as_deref(), Some("[Verse 1]\nours"));
+    assert_eq!(crate::library_look::get(&b.db).unwrap().and_then(|l| l.display).as_deref(), Some(r#"{"theme":"light"}"#));
+    let learned = rusqlite::Connection::open(super::local::learning_path(&b.db.open_path()))
+        .unwrap()
+        .query_row("SELECT data_json FROM performances WHERE id = 'perf1'", [], |r| r.get::<_, String>(0))
+        .unwrap();
+    assert_eq!(learned, r#"{"x":1}"#);
+}

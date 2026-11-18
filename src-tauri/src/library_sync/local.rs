@@ -42,9 +42,11 @@ const WATCHED: &[(&str, &str, &str)] = &[
     ("readings", "reading", "id"),
     ("services", "service", "id"),
     ("service_songs", "service", "service_id"),
+    ("library_look", "look", "id"),
 ];
 
-pub const TYPES: &[&str] = &["song", "reading", "setlist", "service"];
+/// Record types kept in the library file.
+pub const TYPES: &[&str] = &["song", "reading", "look", "setlist", "service"];
 
 const SONG_COLS: &[&str] = &[
     "title", "body_text", "ccli", "author", "copyright", "default_tempo_wps", "slide_order", "created_at", "updated_at",
@@ -58,6 +60,8 @@ const SETLIST_COLS: &[&str] = &["name", "created_at", "last_used_at"];
 const ITEM_COLS: &[&str] = &["id", "kind", "song_id", "position", "slides_override", "content", "look", "song_key"];
 const READING_COLS: &[&str] = &["title", "body_text", "created_at", "updated_at"];
 const SERVICE_COLS: &[&str] = &["setlist_id", "started_at"];
+const LOOK_COLS: &[&str] = &["display", "scripture", "updated_at"];
+const PERFORMANCE_COLS: &[&str] = &["song_id", "started_at_ms", "provenance", "weight", "data_json", "updated_at_ms"];
 
 /// The fields this version of the app reads and writes for a record type.
 /// Fields it doesn't know (from a newer app) are left alone, never cleared.
@@ -67,6 +71,7 @@ fn known(ty: &str) -> Vec<&'static str> {
         "setlist" => (SETLIST_COLS, &["items", "refs"]),
         "reading" => (READING_COLS, &[]),
         "service" => (SERVICE_COLS, &["songs"]),
+        "look" => (LOOK_COLS, &[]),
         _ => (&[], &[]),
     };
     cols.iter().chain(extra).copied().collect()
@@ -107,7 +112,8 @@ pub fn install(conn: &Connection) -> Result<()> {
         sql += "INSERT OR IGNORE INTO sync_dirty (type, id) SELECT 'song', id FROM songs;
                 INSERT OR IGNORE INTO sync_dirty (type, id) SELECT 'reading', id FROM readings;
                 INSERT OR IGNORE INTO sync_dirty (type, id) SELECT 'setlist', id FROM setlists;
-                INSERT OR IGNORE INTO sync_dirty (type, id) SELECT 'service', id FROM services;";
+                INSERT OR IGNORE INTO sync_dirty (type, id) SELECT 'service', id FROM services;
+                INSERT OR IGNORE INTO sync_dirty (type, id) SELECT 'look', id FROM library_look;";
     }
     conn.execute_batch(&format!("BEGIN; {sql} COMMIT;"))?;
     Ok(())
@@ -219,6 +225,7 @@ pub fn read(conn: &Connection, ty: &str, id: &str) -> Result<Option<Map<String, 
             Ok(m)
         }).transpose()?,
         "reading" => main("readings", READING_COLS)?,
+        "look" => main("library_look", LOOK_COLS)?,
         "service" => main("services", SERVICE_COLS)?.map(|mut m| -> Result<_> {
             let songs = rows(conn, "service_songs", &["song_id"], "service_id", id, "ORDER BY song_id")?;
             put_list(&mut m, "songs", songs.into_iter().filter_map(|mut r| r.remove("song_id")).collect());
@@ -289,6 +296,7 @@ pub fn write(conn: &Connection, ty: &str, id: &str, m: &Map<String, Value>) -> R
             }
         }
         "reading" => upsert(conn, "readings", id, READING_COLS, m)?,
+        "look" => upsert(conn, "library_look", id, LOOK_COLS, m)?,
         "service" => {
             upsert(conn, "services", id, SERVICE_COLS, m)?;
             conn.execute("DELETE FROM service_songs WHERE service_id = ?1", [id])?;
@@ -507,6 +515,14 @@ pub fn apply_push(conn: &Connection, sent: &[Pending], results: &[PushResult]) -
         let mut outcome = PushOutcome::default();
         for p in sent {
             let Some(r) = results.iter().find(|r| r.op == p.op) else { continue };
+            if p.ty == "performance" {
+                // Sent (or refused for good): either way, not sent again.
+                set_shadow(conn, &p.ty, &p.id, r.seq.unwrap_or(0), false, &Map::new())?;
+                if r.status != "applied" {
+                    log::info!("learned timing {} not kept by the server: {:?}", p.id, r.code);
+                }
+                continue;
+            }
             let sh = shadow(conn, &p.ty, &p.id)?;
             let still_dirty = conn
                 .execute("DELETE FROM sync_dirty WHERE type = ?1 AND id = ?2 AND gen = ?3", params![p.ty, p.id, p.gen])?
@@ -569,7 +585,15 @@ pub struct Pulled {
 pub fn apply_pull(conn: &Connection, records: &[Pulled], seq: i64) -> Result<usize> {
     quietly(conn, || {
         let mut changed = 0;
+        let learning = learning_attached(conn);
         for rec in records {
+            if rec.ty == "performance" {
+                if learning && !rec.deleted && valid_id(&rec.id) {
+                    write_performance(conn, &rec.id, &rec.fields)?;
+                    set_shadow(conn, &rec.ty, &rec.id, rec.seq, false, &Map::new())?;
+                }
+                continue;
+            }
             if !TYPES.contains(&rec.ty.as_str()) {
                 continue;
             }
@@ -632,8 +656,100 @@ pub fn reset(conn: &Connection) -> Result<()> {
          INSERT OR IGNORE INTO sync_dirty (type, id) SELECT 'reading', id FROM readings;
          INSERT OR IGNORE INTO sync_dirty (type, id) SELECT 'setlist', id FROM setlists;
          INSERT OR IGNORE INTO sync_dirty (type, id) SELECT 'service', id FROM services;
+         INSERT OR IGNORE INTO sync_dirty (type, id) SELECT 'look', id FROM library_look;
          DELETE FROM sync_state WHERE key = 'seq';
          COMMIT;",
+    )?;
+    Ok(())
+}
+
+// --- Learned timing ------------------------------------------------------------
+//
+// Each performance the engine learns from is a row in `learning.db`, beside
+// the library file (the engine owns that file). Once a row is final it never
+// changes, so sync only sends new final rows and writes other computers'
+// rows in: nothing to merge. Rows sent or received are remembered in
+// `sync_shadow` (type `performance`, no fields kept).
+
+/// The engine's schema for `learning.db` (sidecar/auto_presenter/learning/store.py).
+const LEARNING_SCHEMA: &str = "
+CREATE TABLE IF NOT EXISTS learning.performances (
+  id            TEXT PRIMARY KEY,
+  song_id       TEXT NOT NULL,
+  started_at_ms INTEGER NOT NULL,
+  provenance    TEXT NOT NULL,
+  weight        REAL NOT NULL,
+  final         INTEGER NOT NULL,
+  data_json     TEXT NOT NULL,
+  updated_at_ms INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS learning.performances_song ON performances(song_id, started_at_ms);
+";
+
+/// The engine's learning file for a library file.
+pub fn learning_path(library: &std::path::Path) -> std::path::PathBuf {
+    library.with_file_name("learning.db")
+}
+
+/// Run `f` with the library's `learning.db` attached as `learning`.
+pub fn with_learning<T>(conn: &Connection, path: &std::path::Path, f: impl FnOnce() -> Result<T>) -> Result<T> {
+    conn.execute("ATTACH DATABASE ?1 AS learning", [path.to_string_lossy()])?;
+    let result = conn.execute_batch(LEARNING_SCHEMA).map_err(anyhow::Error::from).and_then(|_| f());
+    let _ = conn.execute_batch("DETACH DATABASE learning");
+    result
+}
+
+fn learning_attached(conn: &Connection) -> bool {
+    conn.query_row("SELECT 1 FROM pragma_database_list WHERE name = 'learning'", [], |_| Ok(()))
+        .optional()
+        .ok()
+        .flatten()
+        .is_some()
+}
+
+fn valid_id(id: &str) -> bool {
+    (1..=100).contains(&id.len()) && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+}
+
+/// Final performances learned here that haven't gone up (with `learning` attached).
+pub fn prepare_performances(conn: &Connection, limit: usize) -> Result<Vec<Pending>> {
+    if !learning_attached(conn) {
+        return Ok(vec![]);
+    }
+    let sql = format!(
+        "SELECT id, {} FROM learning.performances p WHERE final = 1 \
+         AND NOT EXISTS (SELECT 1 FROM sync_shadow s WHERE s.type = 'performance' AND s.id = p.id) \
+         ORDER BY started_at_ms LIMIT ?1",
+        PERFORMANCE_COLS.join(", ")
+    );
+    let mut stmt = conn.prepare(&sql)?;
+    let rows = stmt
+        .query_map([limit as i64], |r| {
+            let id: String = r.get(0)?;
+            let mut m = Map::new();
+            for (i, c) in PERFORMANCE_COLS.iter().enumerate() {
+                m.insert((*c).to_string(), json_of(r.get_ref(i + 1)?));
+            }
+            Ok((id, m))
+        })?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    Ok(rows
+        .into_iter()
+        .filter(|(id, _)| valid_id(id))
+        .map(|(id, set)| Pending { op: format!("op_{}", ulid::Ulid::new()), ty: "performance".into(), id, gen: 0, base: 0, set: Some(set) })
+        .collect())
+}
+
+/// Write another computer's performance into `learning.db`.
+fn write_performance(conn: &Connection, id: &str, m: &Map<String, Value>) -> Result<()> {
+    let mut values = vec![rusqlite::types::Value::Text(id.to_string())];
+    values.extend(PERFORMANCE_COLS.iter().map(|c| sql_of(m.get(*c))));
+    conn.execute(
+        &format!(
+            "INSERT INTO learning.performances (id, {}, final) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 1) ON CONFLICT (id) DO NOTHING",
+            PERFORMANCE_COLS.join(", ")
+        ),
+        rusqlite::params_from_iter(values),
     )?;
     Ok(())
 }

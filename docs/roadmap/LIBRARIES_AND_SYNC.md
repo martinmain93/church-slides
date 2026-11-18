@@ -1,7 +1,7 @@
 # Organization libraries and sync
 
-Status: **agreed 2026-11-18** (decisions at the end). Steps A–C built 2026-11-18;
-step D is next. This is server milestone M4.
+Status: **agreed 2026-11-18** (decisions at the end). Steps A–D built 2026-11-18.
+This is server milestone M4.
 
 ## What a volunteer sees
 
@@ -183,7 +183,7 @@ says a different server must be buildable from the spec.
 | A | Libraries are files; the switcher (no server). **Built 2026-11-18** | Today's app behaves the same; a second empty library can be made and switched to in a dev build; every app test passes |
 | B | Protocol spec + server push/pull/poke + revisions | Server tests: two simulated devices, offline edits on both, no loss, words revision kept, role matrix refuses set-leader song edits |
 | C | App sync client + organization library download. **Built 2026-11-18** (`src-tauri/src/library_sync`; tested against a local server) | Two laptops (or two app instances), offline edits on both, reconnect: no loss, conflict revision kept, this computer's own library never leaves it |
-| D | "Use this computer's library" move, the look in the library, learned timing sync, history view for revisions, status pill | An owner with a real library creates an organization, and a second computer gets all of it |
+| D | "Use this computer's library" move, the look in the library, learned timing sync, history view for revisions, status pill. **Built 2026-11-18** (tested against a local server) | An owner with a real library creates an organization, and a second computer gets all of it |
 
 Steps A and B don't depend on each other.
 
@@ -200,8 +200,28 @@ Steps A and B don't depend on each other.
 - **The status** sits under the switcher and only says something when changes
   are waiting while offline, the sign-in has lapsed, or the server refused a
   change (the change is undone here; the reason stays shown).
-- Not in step C: the display look and learned timing (record types `look`
-  and `performance`, step D), and a way to see or bring back revisions.
+
+## As built (step D)
+
+- **The move** is a button for the organization's owner in Settings →
+  Account ("Use this computer's songs"), offered too right after creating an
+  organization. It's there only while the organization has no songs, here or
+  on the server. The library file is copied (settings stay behind), the
+  engine's `learning.db` moves with it, a backup
+  (`library-before-move-<time>.db`) is kept, and this computer's own library
+  is emptied only once the copy is checked.
+- **The look** is one row in each library file (`library_look`, migration
+  013), synced as record `look:default`. The window keeps a copy so the first
+  frame draws in it. A library with no look: this computer's own takes the
+  window's; an organization's shows the defaults, so a newcomer's first
+  download never overwrites the team's.
+- **Learned timing:** final rows of `learning.db` go up as `performance`
+  records and other computers' are written in; rows still being learned stay
+  here. The server doesn't yet cap rows per song (the engine reads 200).
+- **Earlier words:** the song editor's ⋯ menu has "Earlier words…" in an
+  organization's library; "Bring back" puts them in the editor to be saved.
+- **Not yet:** with this computer's own library open, services still go
+  live to the first organization (until its owner moves the library in).
 
 ## Decisions (2026-11-18)
 
