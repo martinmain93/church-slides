@@ -94,31 +94,18 @@ export const canRunLive = (role: string) => role === "owner" || role === "admin"
 /** Roles that make band links. */
 export const canManageBandLinks = canRunLive;
 
-const LIVE_ORG_KEY = "live_org";
-
 /**
- * Which organization this computer's services go to: the one picked in
- * Settings → Account, else the first one whose role runs the live set.
- * Null when signed out or in none that can.
+ * Which organization this computer's services go to: the one whose library
+ * is open (`openLibraryId`), so a service goes live where its songs are.
+ * With this computer's own library open, the first organization whose role
+ * runs the live set. Null when signed out or in none that can.
  */
-export function liveOrganization(status: AccountStatus | null): Membership | null {
+export function liveOrganization(status: AccountStatus | null, openLibraryId?: string | null): Membership | null {
   if (!status?.signedIn) return null;
   const eligible = status.memberships.filter((m) => canRunLive(m.role));
-  let picked: string | null = null;
-  try {
-    picked = localStorage.getItem(LIVE_ORG_KEY);
-  } catch {
-    // private storage: use the first
-  }
-  return eligible.find((m) => m.orgId === picked) ?? eligible[0] ?? null;
-}
-
-export function setLiveOrganization(orgId: string): void {
-  try {
-    localStorage.setItem(LIVE_ORG_KEY, orgId);
-  } catch {
-    // not remembered; the first eligible organization is used
-  }
+  const open = status.memberships.find((m) => m.orgId === openLibraryId);
+  if (open) return canRunLive(open.role) ? open : null;
+  return eligible[0] ?? null;
 }
 
 /** A one-use address for this computer to connect to the live room as the operator. */

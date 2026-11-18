@@ -252,6 +252,32 @@ export async function openLibrary(id: string): Promise<void> {
   return invoke<void>("open_library", { id });
 }
 
+/** How the open organization library's sync stands. Shown only when
+ * something's waiting or wrong. */
+export interface LibrarySyncStatus {
+  org_id: string | null;
+  state: "off" | "syncing" | "ok" | "offline" | "signed_out" | "error";
+  /** Changes made here that haven't gone up yet. */
+  waiting: number;
+  message: string | null;
+}
+
+export const LIBRARY_SYNC_EVENT = "library-sync";
+
+export async function librarySyncStatus(): Promise<LibrarySyncStatus> {
+  return invoke<LibrarySyncStatus>("library_sync_status");
+}
+
+/** Pull now: a change notice arrived. */
+export async function librarySyncNow(): Promise<void> {
+  return invoke<void>("library_sync_now");
+}
+
+/** A one-use websocket address for an organization's change notices. */
+export async function librarySyncTicket(orgId: string): Promise<string> {
+  return invoke<string>("library_sync_ticket", { orgId });
+}
+
 export async function listSetlists(): Promise<SetlistRow[]> {
   return invoke<SetlistRow[]>("list_setlists");
 }

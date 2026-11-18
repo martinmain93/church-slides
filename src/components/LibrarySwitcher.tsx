@@ -1,15 +1,17 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { useLibraryChanged } from "@/lib/assistantConnect";
-import { listLibraries, openLibrary, type LibraryInfo } from "@/lib/tauri";
+import { syncNote } from "@/lib/librarySync";
+import { listLibraries, openLibrary, type LibraryInfo, type LibrarySyncStatus } from "@/lib/tauri";
 import { useToast } from "@/lib/toast";
 
 /**
  * Which library Home and Library show: this computer's own, or an
  * organization's. Only there when this computer has more than one, so most
- * people never see it.
+ * people never see it. Under it, an organization library's sync status, only
+ * when something's waiting or wrong.
  */
-export function LibrarySwitcher({ onSwitched }: { onSwitched: () => void }) {
+export function LibrarySwitcher({ onSwitched, sync }: { onSwitched: () => void; sync?: LibrarySyncStatus }) {
   const toast = useToast();
   const [libraries, setLibraries] = useState<LibraryInfo[]>([]);
   const [busy, setBusy] = useState(false);
@@ -28,7 +30,16 @@ export function LibrarySwitcher({ onSwitched }: { onSwitched: () => void }) {
     return () => window.removeEventListener("focus", load);
   }, [load]);
 
-  if (libraries.length < 2) return null;
+  const note = sync ? syncNote(sync) : null;
+  const noteLine = note && (
+    <p
+      data-testid="library-sync-note"
+      className={`mt-1 px-1 text-xs ${note.tone === "warn" ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"}`}
+    >
+      {note.text}
+    </p>
+  );
+  if (libraries.length < 2) return noteLine ? <div className="px-3 pb-2">{noteLine}</div> : null;
   const open = libraries.find((l) => l.open);
 
   return (
@@ -58,6 +69,7 @@ export function LibrarySwitcher({ onSwitched }: { onSwitched: () => void }) {
           </option>
         ))}
       </select>
+      {noteLine}
     </div>
   );
 }

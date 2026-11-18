@@ -67,9 +67,10 @@ describe("Settings → Account", () => {
     fireEvent.click(await screen.findByRole("button", { name: "New organization" }));
     fireEvent.change(screen.getByRole("textbox", { name: "New organization" }), { target: { value: "New Life" } });
     fireEvent.click(screen.getByRole("button", { name: "Create" }));
-    // Now in two organizations that can run the live set: pick where services go.
-    const liveAt = await screen.findByRole("combobox", { name: "Services go live at" });
-    expect([...(liveAt as HTMLSelectElement).options].map((o) => o.text)).toEqual(["Grace Chapel", "New Life"]);
+    // In two organizations now. Where services go live isn't a setting: it's
+    // whichever organization's library is open.
+    expect(await screen.findByText("New Life")).toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Services go live at" })).toBeNull();
 
     const teams = screen.getAllByRole("button", { name: "Team" });
     fireEvent.click(teams[teams.length - 1]!);

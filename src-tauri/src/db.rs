@@ -128,6 +128,11 @@ pub fn open_library_file(path: &Path) -> Result<Connection> {
         "PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;",
     )?;
     run_migrations(&mut conn)?;
+    // An organization's library (`orgs/<id>/library.db`) records its changes
+    // for sync; this computer's own never does.
+    if path.parent().and_then(Path::parent).and_then(Path::file_name).is_some_and(|n| n == "orgs") {
+        crate::library_sync::local::install(&conn)?;
+    }
     Ok(conn)
 }
 

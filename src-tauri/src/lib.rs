@@ -9,6 +9,7 @@ mod diagnostics;
 mod feedback;
 mod keep_awake;
 mod libraries;
+mod library_sync;
 mod library_export;
 mod library_watch;
 mod mcp;
@@ -417,6 +418,9 @@ pub fn run() {
             // Announce this operator on the LAN and watch for others.
             let sync = peer_sync::PeerSync::new(app.handle().clone(), &db);
             log::info!("opened library at {}", db.open_path().display());
+            let library_sync = Arc::new(library_sync::LibrarySync::default());
+            library_sync.start(app.handle().clone(), db.clone(), app_data_dir.clone());
+            app.manage(library_sync);
             app.manage(db);
             app.manage(sync);
             let handle_for_sync = app.handle().clone();
@@ -459,6 +463,9 @@ pub fn run() {
             libraries::list_libraries,
             libraries::open_library,
             libraries::create_library,
+            library_sync::library_sync_status,
+            library_sync::library_sync_now,
+            library_sync::library_sync_ticket,
             open_audience_window,
             close_audience_window,
             toggle_audience_fullscreen,

@@ -36,6 +36,7 @@ import {
   bandPublish,
   bandStart,
   getSongCharts,
+  listLibraries,
   type BandInfo,
 } from "@/lib/tauri";
 
@@ -245,8 +246,9 @@ export function useBandHost(opts: BandHostOptions): BandHostApi {
     // Outside the app (browser preview) this is the mock account.
     if (!FEATURES.account) return;
     let live = true;
-    accountStatus().then(
-      (s) => live && setLiveOrg(liveOrganization(s)),
+    // The open library decides: a service goes live where its songs are.
+    Promise.all([accountStatus(), listLibraries().catch(() => [])]).then(
+      ([s, libraries]) => live && setLiveOrg(liveOrganization(s, libraries.find((l) => l.open)?.id)),
       () => undefined,
     );
     return () => {

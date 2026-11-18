@@ -157,6 +157,19 @@ pub fn list(db: &Db) -> Vec<LibraryInfo> {
             }
         }
     }
+    // The organizations this person is in: named as the server names them,
+    // and listed before their library is downloaded (opening one downloads it).
+    if let Some(app_data) = home_path.parent() {
+        for m in crate::account::memberships(app_data) {
+            if org_path(&home_path, &m.org_id).is_err() {
+                continue;
+            }
+            match orgs.iter_mut().find(|o| o.id == m.org_id) {
+                Some(o) => o.name = m.org_name,
+                None => orgs.push(LibraryInfo { id: m.org_id, name: m.org_name, kind: "organization", open: false }),
+            }
+        }
+    }
     orgs.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
     let home_open = open == home_path;
     let mut out = Vec::new();
@@ -178,7 +191,19 @@ fn path_for(db: &Db, id: &str) -> Result<PathBuf> {
     }
     let path = org_path(db.home_path(), id)?;
     if !path.exists() {
-        bail!("there's no library {id:?} on this computer");
+        // An organization this person is in, opened for the first time: an
+        // empty file, which sync fills.
+        let member = db
+            .home_path()
+            .parent()
+            .map(crate::account::memberships)
+            .unwrap_or_default()
+            .into_iter()
+            .find(|m| m.org_id == id);
+        match member {
+            Some(m) => create(db, id, &m.org_name)?,
+            None => bail!("there's no library {id:?} on this computer"),
+        }
     }
     Ok(path)
 }
@@ -245,6 +270,7 @@ pub async fn open_library(
     }
     open(&state, &id).map_err(|e| e.to_string())?;
     let _ = app.emit(crate::library_watch::LIBRARY_CHANGED_EVENT, ());
+    app.state::<Arc<crate::library_sync::LibrarySync>>().kick();
     Ok(())
 }
 

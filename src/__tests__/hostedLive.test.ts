@@ -1,7 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { liveOrganization, setLiveOrganization, type AccountStatus } from "@/lib/account";
+import { liveOrganization, type AccountStatus } from "@/lib/account";
 import { CloudHost } from "@/lib/band/cloudHost";
 import { pickOrganization } from "@/lib/band/memberSignIn";
 import { bandInviteUrl, bandPageHasLink, bandSocketUrl, hostedLink, useBandConnection } from "@/lib/band/useBandConnection";
@@ -233,8 +233,7 @@ describe("which organization a service goes to", () => {
     serverIsDefault: true,
   });
 
-  it("only one whose role runs the live set, the picked one first", () => {
-    localStorage.clear();
+  it("the open library's organization, where the role runs the live set", () => {
     expect(liveOrganization(null)).toBeNull();
     expect(liveOrganization(status([{ orgId: "m", orgName: "M", role: "member" }]))).toBeNull();
     const s = status([
@@ -242,10 +241,12 @@ describe("which organization a service goes to", () => {
       { orgId: "a", orgName: "A", role: "operator" },
       { orgId: "b", orgName: "B", role: "admin" },
     ]);
+    // This computer's own library open: the first that can run it.
+    expect(liveOrganization(s, "this-computer")?.orgId).toBe("a");
     expect(liveOrganization(s)?.orgId).toBe("a");
-    setLiveOrganization("b");
-    expect(liveOrganization(s)?.orgId).toBe("b");
-    setLiveOrganization("m"); // can't run it there
-    expect(liveOrganization(s)?.orgId).toBe("a");
+    // An organization's library open: its services go live there.
+    expect(liveOrganization(s, "b")?.orgId).toBe("b");
+    // Its library is open but the role can't run the live set: nowhere.
+    expect(liveOrganization(s, "m")).toBeNull();
   });
 });

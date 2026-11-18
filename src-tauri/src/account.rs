@@ -111,6 +111,12 @@ pub fn status(app_data: &Path) -> AccountStatus {
     }
 }
 
+/// The organizations this computer's account is in, as last heard from the
+/// server. Reads no secret, so it never waits on the keychain.
+pub fn memberships(app_data: &Path) -> Vec<Membership> {
+    load(app_data).map(|c| c.memberships).unwrap_or_default()
+}
+
 /// Forget everything local about the account. Never fails halfway: a keychain
 /// error still removes the file, so the app shows signed out.
 fn clear(app_data: &Path) {

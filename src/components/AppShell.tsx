@@ -29,9 +29,10 @@ import { UpdatePrompt } from "@/components/UpdatePrompt";
 import { SongEditor } from "@/components/library/SongEditor";
 import { useLibraryChanged } from "@/lib/assistantConnect";
 import { LibrarySwitcher } from "@/components/LibrarySwitcher";
+import { useLibrarySync } from "@/lib/librarySync";
 import { useAssistantImport } from "@/lib/assistantImport";
 import { loadAudioInputPrefs } from "@/lib/audioInputPrefs";
-import { getAiEngineStatus, listSongs } from "@/lib/tauri";
+import { getAiEngineStatus, listSongs, type LibrarySyncStatus } from "@/lib/tauri";
 import { fillMissingVerses } from "@/lib/scripture/prepared";
 import { monitorCount } from "@/lib/presentation/projection";
 import { defaultSetlistName } from "@/lib/setlistName";
@@ -106,6 +107,8 @@ export function AppShell() {
 
 function Inner() {
   const toast = useToast();
+  // The organization library's change notices, for as long as the app runs.
+  const librarySync = useLibrarySync();
   const [view, setView] = useState<View>({ kind: "home" });
   const [reloadKey, setReloadKey] = useState(0);
   const [recordServices, setRecordServices] = useState(true);
@@ -320,6 +323,7 @@ function Inner() {
             }}
             settingsPage={view.kind === "settings" ? view.page : view.kind === "recordingEditor" || view.kind === "modelInspector" ? "other" : null}
             onSelectSettings={(page) => setView({ kind: "settings", page })}
+            librarySync={librarySync}
           />
           <main className="flex-1 overflow-hidden bg-background">
             {view.kind === "home" && (
@@ -425,6 +429,7 @@ function Sidebar({
   onSelectHome,
   onSelectLibrary,
   onSelectSettings,
+  librarySync,
 }: {
   active: Section;
   /** The open settings sub-page, or null when settings aren't open. */
@@ -432,6 +437,7 @@ function Sidebar({
   onSelectHome: () => void;
   onSelectLibrary: () => void;
   onSelectSettings: (page: SettingsPageId) => void;
+  librarySync: LibrarySyncStatus;
 }) {
   return (
     <aside className="flex w-56 flex-col overflow-y-auto border-r border-border bg-muted/30">
@@ -442,7 +448,7 @@ function Sidebar({
         </span>
         <SidecarStatusBadge />
       </div>
-      <LibrarySwitcher onSwitched={onSelectHome} />
+      <LibrarySwitcher onSwitched={onSelectHome} sync={librarySync} />
       <nav className="flex flex-1 flex-col gap-1 px-2">
         <SidebarLink
           icon={<HomeIcon className="size-4" />}

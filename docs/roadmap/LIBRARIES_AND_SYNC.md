@@ -1,7 +1,7 @@
 # Organization libraries and sync
 
-Status: **agreed 2026-11-18** (decisions at the end). Nothing built yet. This is step
-one of server milestone M4: the app's library design comes first, then sync.
+Status: **agreed 2026-11-18** (decisions at the end). Steps A–C built 2026-11-18;
+step D is next. This is server milestone M4.
 
 ## What a volunteer sees
 
@@ -120,10 +120,12 @@ This fills in the "Sync" section of the server plan. The unit of sync is a
 **record**: a song (with its chart, scripture links and references) or a
 service (with its items). History rows are append-only.
 
-1. **Every local change is written to the library file at once, plus a row in
-   an `outbox` table** in the same transaction: the record id, which fields
-   changed, and the server version the change was based on. The app never
-   waits on the network.
+1. **Every local change is written to the library file at once, and marked to
+   go up in the same transaction.** As built, triggers in an organization's
+   file mark the record in `sync_dirty`, so writes from the app, the AI
+   assistant's process and imports are all caught without any of them knowing
+   about sync. `sync_shadow` keeps each record as the server last had it; what
+   goes up is the difference. The app never waits on the network.
 2. **Push:** when online, the app sends the outbox in order. The organization's
    Durable Object applies each change, gives it the next number in the
    organization's change log, and answers with that number. Sent rows leave
@@ -180,10 +182,26 @@ says a different server must be buildable from the spec.
 | --- | --- | --- |
 | A | Libraries are files; the switcher (no server). **Built 2026-11-18** | Today's app behaves the same; a second empty library can be made and switched to in a dev build; every app test passes |
 | B | Protocol spec + server push/pull/poke + revisions | Server tests: two simulated devices, offline edits on both, no loss, words revision kept, role matrix refuses set-leader song edits |
-| C | App sync client + organization library download | Two laptops (or two app instances), offline edits on both, reconnect: no loss, conflict revision kept, this computer's own library never leaves it |
+| C | App sync client + organization library download. **Built 2026-11-18** (`src-tauri/src/library_sync`; tested against a local server) | Two laptops (or two app instances), offline edits on both, reconnect: no loss, conflict revision kept, this computer's own library never leaves it |
 | D | "Use this computer's library" move, the look in the library, learned timing sync, history view for revisions, status pill | An owner with a real library creates an organization, and a second computer gets all of it |
 
 Steps A and B don't depend on each other.
+
+## As built (step C)
+
+- **Where a service goes live is the open library,** not a setting: the
+  "Services go live at" choice is gone. With this computer's own library
+  open, services still go to the first organization whose role runs the live
+  set, until step D moves that library in.
+- **Organizations show in the library switcher once signed in,** before their
+  library is downloaded. Opening one makes the file, and sync fills it.
+- **Change notices** are a websocket the app window holds; the Rust loop also
+  pulls every minute and sends changes about 3 seconds after they're made.
+- **The status** sits under the switcher and only says something when changes
+  are waiting while offline, the sign-in has lapsed, or the server refused a
+  change (the change is undone here; the reason stays shown).
+- Not in step C: the display look and learned timing (record types `look`
+  and `performance`, step D), and a way to see or bring back revisions.
 
 ## Decisions (2026-11-18)
 

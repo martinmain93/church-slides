@@ -431,6 +431,10 @@ export const mockTauri = {
 
   // --- Libraries ----------------------------------------------------------
 
+  async library_sync_status() {
+    return { org_id: null, state: "off", waiting: 0, message: null };
+  },
+  async library_sync_now() {},
   async list_libraries() {
     return [{ id: "this-computer", name: "This computer", kind: "computer", open: true }];
   },
