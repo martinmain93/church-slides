@@ -382,6 +382,7 @@ pub fn run() {
                 .path()
                 .app_data_dir()
                 .expect("app_data_dir resolves on supported platforms");
+            account::set_app_identifier(&app.config().identifier);
             let db_path = db::default_db_path(&app_data_dir);
             let db = Arc::new(
                 Db::open(&db_path)

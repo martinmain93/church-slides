@@ -158,3 +158,30 @@ async fn moving_a_library_in_reaches_a_second_computer() {
         .unwrap();
     assert_eq!(learned, r#"{"x":1}"#);
 }
+
+/// Another computer edits a song in a running app's organization, so the app
+/// can be watched picking it up:
+/// `SYNC_E2E_ORG=<org> SYNC_E2E_SONG=<song id> CHURCH_SLIDES_SERVER=… cargo test --lib library_sync::e2e::another_computer_edits -- --ignored`
+#[tokio::test]
+#[ignore = "drives a running app's organization: see the doc comment"]
+async fn another_computer_edits() {
+    let (Ok(org), Ok(song_id)) = (std::env::var("SYNC_E2E_ORG"), std::env::var("SYNC_E2E_SONG")) else {
+        panic!("set SYNC_E2E_ORG and SYNC_E2E_SONG");
+    };
+    let first = tempfile::tempdir().unwrap();
+    account::sign_in(first.path(), None, |url| {
+        let url = url.to_string();
+        tokio::spawn(async move {
+            let _ = reqwest::Client::new().get(url).send().await;
+        });
+        Ok(())
+    })
+    .await
+    .unwrap();
+    let c = Computer::new(&org, Some(first.path()));
+    c.sync(&org).await;
+    let mut s = c.db.get_song(&song_id).unwrap().expect("the song came down");
+    s.body_text = format!("{}\n\n[Chorus]\nEdited on another computer", s.body_text);
+    c.db.update_song(&song_id, song(&s.title, &s.body_text)).unwrap();
+    c.sync(&org).await;
+}

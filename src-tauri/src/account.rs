@@ -127,8 +127,20 @@ fn clear(app_data: &Path) {
 
 // --- Keychain -------------------------------------------------------------------
 
+/// The keychain item's service: `<app identifier>.account`, so a copy of the
+/// app with its own identifier (a test build) never touches the real
+/// sign-in. The released app's is `com.churchslides.app.account`.
+static KEYCHAIN_SERVICE: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+
+/// Set once at startup from the app's identifier.
+pub fn set_app_identifier(identifier: &str) {
+    let _ = KEYCHAIN_SERVICE.set(format!("{identifier}.account"));
+}
+
 #[cfg_attr(test, allow(dead_code))]
-const KEYCHAIN_SERVICE: &str = "com.churchslides.app.account";
+fn keychain_service() -> &'static str {
+    KEYCHAIN_SERVICE.get().map(String::as_str).unwrap_or("com.churchslides.app.account")
+}
 #[cfg_attr(test, allow(dead_code))]
 const KEYCHAIN_USER: &str = "refresh-token";
 
@@ -143,19 +155,19 @@ struct Keychain;
 
 impl SecretStore for Keychain {
     fn get(&self) -> Result<Option<String>> {
-        match keyring::Entry::new(KEYCHAIN_SERVICE, KEYCHAIN_USER)?.get_password() {
+        match keyring::Entry::new(keychain_service(), KEYCHAIN_USER)?.get_password() {
             Ok(s) => Ok(Some(s)),
             Err(keyring::Error::NoEntry) => Ok(None),
             Err(e) => Err(anyhow!("Couldn't read the sign-in from the keychain: {e}")),
         }
     }
     fn set(&self, secret: &str) -> Result<()> {
-        keyring::Entry::new(KEYCHAIN_SERVICE, KEYCHAIN_USER)?
+        keyring::Entry::new(keychain_service(), KEYCHAIN_USER)?
             .set_password(secret)
             .map_err(|e| anyhow!("Couldn't save the sign-in to the keychain: {e}"))
     }
     fn delete(&self) -> Result<()> {
-        match keyring::Entry::new(KEYCHAIN_SERVICE, KEYCHAIN_USER)?.delete_credential() {
+        match keyring::Entry::new(keychain_service(), KEYCHAIN_USER)?.delete_credential() {
             Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
             Err(e) => Err(anyhow!("Couldn't remove the sign-in from the keychain: {e}")),
         }
