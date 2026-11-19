@@ -52,6 +52,10 @@ pnpm codegen                    # after changing sidecar/auto_presenter/protocol
 - **No new telemetry** without a maintainer's approval. Crash reports and
   stats exist only in official builds (see `src/lib/usage.ts` and
   `src-tauri/src/telemetry.rs`).
+- **Keep the privacy page and terms true.** A change that sends, stores,
+  keeps or shows people's data differently updates `site/privacy.html` in
+  the same change; one that changes what people may do updates
+  `site/terms.html`. Major releases review both first (`docs/RELEASING.md`).
 - **Don't reset files to undo one edit.** Never use `git checkout -- <file>` or
   `git restore` to undo one experimental change in a file that also has
   other uncommitted work.

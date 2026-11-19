@@ -227,6 +227,15 @@ else
   sha="$(git rev-parse HEAD)"
   python3 scripts/changelog.py has "$version" \
     || die "CHANGELOG.md has no entry for $version (bump_version.sh names the Unreleased section)"
+  # A major release (X.Y.0) needs the privacy and terms pages reviewed for it
+  # (docs/RELEASING.md, "Privacy and terms").
+  if [[ "$version" == *.0 ]]; then
+    for page in site/privacy.html site/terms.html; do
+      reviewed="$(sed -n 's/.*<meta name="reviewed-for" content="\([^"]*\)".*/\1/p' "$page")"
+      [[ "$reviewed" == "${version%.*}" ]] \
+        || die "$page was reviewed for ${reviewed:-no version}, not ${version%.*}: review it (docs/RELEASING.md) and set its reviewed-for"
+    done
+  fi
 
   # Already published from this commit? Then a re-push (say, after the page
   # deploy failed and refused the push) only redoes the page.
