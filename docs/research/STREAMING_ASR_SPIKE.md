@@ -123,6 +123,15 @@ audio rather than let it write freely, as the Whisper next-line check does.
 
 ## Speed and size on this Mac (M-series, MLX)
 
+**Caveat: every run here was on battery with Low Power Mode on** (it's set to
+switch on whenever the Mac is on battery). Low Power Mode has slowed engine
+passes badly before (`docs/research/LIVE_LATENCY.md`; the 2026-10-14
+low-battery lag). So the local pass times, and the local engines' first-sight
+and final delays, are probably pessimistic. Whisper and Qwen were throttled
+alike, so they still compare fairly with each other. Accuracy is unaffected,
+and the cloud services' delays are mostly network. Re-time on mains power
+before quoting absolute numbers.
+
 | Model | Seconds per 6 s pass (p50 / p90) | Download |
 |---|---|---|
 | Whisper small.en | not timed separately here | 464 MB |
