@@ -1,0 +1,8 @@
+{
+  "type": "look",
+  "id": "default",
+  "fields": {
+    "display": "{\"theme\":\"dark\",\"font\":\"rounded\",\"size\":\"l\",\"weight\":\"regular\"}",
+    "updated_at": 1731000000000
+  }
+}

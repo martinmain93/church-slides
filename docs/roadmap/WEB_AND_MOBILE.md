@@ -1,8 +1,11 @@
 # Web and mobile apps: how the code is split
 
-Status: **agreed 2026-11-18.** Groundwork (record formats, the TypeScript
-record conversion, the library data-source interface) is being built first;
-the web app follows.
+Status: **agreed 2026-11-18. Groundwork built 2026-11-18:** record formats
+(`docs/server-protocol/records.md` and samples), the TypeScript conversion
+(`src/core/records.ts`), the shared library types (`src/core/library.ts`),
+the data-source interface (`src/library/`) with the desktop version, and the
+lint rule for the layers. The desktop's views don't use the interface yet;
+they move over as the web app needs their pieces. Next: the web app.
 
 Church Slides runs today as a desktop app. A web app at
 `app.churchslides.app` comes next, so a team can plan services from a phone

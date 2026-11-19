@@ -1,0 +1,44 @@
+{
+  "type": "song",
+  "id": "song_01HSAMPLEAMAZINGGRACE00",
+  "fields": {
+    "title": "Amazing Grace",
+    "body_text": "[Verse 1]\nAmazing grace, how sweet the sound\nThat saved a wretch like me\n\n[Verse 2]\n'Twas grace that taught my heart to fear\nAnd grace my fears relieved",
+    "author": "John Newton",
+    "ccli": "22025",
+    "copyright": "Public domain",
+    "default_tempo_wps": 1.2,
+    "slide_order": "V1, V2, V1",
+    "created_at": 1731000000000,
+    "updated_at": 1731500000000,
+    "chart": {
+      "chart_json": "{\"key\":\"G\",\"lines\":[]}",
+      "original_key": "G",
+      "source_format": "chordpro",
+      "updated_at": 1731500000000
+    },
+    "scriptures": [
+      {
+        "id": "scr_01HSAMPLE0000000000001",
+        "reference": "Ephesians 2:8",
+        "translation": "web",
+        "section_key": "verse:1",
+        "anchor_lyric": "Amazing grace, how sweet the sound",
+        "every_repeat": 1,
+        "position": 0,
+        "source": "manual"
+      }
+    ],
+    "references": [
+      {
+        "id": "ref_01HSAMPLE0000000000001",
+        "kind": "lead_sheet",
+        "source_name": "Amazing Grace - G.pdf",
+        "data_json": "{\"notes\":[]}",
+        "summary_json": "{}",
+        "created_at": 1731000000000,
+        "updated_at": 1731000000000
+      }
+    ]
+  }
+}

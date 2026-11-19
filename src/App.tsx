@@ -1,4 +1,6 @@
 import { AppShell } from "@/components/AppShell";
+import { LibraryProvider } from "@/library/context";
+import { desktopLibrary } from "@/library/desktop";
 import { DebugWindow } from "@/components/debug/DebugWindow";
 import { AudienceView } from "@/components/presentation/AudienceView";
 import { BandView } from "@/components/band/BandView";
@@ -43,5 +45,9 @@ export default function App() {
   // session would open its own recording sink and audio handlers.
   if (kind === "debug") return <DebugWindow />;
   if (kind === "identify") return <IdentifyScreen />;
-  return <AppShell />;
+  return (
+    <LibraryProvider source={desktopLibrary}>
+      <AppShell />
+    </LibraryProvider>
+  );
 }
