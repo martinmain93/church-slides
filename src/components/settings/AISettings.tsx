@@ -16,7 +16,7 @@ import {
 } from "@/lib/instructionModels";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { openLink } from "@/lib/tauri";
+import { hostedAiStatus, openLink } from "@/lib/tauri";
 import { useToast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 
@@ -72,6 +72,14 @@ export function GroqKeyField() {
   const toast = useToast();
   const models = useInstructionModels();
   const [keyDraft, setKeyDraft] = useState("");
+  // Signed in to an organization: its AI allowance stands in for a key.
+  const [allowanceOf, setAllowanceOf] = useState<string | null>(null);
+  useEffect(() => {
+    hostedAiStatus().then(
+      (s) => setAllowanceOf(s.own_groq_key ? null : s.org_name),
+      () => undefined,
+    );
+  }, []);
 
   useEffect(() => {
     if (!models.seen) refreshInstructionModels().catch(() => undefined);
@@ -90,6 +98,9 @@ export function GroqKeyField() {
     }
   }
 
+  if (allowanceOf) {
+    return <div className="text-xs text-muted-foreground">Uses {allowanceOf}&rsquo;s AI allowance. No key needed.</div>;
+  }
   if (groqHasKey) return <div className="text-xs text-muted-foreground">Groq key saved.</div>;
   return (
     <div className="space-y-1 pt-1">
@@ -152,3 +163,4 @@ function Choice({
     </button>
   );
 }
+

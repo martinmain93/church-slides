@@ -141,17 +141,17 @@ def _hosted_model() -> tuple[str, str, str] | None:
     """(base_url, model, key) of the chosen hosted instruction model, if its
     key is on file. Reading a pasted message is prep, not a live service, so
     there is no local fallback to wait on — the phrase reading covers it."""
-    from auto_presenter.api_keys import get_key
+    from auto_presenter.api_keys import endpoint
     from auto_presenter.decision.instruction_models import find_model
     from auto_presenter.server_state import _state
 
     spec = find_model(_state.instruction_model_id)
     if spec is None or spec.kind != "hosted":
         return None
-    key = get_key(spec.provider)
-    if not key:
+    where = endpoint(spec.provider, spec.base_url)
+    if where is None:
         return None
-    return spec.base_url, spec.model_name, key
+    return where[0], spec.model_name, where[1]
 
 
 async def _handle_find_scripture_references(

@@ -27,7 +27,7 @@ import re
 import urllib.error
 from dataclasses import dataclass
 
-from auto_presenter.api_keys import get_key
+from auto_presenter.api_keys import endpoint
 from auto_presenter.chords import words
 from auto_presenter.http_client import REQUEST_ERRORS, open_json_post, read_json
 from auto_presenter.protocol import ChordPlacementInfo, ChordSuggestLine
@@ -124,10 +124,11 @@ class ChordModelBackend:
 
     def request(self, song_key: str, lines: list[ChordSuggestLine]) -> tuple[list[dict], bool]:
         """Raw placements and the model's phrase flag. `([], False)` on failure."""
-        key = get_key(self.provider)
-        if not key:
+        where = endpoint(self.provider, self.base_url)
+        if where is None:
             log.warning("no API key saved for %s; cannot suggest chords", self.provider)
             raise MissingKey(self.provider)
+        base_url, key = where
         payload = {
             "model": self.model,
             "temperature": 0,
@@ -142,7 +143,7 @@ class ChordModelBackend:
         }
         try:
             response = open_json_post(
-                f"{self.base_url}/chat/completions",
+                f"{base_url}/chat/completions",
                 payload,
                 api_key=key,
                 timeout_seconds=self.timeout_seconds,

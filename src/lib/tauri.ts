@@ -291,6 +291,12 @@ export async function songRevision(songId: string, revision: number): Promise<So
   return r.revision;
 }
 
+/** Whose AI allowance this computer's AI uses, when signed in to an
+ * organization; a Groq key of the person's own is used instead. */
+export async function hostedAiStatus(): Promise<{ org_name: string | null; own_groq_key: boolean }> {
+  return invoke("hosted_ai_status");
+}
+
 /** How the open organization library's sync stands. Shown only when
  * something's waiting or wrong. */
 export interface LibrarySyncStatus {

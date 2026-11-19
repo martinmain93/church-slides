@@ -49,7 +49,7 @@ GET {server}/.well-known/church-slides
 {
   "protocol": "0",
   "api": "/v1",
-  "capabilities": ["account", "organizations", "live"],
+  "capabilities": ["account", "organizations", "live", "sync", "ai"],
   "auth": {
     "issuer": "https://api.churchslides.app",
     "resource": "https://api.churchslides.app/v1",
@@ -62,7 +62,7 @@ GET {server}/.well-known/church-slides
 | --- | --- |
 | `protocol` | Protocol version this server speaks. |
 | `api` | Path of the protected API, relative to the server. |
-| `capabilities` | What this server offers. A server may offer any subset. Values so far: `account`, `organizations`, `live`. Planned: `sync`, `live`, `ai`, `mcp`. The app shows only features whose capability is listed. |
+| `capabilities` | What this server offers. A server may offer any subset. Values so far: `account`, `organizations`, `live`, `sync`, `ai`. Planned: `mcp`. The app shows only features whose capability is listed. |
 | `auth.issuer` | The OAuth authorization server. Its metadata is at `{issuer}/.well-known/oauth-authorization-server` ([RFC 8414]). |
 | `auth.resource` | The resource indicator ([RFC 8707]) to request tokens for. |
 | `auth.scopes` | Scopes the app should request. |
@@ -448,6 +448,41 @@ on connecting, carries the latest number. The socket is only a nudge: a
 client that missed one pulls when it reconnects. Either side may
 send `ping`; the server answers `pong`. Removing a member or changing their
 role closes it (`4001`).
+
+## AI gateway
+
+Capability `ai`. An OpenAI-compatible endpoint, so a computer can use AI
+features (spoken requests, finding Bible verses, chord suggestions) without
+an AI account of its own. The server forwards each call to a provider and
+charges it to the organization's daily allowance.
+
+### `POST {api}/orgs/{orgId}/ai/key`
+
+For roles that run services (`run_live`). Returns a key for the gateway
+only, not for the API:
+
+```json
+{ "key": "csa_…", "expiresAt": 1731990000000, "baseUrl": "https://…/ai/v1",
+  "models": { "chat": ["openai/gpt-oss-20b", "openai/gpt-oss-120b"],
+              "transcription": ["whisper-large-v3-turbo", "whisper-large-v3"] } }
+```
+
+A key lasts a day. It stops working at once if its person leaves the
+organization or loses the role. Ask for a new one before it expires.
+
+### Calls
+
+`POST {baseUrl}/chat/completions` and `POST {baseUrl}/audio/transcriptions`,
+as OpenAI's API, with `Authorization: Bearer csa_…`. Only the listed models;
+no streaming; output tokens and uploads are capped. A call over the day's
+allowance gets `rate_limited` and is not forwarded. Nothing sent is stored;
+the server keeps only counts.
+
+### `GET {api}/orgs/{orgId}/ai/usage`
+
+`{ "day": "2026-11-18", "used": { "requests": 12, "tokens": 9000, "audioSeconds": 40 },
+"allowance": { "requests": 500, "tokens": 1000000, "audioSeconds": 10800 } }`.
+Days are UTC.
 
 ## Live set
 

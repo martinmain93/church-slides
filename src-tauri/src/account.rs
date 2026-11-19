@@ -123,6 +123,7 @@ fn clear(app_data: &Path) {
     *ACCESS.lock().unwrap_or_else(|e| e.into_inner()) = None;
     let _ = secrets().delete();
     let _ = std::fs::remove_file(config_path(app_data));
+    crate::hosted_ai::forget(app_data);
 }
 
 // --- Keychain -------------------------------------------------------------------

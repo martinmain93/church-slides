@@ -25,7 +25,7 @@ import re
 import urllib.error
 from dataclasses import dataclass, field
 
-from auto_presenter.api_keys import get_key
+from auto_presenter.api_keys import endpoint
 from auto_presenter.chords import words
 from auto_presenter.chords.suggest import (
     ChordModelBackend,
@@ -319,9 +319,10 @@ def system_prompt(slide_edits: bool) -> str:
 
 def transcribe_clip(audio: bytes, *, mime: str) -> str:
     """One Groq Whisper call. Raises MissingKey or ModelUnreachable."""
-    key = get_key("groq")
-    if not key:
+    where = endpoint("groq", "https://api.groq.com/openai/v1")
+    if where is None:
         raise MissingKey("groq")
+    base_url, key = where
     if not audio:
         raise ModelUnreachable()
     if len(audio) > _MAX_AUDIO_BYTES:
@@ -339,7 +340,7 @@ def transcribe_clip(audio: bytes, *, mime: str) -> str:
     }
     try:
         with open_multipart_post(
-            "https://api.groq.com/openai/v1/audio/transcriptions",
+            f"{base_url}/audio/transcriptions",
             fields,
             file_field="file",
             filename=filename,
@@ -390,9 +391,10 @@ class VoiceChartBackend:
         history: list | None = None,
         slide_edits: bool = False,
     ) -> RawChart:
-        key = get_key(self._inner.provider)
-        if not key:
+        where = endpoint(self._inner.provider, self._inner.base_url)
+        if where is None:
             raise MissingKey(self._inner.provider)
+        base_url, key = where
         prior = list(history or [])[-_MAX_HISTORY:]
         log.info(
             "voice chart asking %s lines=%d earlier=%d slide_edits=%s",
@@ -411,7 +413,7 @@ class VoiceChartBackend:
         }
         try:
             response = open_json_post(
-                f"{self._inner.base_url}/chat/completions",
+                f"{base_url}/chat/completions",
                 payload,
                 api_key=key,
                 timeout_seconds=self._inner.timeout_seconds,
