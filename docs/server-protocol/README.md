@@ -49,7 +49,7 @@ GET {server}/.well-known/church-slides
 {
   "protocol": "0",
   "api": "/v1",
-  "capabilities": ["account", "organizations", "live", "sync", "ai"],
+  "capabilities": ["account", "organizations", "live", "sync", "ai", "mcp"],
   "auth": {
     "issuer": "https://api.churchslides.app",
     "resource": "https://api.churchslides.app/v1",
@@ -62,7 +62,7 @@ GET {server}/.well-known/church-slides
 | --- | --- |
 | `protocol` | Protocol version this server speaks. |
 | `api` | Path of the protected API, relative to the server. |
-| `capabilities` | What this server offers. A server may offer any subset. Values so far: `account`, `organizations`, `live`, `sync`, `ai`. Planned: `mcp`. The app shows only features whose capability is listed. |
+| `capabilities` | What this server offers. A server may offer any subset. Values so far: `account`, `organizations`, `live`, `sync`, `ai`, `mcp`. The app shows only features whose capability is listed. |
 | `auth.issuer` | The OAuth authorization server. Its metadata is at `{issuer}/.well-known/oauth-authorization-server` ([RFC 8414]). |
 | `auth.resource` | The resource indicator ([RFC 8707]) to request tokens for. |
 | `auth.scopes` | Scopes the app should request. |
@@ -483,6 +483,28 @@ the server keeps only counts.
 `{ "day": "2026-11-18", "used": { "requests": 12, "tokens": 9000, "audioSeconds": 40 },
 "allowance": { "requests": 500, "tokens": 1000000, "audioSeconds": 10800 } }`.
 Days are UTC.
+
+## AI assistants (MCP)
+
+Capability `mcp`; discovery's `mcp` field gives the path (`/mcp`). A remote
+[MCP](https://modelcontextprotocol.io) server over an organization's library,
+for Claude, ChatGPT or any MCP client.
+
+- **Transport:** Streamable HTTP. `POST /mcp` with one JSON-RPC request,
+  answered with one JSON reply (no server-sent streams). Notifications get
+  `202`.
+- **Sign-in:** MCP's authorization spec. Without a token the server answers
+  `401` with `WWW-Authenticate` pointing at its protected-resource metadata
+  (`/.well-known/oauth-protected-resource/mcp`, RFC 9728), whose resource is
+  `{server}/mcp`. The client registers (dynamic registration or a Client ID
+  Metadata Document), signs in with PKCE, and asks for `resource={server}/mcp`.
+  A token for `/mcp` isn't accepted by `/v1`, and the reverse. A sign-in that
+  names no resource is for `/v1`.
+- **Tools:** the same names, arguments and results as the app's local MCP
+  tools, plus an `organization` argument (its id or name; optional when the
+  person is in one) and `list_organizations`. Tools that read a computer's
+  files stay local. Every change is an ordinary sync push, so roles, the
+  record rules above and change notices apply.
 
 ## Live set
 
