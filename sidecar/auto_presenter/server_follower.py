@@ -157,12 +157,22 @@ def assist_tier() -> bool:
     return v is not None and v.verdict == "assist" and v.backend == "whisper"
 
 
+def _whisper_of(backend: object) -> object:
+    """The Whisper behind a session's speech engine. Qwen3-ASR streaming
+    (`asr.qwen_backend`) transcribes, but the follower's scorer, the openings
+    listener and the next-line check are built on Whisper small.en, which it
+    carries as `whisper`. Every other backend is its own."""
+    whisper = getattr(backend, "whisper", None)
+    return whisper if whisper is not None else backend
+
+
 def span_scorer_for(backend: object):
     """The session's span scorer: MLX on Apple silicon; ONNX Runtime elsewhere,
     when the CPU path is on (`cpu_path_enabled`) and its model is here; else None."""
     from auto_presenter.asr.mlx_backend import MLXWhisperBackend
     from auto_presenter.follower.scorer import MLXSpanScorer
 
+    backend = _whisper_of(backend)
     if isinstance(backend, MLXWhisperBackend):
         return MLXSpanScorer(backend._repo)
     if not cpu_path_enabled():
@@ -187,7 +197,7 @@ def build_session_followers(content: SetlistContent, backend: object) -> LiveFol
     if tunables is not None and not tunables.score_follower:
         log.info("score follower off (tunable)")
         return None
-    on_gpu = isinstance(backend, MLXWhisperBackend)
+    on_gpu = isinstance(_whisper_of(backend), MLXWhisperBackend)
     if not on_gpu and not cpu_path_enabled():
         log.info("score follower needs the MLX backend; matcher only this session")
         return None
@@ -247,6 +257,7 @@ def start_next_line_check(followers: LiveFollowers, backend: object) -> None:
     from auto_presenter.asr.mlx_backend import MLXWhisperBackend
     from auto_presenter.follower import next_line
 
+    backend = _whisper_of(backend)
     if (
         not isinstance(backend, MLXWhisperBackend)
         or backend._model_name != "mlx-whisper-small.en"

@@ -69,6 +69,13 @@ fast = ["sherpa-onnx>=1.13"]
 # not something the base install or PyInstaller has to carry.
 mlx = ["mlx-whisper>=0.4"]
 
+# Qwen3-ASR on Apple silicon (Apache 2.0, weights Apache 2.0): the opt-in
+# `asr_qwen_streaming` speech engine (auto_presenter/asr/qwen_backend.py).
+# Deliberately NOT the package's `[aligner]` extra: that adds `soynlp`
+# (GPL-3.0) and `nagisa` for Korean and Japanese word splitting only. The
+# forced aligner reads English with neither.
+qwen = ["mlx-qwen3-asr>=0.4.4"]
+
 [tool.uv]
 # The frozen sidecar's minimum OS is the highest floor among its native wheels,
 # so the lock has to pick versions that still ship wheels for the oldest Macs we

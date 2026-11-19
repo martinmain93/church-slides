@@ -31,6 +31,7 @@ from auto_presenter.api_keys import (
 from auto_presenter.asr.backend import ASRBackend
 from auto_presenter.asr.groq_backend import GroqWhisperBackend
 from auto_presenter.asr.junk import DoubtfulWordFilter
+from auto_presenter.asr.machine_check import ASSIST_TRANSCRIBE_EVERY_S
 from auto_presenter.asr.mlx_backend import MLXWhisperBackend
 from auto_presenter.asr.model_manager import (
     DownloadProgressEvent,
@@ -42,7 +43,6 @@ from auto_presenter.asr.model_manager import (
 )
 from auto_presenter.asr.streaming import SlidingWindowWrapper
 from auto_presenter.asr.types import TranscriptEvent
-from auto_presenter.asr.machine_check import ASSIST_TRANSCRIBE_EVERY_S
 from auto_presenter.asr.whisper_backend import SHORT_CONTEXT_PAD_S, WhisperBackend
 from auto_presenter.audio.capture import AudioCapture
 from auto_presenter.audio.live_capture import LiveCapture
@@ -84,6 +84,7 @@ from auto_presenter.protocol import (
     DownloadInstructionModelRequest,
     EngineTelemetryMessage,
     ExportRecordingRequest,
+    FindScriptureReferencesRequest,
     FlowPositionMessage,
     GetHymnRequest,
     GetLearningStateRequest,
@@ -104,6 +105,7 @@ from auto_presenter.protocol import (
     ModelStatusResponse,
     ParseLeadSheetRequest,
     ParticleFilterTunables,
+    PassageContextsRequest,
     PingMessage,
     PipelineHealthMessage,
     PongMessage,
@@ -117,8 +119,6 @@ from auto_presenter.protocol import (
     RemoveScriptureTranslationRequest,
     ReplayRecordingRequest,
     ResolvePassagesRequest,
-    FindScriptureReferencesRequest,
-    PassageContextsRequest,
     SaveGoldenRequest,
     SearchHymnsRequest,
     SearchScriptureCatalogRequest,
@@ -150,6 +150,7 @@ from auto_presenter.recording.sink import (
 )
 from auto_presenter.server_chords import _handle_suggest_chords, _handle_voice_chart
 from auto_presenter.server_follower import (
+    assist_tier,
     build_session_followers,
     build_session_openings,
     cpu_path_enabled,
@@ -160,7 +161,6 @@ from auto_presenter.server_follower import (
     note_operator_move,
     onnx_scorer_dir,
     saved_verdict,
-    assist_tier,
     session_side_pass,
 )
 from auto_presenter.server_follower import observe_health as observe_follower_health
@@ -207,26 +207,26 @@ from auto_presenter.server_recordings import (
 )
 from auto_presenter.server_scripture import (
     _handle_commit_scripture_import,
+    _handle_find_scripture_references,
     _handle_install_scripture_translation,
     _handle_list_scripture_translations,
+    _handle_passage_contexts,
     _handle_preview_scripture_import,
     _handle_remove_scripture_translation,
     _handle_resolve_passages,
-    _handle_find_scripture_references,
-    _handle_passage_contexts,
     _handle_search_scripture,
     _handle_search_scripture_catalog,
 )
 from auto_presenter.server_state import (
     _broadcast,
-    check_ai_move_landed,
-    deliver_decision,
-    restore_screen_record,
     _indexed_setlist,
     _matcher_belief,
     _send,
     _send_error,
     _state,
+    check_ai_move_landed,
+    deliver_decision,
+    restore_screen_record,
     sync_transcribing,
 )
 from auto_presenter.tracker.types import BeliefState
@@ -935,6 +935,7 @@ async def _start_audio_session(
             await asyncio.to_thread(backend.warm)
         except Exception as exc:
             log.warning("mlx-whisper warm failed (first live pass will retry): %s", exc)
+        backend = await _maybe_qwen_backend(backend, msg.tunables or _state.tunables)
     elif msg.backend == "groq":
         api_key = get_instruction_api_key("groq")
         if not api_key:
@@ -1453,6 +1454,30 @@ def _session_state_handler(learning, setlist_id: str | None = None, generation: 
             await asyncio.to_thread(stop_learning, learning)
 
     return on_state
+
+
+async def _maybe_qwen_backend(
+    whisper: MLXWhisperBackend, tunables: ParticleFilterTunables | None
+) -> ASRBackend:
+    """Qwen3-ASR streaming in place of Whisper's transcription, when the
+    `asr_qwen_streaming` tunable asks for it (off by default). Whisper stays
+    loaded for the follower. Any failure leaves the session on Whisper: the
+    service never waits on an experiment."""
+    if tunables is None or not tunables.asr_qwen_streaming:
+        return whisper
+    from auto_presenter.asr.qwen_backend import QwenStreamingBackend
+
+    if not QwenStreamingBackend.is_available():
+        log.warning("asr_qwen_streaming is on but mlx-qwen3-asr isn't installed; using Whisper")
+        return whisper
+    qwen = QwenStreamingBackend(whisper)
+    try:
+        await asyncio.to_thread(qwen.warm)
+    except Exception:
+        log.exception("Qwen3-ASR failed to load; using Whisper")
+        return whisper
+    log.info("speech: Qwen3-ASR 0.6B streaming (follower scores with %s)", whisper.name())
+    return qwen
 
 
 def _follow_readings(tunables: ParticleFilterTunables | None) -> bool:
