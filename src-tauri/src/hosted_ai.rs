@@ -9,7 +9,8 @@
 //! A key of their own always wins.
 //!
 //! The file sits beside the other keys (`instruction_api_keys.json`), with the
-//! same protection; the key only reaches the gateway and expires within a day.
+//! same protection; the key only reaches the gateway and lasts 15 minutes, so
+//! it's renewed every few minutes while the app runs.
 //! Signing out removes it (`account::clear`).
 
 use std::path::{Path, PathBuf};
@@ -25,10 +26,12 @@ pub const FILE: &str = "hosted_ai.json";
 
 /// Roles that run services, and so may use the organization's allowance.
 const RUNS_SERVICES: &[&str] = &["owner", "admin", "operator"];
-/// A key is renewed when less than this is left of it.
-const RENEW_BEFORE_MS: i64 = 2 * 60 * 60 * 1000;
+/// A key is renewed when less than this is left of it. Keys last 15 minutes,
+/// so this renews every 5 and leaves 10 to ride out a dropped connection.
+const RENEW_BEFORE_MS: i64 = 10 * 60 * 1000;
 const CHECK_EVERY: Duration = Duration::from_secs(60);
-const AFTER_FAILURE: Duration = Duration::from_secs(30 * 60);
+/// Retry soon after a failure: a key that runs out stops online speech.
+const AFTER_FAILURE: Duration = Duration::from_secs(2 * 60);
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct HostedAi {

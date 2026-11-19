@@ -467,16 +467,21 @@ only, not for the API:
               "transcription": ["whisper-large-v3-turbo", "whisper-large-v3"] } }
 ```
 
-A key lasts a day. It stops working at once if its person leaves the
-organization or loses the role. Ask for a new one before it expires.
+A key lasts 15 minutes; ask for a new one every few. The server checks the
+person's membership and role when it issues a key, not on each call, so a
+call is never slowed by a database lookup; someone who leaves the
+organization or loses the role loses AI within 15 minutes.
 
 ### Calls
 
 `POST {baseUrl}/chat/completions` and `POST {baseUrl}/audio/transcriptions`,
 as OpenAI's API, with `Authorization: Bearer csa_…`. Only the listed models;
 no streaming; output tokens and uploads are capped. A call over the day's
-allowance gets `rate_limited` and is not forwarded. Nothing sent is stored;
-the server keeps only counts.
+allowance gets `rate_limited` and is not forwarded. The count is kept after
+answering and may lag by up to a minute, so a busy day can run slightly over.
+Nothing sent is stored; the server keeps only counts. Each answer has a
+`Server-Timing: upstream;dur=…` header: how long the provider took, so the
+gateway's own cost is the rest.
 
 ### `GET {api}/orgs/{orgId}/ai/usage`
 
