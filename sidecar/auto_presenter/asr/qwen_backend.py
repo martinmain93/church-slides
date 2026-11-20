@@ -91,6 +91,29 @@ SIDE_WINDOW_SECONDS = 6.0
 #: the real-time eval only, until it picks a value.
 EDGE_MARGIN_SECONDS = float(os.environ.get("AUTO_PRESENTER_QWEN_EDGE_MARGIN", "0") or 0)
 
+#: Trial: a word goes final the first step it is heard, without waiting for a
+#: second step to agree, once its aligned end is at least this far behind the
+#: newest audio. The matcher reads final words only, and agreement costs a
+#: whole step (Qwen first hears a word ~1.1 s before it agrees). `None` keeps
+#: LocalAgreement-2. Read from the environment for quick trials only.
+_FIRST = os.environ.get("AUTO_PRESENTER_QWEN_FIRST_HEARING", "")
+FIRST_HEARING_SECONDS: float | None = float(_FIRST) if _FIRST else None
+
+#: Trial: when a window's unconfirmed words are flushed (commit, pause, end),
+#: drop the trailing run the aligner squeezed under this many seconds each:
+#: text the decoder wrote past what it heard. 0 is off.
+SQUEEZED_SECONDS = float(os.environ.get("AUTO_PRESENTER_QWEN_DROP_SQUEEZED", "0") or 0)
+
+
+def _drop_squeezed(words: list[_Aligned]) -> list[_Aligned]:
+    if SQUEEZED_SECONDS <= 0:
+        return words
+    end = len(words)
+    while end > 0 and words[end - 1].t_end - words[end - 1].t_start < SQUEEZED_SECONDS:
+        end -= 1
+    return words[:end]
+
+
 _SENTENCE_END = (".", "?", "!")
 
 
@@ -139,6 +162,7 @@ class QwenStreamingBackend:
         max_context_seconds: float = MAX_CONTEXT_SECONDS,
         unfixed_tokens: int = UNFIXED_TOKENS,
         edge_margin_seconds: float = EDGE_MARGIN_SECONDS,
+        first_hearing_seconds: float | None = FIRST_HEARING_SECONDS,
     ) -> None:
         #: The session's Whisper, for the follower's scorer and next-line check.
         self.whisper = whisper
@@ -146,6 +170,10 @@ class QwenStreamingBackend:
         self.max_context_seconds = max_context_seconds
         self.unfixed_tokens = unfixed_tokens
         self.edge_margin_seconds = edge_margin_seconds
+        self.first_hearing_seconds = first_hearing_seconds
+        #: Text Qwen3-ASR is told to expect (its system prompt): the words the
+        #: service will sing. Read by every new stream; "" for none.
+        self.context = ""
         self._model: Any = None
         self._model_path: str = QWEN_REPO
         self._aligner: Any = None
@@ -213,6 +241,7 @@ class QwenStreamingBackend:
             max_context_sec=self.max_context_seconds,
             language="English",
             unfixed_token_num=self.unfixed_tokens,
+            context=self.context,
         )
 
     def feed(self, state: Any, audio: np.ndarray) -> None:
@@ -339,6 +368,10 @@ class QwenStreamer:
             with timer, GPU_LOCK:
                 if self._state is None:
                     self._state = b.new_state()
+                elif self._state.context != b.context:
+                    # a new prompt invalidates the cached prompt + audio prefix
+                    self._state.context = b.context
+                    self._state._prefix_cache = None
                 before = self._window_start()
                 b.feed(self._state, audio)
                 self._fed += len(audio)
@@ -355,7 +388,9 @@ class QwenStreamer:
 
         if committed:
             # the package froze the old window: what it still held is final
-            yield from self._emit(self._prev[self._final:], True, available_at, ends_segment=True)
+            yield from self._emit(
+                _drop_squeezed(self._prev[self._final:]), True, available_at, ends_segment=True
+            )
             self._prev, self._final = [], 0
 
         ends = _sentence_ends(text, len(aligned))
@@ -371,6 +406,11 @@ class QwenStreamer:
             and (b.edge_margin_seconds <= 0 or words[agree].t_end <= settled)
         ):
             agree += 1
+        if b.first_hearing_seconds is not None:
+            heard = start + len(self._state.audio_accum) / SAMPLE_RATE - b.first_hearing_seconds
+            agree = max(agree, self._final)
+            while agree < len(words) and words[agree].t_end <= heard:
+                agree += 1
         if agree > self._final:
             yield from self._emit(words[self._final : agree], True, available_at)
             self._final = agree
@@ -383,7 +423,8 @@ class QwenStreamer:
     def _flush(self, end_t: float) -> Iterator[TranscriptEvent]:
         if self._state is not None:
             yield from self._emit(
-                self._prev[self._final:], True, end_t + self._last_pass_seconds, ends_segment=True
+                _drop_squeezed(self._prev[self._final:]), True, end_t + self._last_pass_seconds,
+                ends_segment=True,
             )
         self._prev, self._final = [], 0
 

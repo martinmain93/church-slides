@@ -22,6 +22,8 @@ class _State:
     buffer: np.ndarray = field(default_factory=lambda: np.zeros(0, np.float32))
     audio_accum: np.ndarray = field(default_factory=lambda: np.zeros(0, np.float32))
     window_text: str = ""
+    context: str = ""
+    _prefix_cache: object = None
     chunk_size_samples: int = SAMPLE_RATE
 
 

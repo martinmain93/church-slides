@@ -13,6 +13,7 @@ import asyncio
 import dataclasses
 import json
 import logging
+import os
 import shutil
 import threading
 import time
@@ -1456,6 +1457,24 @@ def _session_state_handler(learning, setlist_id: str | None = None, generation: 
     return on_state
 
 
+_QWEN_LYRICS: dict[str, str] | None = None
+
+
+def _qwen_follow_song(matcher: Any, session: Any) -> None:
+    """Trial: give a Qwen session the lyrics of the song the tracker is on, as
+    its context prompt. Lyrics come from a JSON map (song id -> text) named by
+    AUTO_PRESENTER_QWEN_LYRICS; nothing happens without it."""
+    global _QWEN_LYRICS
+    path = os.environ.get("AUTO_PRESENTER_QWEN_LYRICS")
+    backend = getattr(session, "_backend", None)
+    if not path or backend is None or not hasattr(backend, "context"):
+        return
+    if _QWEN_LYRICS is None:
+        _QWEN_LYRICS = json.loads(Path(path).read_text())
+    item = matcher.setlist.item(getattr(matcher, "current_item_idx", -1))
+    backend.context = _QWEN_LYRICS.get(item.song_id, "") if item is not None else ""
+
+
 async def _maybe_qwen_backend(
     whisper: MLXWhisperBackend, tunables: ParticleFilterTunables | None
 ) -> ASRBackend:
@@ -1810,6 +1829,7 @@ def _make_transcript_handler(
         except Exception:  # pragma: no cover - defensive
             log.exception("matcher.update raised; dropping event")
             return
+        _qwen_follow_song(matcher, session)
         # Reporting and side features. None may abort the decision (each is
         # guarded: an optional feature failing used to skip
         # `director.on_decision` and drop a real slide change), and none may
