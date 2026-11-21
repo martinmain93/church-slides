@@ -271,7 +271,8 @@ def start_next_line_check(followers: LiveFollowers, backend: object) -> None:
         head = next_line.load_head(next_line.QWEN_MODEL_FILE)
         if head is None:
             log.warning(
-                "Qwen next-line model missing (%s); check off this session",
+                "Qwen next-line model missing (%s); check off this session. "
+                "Install it with scripts/setup_next_line_model.py",
                 next_line.model_dir() / next_line.QWEN_MODEL_FILE,
             )
             return

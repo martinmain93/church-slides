@@ -346,7 +346,11 @@ frames, so they needed a new scale for Qwen:
 
 The check costs about 6 ms a tick for the head, beside the audio tower on its
 own MLX stream. As float16 the model is 10 MB; logits move at most 0.014 from
-float32.
+float32. It is published as the `models-next-line-qwen-gru512x2` asset on the
+releases repo (MIT, with a notice on its training data), and
+`scripts/setup_next_line_model.py` installs it beside the Whisper model.
+Release builds don't carry the Qwen engine yet (the `qwen` extra isn't in
+the build), so they don't bundle this model either.
 
 The margin scale was picked on the same 3 recordings it was measured on.
 The full gate above (50f15ff) holds it to all 9 goldens and the talk-only
@@ -382,6 +386,8 @@ Open:
 
 - Backend and check: `sidecar/auto_presenter/asr/qwen_backend.py`,
   `sidecar/auto_presenter/follower/next_line.py` (`qwen_encoder`, `Tuning`).
+- Phone model: published release asset, installed by
+  `scripts/setup_next_line_model.py`.
 - Phone-model training and scoring: `research/spikes/qwen_improve/phone_head/`;
   attention timing: `research/spikes/qwen_improve/attn_timing.py`.
 - Real-time runs: `../auto-presenter-research/work/qwen_backend/` (`q_*`,
