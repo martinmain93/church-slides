@@ -266,6 +266,33 @@ wrong-slide.
 | Qwen closed-set line scoring as the next-line check (idea 2) | Loses to the shipped phone check early (2% false alarms, +0.7 s: 49% vs 73%), and 661 vs 114 ms a check | Rejected |
 | **Phone model on Qwen's audio tower** (below) | Quick set 0.241 vs 0.269 for the same run on the Whisper check | **Built** |
 
+### The span scorer stays on Whisper
+
+The follower's lyric-span scorer is teacher-forced Whisper. Every 2 s it
+scores every 6-word span of the song against the last 6 s of audio. The
+song-openings watch (off-setlist detection) and learned references use it
+too. A Qwen version (`research/spikes/qwen_improve/span_scorer.py`) prefills
+the audio prompt once and broadcasts its KV cache over each batch of spans.
+It was run offline on the 9 church goldens, every 2 s, with the best span
+counted right when its slide is the one sung:
+
+| 1,578 windows | Right slide (at its placed time) | Right slide (last 3 s) | ms a call p50 (p90) |
+|---|---|---|---|
+| Whisper small.en (shipped) | 74.4% | 77.7% | 341 (504) |
+| Qwen3-ASR 0.6B | 76.0% | 78.3% | 1,011 (1,643) |
+
+The two are level per recording (55–90% Whisper, 61–89% Qwen), and Qwen
+costs three times as much. Its decoder is about 3x Whisper's and every span
+runs through all of it, so at one call every 2 s it would take about half
+the GPU. They are right on different windows (either one: 83.7%), so
+fusing both could pay, but not at that price.
+
+Memory points the same way. Whisper small.en is 0.48 GB, and the forced
+aligner, now unneeded with attention times, is 1.84 GB. **So Qwen sessions
+keep Whisper as the scorer and drop the aligner.** Attention times and the
+0.5 flush filter are now the Qwen backend's defaults, and the aligner is
+loaded only with `AUTO_PRESENTER_QWEN_ATTN_TIMES=0`.
+
 ### The next-line check on Qwen's audio
 
 The shipped check reads phones from Whisper's encoder. Qwen's audio tower

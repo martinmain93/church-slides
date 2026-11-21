@@ -126,8 +126,12 @@ def _drop_squeezed(words: list[_Aligned]) -> list[_Aligned]:
 #: 0.3 s, behind the newest audio). `None` is off.
 _FC = os.environ.get("AUTO_PRESENTER_QWEN_FIRST_CONF", "")
 FIRST_CONF: float | None = float(_FC) if _FC else None
-#: Trial: flushed (never agreed) words below this probability are dropped.
-FLUSH_MIN_CONF = float(os.environ.get("AUTO_PRESENTER_QWEN_FLUSH_MIN_CONF", "0") or 0)
+#: Flushed (never agreed) words below this probability are dropped: text the
+#: decoder wrote past what it heard. Attention times have no squeezed
+#: durations to go by, so this is their filter; with current-song lyrics as
+#: context it gave the spike's best WER (0.237), and every real-time run on
+#: attention times used it (docs/research/QWEN3_ASR_IMPROVEMENTS.md).
+FLUSH_MIN_CONF = float(os.environ.get("AUTO_PRESENTER_QWEN_FLUSH_MIN_CONF", "0.5") or 0)
 
 
 # ------------------------------------------------------------- token probabilities
@@ -224,12 +228,13 @@ def _word_probabilities(state: Any, n_words: int) -> list[float]:
     return words
 
 
-#: Trial: word times from Qwen3-ASR's own attention instead of the forced
-#: aligner. Spike (research/spikes/qwen_improve/attn_timing.py, 3 held-out
-#: public songs, reference words forced): these decoder heads' mean attention
-#: peak put word starts p50 0.09 s, >1 s off 4%, where the aligner was p50
-#: 0.11 s, >1 s off 26%. Read from the environment for trials only.
-ATTN_TIMES = os.environ.get("AUTO_PRESENTER_QWEN_ATTN_TIMES") == "1"
+#: Word times from Qwen3-ASR's own attention instead of the forced aligner,
+#: which is then never loaded (1.8 GB). Spike (research/spikes/qwen_improve/
+#: attn_timing.py, 3 held-out public songs, reference words forced): these
+#: decoder heads' mean attention peak put word starts p50 0.09 s, >1 s off
+#: 4%, where the aligner was p50 0.11 s, >1 s off 26%; streamed, words >1 s
+#: off 28% -> 1.8%. `AUTO_PRESENTER_QWEN_ATTN_TIMES=0` brings the aligner back.
+ATTN_TIMES = os.environ.get("AUTO_PRESENTER_QWEN_ATTN_TIMES", "1") == "1"
 #: (layer, head) picked on 3 other songs.
 ATTN_HEADS = ((6, 6), (6, 10), (6, 7), (6, 13), (12, 6), (11, 11), (2, 11), (11, 12))
 
@@ -413,9 +418,10 @@ class QwenStreamingBackend:
     # ------------------------------------------------------------- loading
 
     def load(self) -> None:
-        """Load the speech model and the aligner (once; downloads if missing)."""
+        """Load the speech model, and the aligner unless word times come from
+        attention (once; downloads if missing)."""
         with self._load_lock:
-            if self._model is not None and self._aligner is not None:
+            if self._model is not None and (ATTN_TIMES or self._aligner is not None):
                 return
             from mlx_qwen3_asr import ForcedAligner
             from mlx_qwen3_asr.load_models import load_model
@@ -428,9 +434,10 @@ class QwenStreamingBackend:
             with GPU_LOCK:
                 self._model_path = local_snapshot(QWEN_REPO)
                 self._model, _ = load_model(self._model_path)
-                aligner = ForcedAligner(model_path=local_snapshot(ALIGNER_REPO))
-                aligner._ensure_loaded()
-                self._aligner = aligner
+                if not ATTN_TIMES:
+                    aligner = ForcedAligner(model_path=local_snapshot(ALIGNER_REPO))
+                    aligner._ensure_loaded()
+                    self._aligner = aligner
 
     def warm(self) -> None:
         """Load both models and run one step, off the sung-word path.
