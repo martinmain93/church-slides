@@ -256,8 +256,11 @@ export function usePresentationSession(
   const heldSongJumpRef = useRef(heldSongJump);
   heldSongJumpRef.current = heldSongJump;
 
-  // Something else moved the screen while a jump waited: that move wins.
+  // Someone else moved the screen while a jump waited: that move wins. The
+  // AI carrying on through the song on screen doesn't count.
   useEffect(() => {
+    const ai = lastAiPosition.current;
+    if (ai !== null && ai.itemIdx === itemIdx && ai.slideIdx === slideIdx) return;
     jumpHoldRef.current?.drop();
   }, [itemIdx, slideIdx]);
 
@@ -317,8 +320,26 @@ export function usePresentationSession(
         if (liveAiModeRef.current !== "active") return;
         const track = trackFromMessage(msg, Date.now());
         if (!slidesForRef.current?.(track.itemIdx)) return;
-        setFlowAnchor({ kind: "track", track });
-        syncRef.current(track);
+        const follow = () => {
+          setFlowAnchor({ kind: "track", track });
+          syncRef.current(track);
+        };
+        // A track into another song is the AI jumping songs: in continuous
+        // mode (the default with the AI on) this, not `slide_change`, is
+        // what moves the screen, so it waits for the leader the same way.
+        // A newer track for that song replaces this one, so "Go" lands
+        // where the singing has got to.
+        const hold = jumpHoldRef.current;
+        if (hold?.active() && track.itemIdx !== positionRef.current.itemIdx) {
+          const target = songForRef.current?.(track.itemIdx);
+          if (target && heldSongJumpRef.current(hold, track.itemIdx, `item:${track.itemIdx}`, target.title, heardWords.current, follow)) {
+            return;
+          }
+        }
+        // Any track that goes ahead replaces a jump still waiting: back on
+        // the song on screen means the AI changed its mind.
+        hold?.drop();
+        follow();
       });
     }).catch(() => {
       // No sidecar: nothing to follow, and the column follows the slides.

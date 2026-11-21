@@ -275,6 +275,84 @@ describe("the session holds AI jumps to another song", () => {
   });
 });
 
+describe("in continuous mode (the default with the AI on)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    notifySlideChange.mockClear();
+    handlers.clear();
+  });
+  afterEach(() => vi.useRealTimers());
+
+  const slides = [{ words: [] }, { words: ["a", "b", "c", "d"] }, { words: ["e", "f", "g", "h"] }];
+
+  async function setup() {
+    const jumpTo = vi.fn();
+    const hook = renderHook(
+      (props: { itemIdx: number; slideIdx: number }) => {
+        const jumpHold = useJumpHold();
+        const session = usePresentationSession({
+          setlistId: "s1",
+          recordingEnabled: false,
+          itemIdx: props.itemIdx,
+          slideIdx: props.slideIdx,
+          jumpTo,
+          itemCount: 3,
+          displayPref: "auto",
+          slidesFor: () => slides,
+          jumpHold,
+          songFor: (i) => ({ title: ["Holy, Holy, Holy", "Be Thou My Vision", "Amazing Grace"][i]!, slideCount: 3 }),
+        });
+        return { jumpHold, session };
+      },
+      { initialProps: { itemIdx: 0, slideIdx: 1 } },
+    );
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    act(() => hook.result.current.jumpHold.setLeaders(1));
+    broadcast("ai_status", {
+      kind: "ai_status", mode: "active", state: "tracking",
+      last_decision_t_seconds: null, last_override_t_seconds: null,
+    });
+    return { ...hook, jumpTo };
+  }
+
+  const track = (item_idx: number, word: number) =>
+    broadcast("flow_position", { kind: "flow_position", item_idx, word, rate_wps: 0, limit: 8, jump: true, confidence: 0.9 });
+
+  it("a track into another song waits for the leader, then follows it", async () => {
+    const { result, jumpTo } = await setup();
+    expect(result.current.session.displayMode).toBe("continuous");
+    track(2, 1);
+    expect(jumpTo).not.toHaveBeenCalled();
+    expect(result.current.jumpHold.notice?.title).toBe("Amazing Grace");
+    track(2, 5); // the singing went on meanwhile
+    act(() => vi.advanceTimersByTime(JUMP_HOLD_MS));
+    expect(jumpTo).toHaveBeenLastCalledWith(2, 2);
+  });
+
+  it("the song on screen carries on while a jump waits", async () => {
+    const { result, jumpTo, rerender } = await setup();
+    track(2, 1);
+    track(0, 5); // the AI came back to the song on screen
+    expect(result.current.jumpHold.notice).toBeNull();
+    expect(jumpTo).toHaveBeenLastCalledWith(0, 2);
+    rerender({ itemIdx: 0, slideIdx: 2 });
+    act(() => vi.advanceTimersByTime(JUMP_HOLD_MS * 2));
+    expect(jumpTo).not.toHaveBeenCalledWith(2, expect.anything());
+  });
+
+  it("Stop keeps the song on screen", async () => {
+    const { result, jumpTo } = await setup();
+    track(2, 1);
+    act(() => result.current.jumpHold.answer(result.current.jumpHold.notice!.id, false));
+    act(() => vi.advanceTimersByTime(JUMP_HOLD_MS * 2));
+    expect(jumpTo).not.toHaveBeenCalled();
+    expect(notifySlideChange).toHaveBeenLastCalledWith({ itemIdx: 0, slideIdx: 1, source: "manual" });
+  });
+});
+
 describe("the leader's bar", () => {
   it("says where it's going, and answers", () => {
     const onAnswer = vi.fn();
