@@ -10,6 +10,8 @@ refuses to release a version that has no entry here.
 
 ## Unreleased
 
+- Fixed: **a song the band starts that isn't in the setlist is found again.** In Auto, the app now recognises it from your library, usually within a minute of singing, and adds it to the setlist. Before, this almost never happened.
+
 ## 0.2.3 — 18 November 2026
 
 - Changed: **adding songs to a setlist no longer shuffles the list.** A song you add stays where it is, with a tick, so the next click lands on the song you meant. Click it again to add a reprise.

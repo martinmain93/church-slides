@@ -36,7 +36,11 @@ import websockets  # noqa: E402
 
 from auto_presenter.protocol import ParticleFilterTunables  # noqa: E402
 
-DEFAULT_DATA = REPO.parent / "auto-presenter-research" / "public_worship" / "speech"
+#: the research folder sits beside the checkout; a worktree is nested inside it
+DEFAULT_DATA = next(
+    (p / "auto-presenter-research" for p in REPO.parents if (p / "auto-presenter-research").is_dir()),
+    REPO.parent / "auto-presenter-research",
+) / "public_worship" / "speech"
 #: Too frequent to keep, and not evidence of a trigger.
 SKIP_KINDS = {"audio_level", "belief_state", "pipeline_health", "music_state", "chord_state"}
 TRIGGER_SOURCES = {"ai", "voice"}
