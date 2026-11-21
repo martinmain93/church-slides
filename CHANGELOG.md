@@ -10,6 +10,8 @@ refuses to release a version that has no entry here.
 
 ## Unreleased
 
+- New: **the worship leader can stop a surprise song jump.** With nobody on the operator view, when the AI goes to a different song (not just the next one at the end of a song), the leader's screen shows "Going to …" and the words it heard for 3 seconds, with Go now and Stop. If nobody answers, it goes.
+
 ## 0.2.3 — 18 November 2026
 
 - Changed: **adding songs to a setlist no longer shuffles the list.** A song you add stays where it is, with a tick, so the next click lands on the song you meant. Click it again to add a reprise.

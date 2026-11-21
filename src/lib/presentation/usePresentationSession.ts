@@ -47,6 +47,12 @@ import {
   useRecordingSession,
   type RecordingSessionApi,
 } from "@/lib/recordingClient";
+import {
+  heardLine,
+  isSurprisingSongJump,
+  JUMP_HOLD_WORDS,
+  type JumpHoldApi,
+} from "@/lib/presentation/jumpHold";
 import { aiAnchor, aiKinds, aiMayLeave, type ItemKind } from "@/lib/serviceItems";
 import { buildSetlistContent } from "@/lib/setlistContent";
 import { getSharedConnection } from "@/lib/sidecarConnection";
@@ -90,6 +96,13 @@ export interface PresentationSessionOptions {
   /** Each item's kind, in order. Over a passage or text item the AI waits
    * on the next song (`serviceItems.aiAnchor`); omitted, every item is a song. */
   itemKinds?: readonly ItemKind[];
+  /**
+   * Single-screen view with a leader's screen: AI jumps to another song wait
+   * for the leader (`jumpHold.ts`). Omitted, every AI move applies at once.
+   */
+  jumpHold?: JumpHoldApi;
+  /** An item's title and slide count, for a held jump. */
+  songFor?: (itemIdx: number) => { title: string; slideCount: number } | undefined;
 }
 
 export interface PresentationSessionApi {
@@ -113,7 +126,14 @@ export function usePresentationSession(
     setlistId, setlistContent, recordingEnabled, itemIdx, slideIdx, jumpTo,
     itemCount = 0, onSetlistMutated, initialAiMode: requestedAiMode,
     displayPref = "slide", slidesFor, screen = "single", itemKinds: shownKinds = NO_KINDS,
+    jumpHold, songFor,
   } = opts;
+  const jumpHoldRef = useRef(jumpHold);
+  jumpHoldRef.current = jumpHold;
+  const songForRef = useRef(songFor);
+  songForRef.current = songFor;
+  const setlistContentRef = useRef(setlistContent);
+  setlistContentRef.current = setlistContent;
   // A passage is followed like a song as it is read aloud; a text item still
   // has the AI wait on the next song (docs/done/SERVICE_ITEMS.md phase 2).
   const itemKinds = useMemo(() => aiKinds(shownKinds, true), [shownKinds]);
@@ -169,6 +189,18 @@ export function usePresentationSession(
       ) {
         return;
       }
+      const hold = jumpHoldRef.current;
+      if (decision.source === "ai" && hold?.active()) {
+        const target = songForRef.current?.(pos.itemIdx);
+        if (target && heldSongJump(hold, pos.itemIdx, `item:${pos.itemIdx}`, target.title, heardWords.current, () => {
+          lastAiPosition.current = pos;
+          jumpToRef.current(pos.itemIdx, pos.slideIdx);
+        })) {
+          return;
+        }
+      }
+      // Anything else that moves the screen replaces a jump still waiting.
+      hold?.drop();
       // Claimed by its source, so the recording says what moved the screen.
       // A spoken move used to be left unclaimed and saved as "manual",
       // which hid every voice request among the operator's clicks.
@@ -177,6 +209,57 @@ export function usePresentationSession(
       jumpTo(decision.itemIdx, decision.slideIdx);
     },
   });
+
+  // The leader said no to a held jump: tell the AI the screen stayed put, as
+  // a hand on the keyboard would, so it re-anchors here.
+  const stayHere = () => {
+    const anchor = aiAnchor(itemKindsRef.current, positionRef.current);
+    if (anchor) recordingRef.current.notifySlideChange({ ...anchor, source: "manual" });
+  };
+  /** Offer a jump to another song to the leader; true when it now waits. */
+  const heldSongJump = (
+    hold: JumpHoldApi,
+    toItemIdx: number,
+    key: string,
+    title: string,
+    heard: readonly string[],
+    go: () => void,
+    stop: () => void = stayHere,
+  ): boolean => {
+    const from = positionRef.current;
+    const here = songForRef.current?.(from.itemIdx);
+    if (!isSurprisingSongJump(from, toItemIdx, here?.slideCount ?? 0)) return false;
+    return hold.offer({ key, title, words: heardLine(heard), go, stop });
+  };
+  // The last few words heard, for the leader to see why a jump waits.
+  const heardWords = useRef<string[]>([]);
+  useEffect(() => {
+    if (!jumpHold) return;
+    let cancelled = false;
+    let unsub = () => {};
+    void getSharedConnection()
+      .then((conn) => {
+        if (cancelled) return;
+        unsub = conn.onMessage("transcript_partial", (msg) => {
+          if (!msg.is_final) return;
+          const words = (msg.words ?? []).map((w) => w.text);
+          heardWords.current = heardWords.current.concat(words).slice(-JUMP_HOLD_WORDS);
+        });
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+      unsub();
+    };
+  }, [jumpHold !== undefined]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const heldSongJumpRef = useRef(heldSongJump);
+  heldSongJumpRef.current = heldSongJump;
+
+  // Something else moved the screen while a jump waited: that move wins.
+  useEffect(() => {
+    jumpHoldRef.current?.drop();
+  }, [itemIdx, slideIdx]);
 
   // Off-setlist import: persist first, jump once the context has the new item.
   const pendingImport = useRef<{ itemIdx: number; slideIdx: number; source: "ai" | "voice" } | null>(null);
@@ -279,8 +362,8 @@ export function usePresentationSession(
     void getSharedConnection().then((conn) => {
       if (cancelled) return;
       unsub = conn.onMessage("import_library_song", (msg) => {
-        void (async () => {
-          if (msg.source === "ai" && liveAiModeRef.current !== "active") return;
+        if (msg.source !== "voice" && liveAiModeRef.current !== "active") return;
+        const runImport = () => void (async () => {
           pendingImport.current = {
             itemIdx: msg.item_idx,
             slideIdx: msg.slide_idx,
@@ -311,6 +394,27 @@ export function usePresentationSession(
             console.error("import_library_song persist failed:", err);
           }
         })();
+        const hold = jumpHoldRef.current;
+        if (msg.source !== "voice" && hold?.active()) {
+          const held = heldSongJumpRef.current(
+            hold,
+            msg.item_idx,
+            `song:${msg.song_id}`,
+            msg.title,
+            (msg.query ?? "").split(/\s+/),
+            runImport,
+            () => {
+              // Not added: the AI had already put it in its own copy of the
+              // set, so send it the set as it really is.
+              const content = setlistContentRef.current;
+              if (content) recordingRef.current.updateSetlistContent(content, positionRef.current.itemIdx);
+              stayHere();
+            },
+          );
+          if (held) return;
+        }
+        hold?.drop();
+        runImport();
       });
     }).catch(() => {
       // No AI engine (or it isn't up): nothing will ask to import a song, and

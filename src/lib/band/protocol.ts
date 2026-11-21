@@ -15,6 +15,7 @@
 import type { LibrarySong } from "@/lib/band/librarySearch";
 import type { ChordChart } from "@/lib/chords/chart";
 import type { ParsedSection } from "@/lib/parseSong";
+import type { JumpHoldNotice } from "@/lib/presentation/jumpHold";
 import type { BlankMode } from "@/lib/presentation/state";
 
 export interface BandSong {
@@ -57,7 +58,9 @@ export type BandCommand =
   | { kind: "set_transpose"; itemId: string; semitones: number }
   /** Add a library song to the set right after the current one; "now" also goes to it.
    *  `key`: play it in this key in this service ("fits next" moved it). */
-  | { kind: "add_song"; songId: string; when: "next" | "now"; key?: string };
+  | { kind: "add_song"; songId: string; when: "next" | "now"; key?: string }
+  /** The leader's answer to an AI jump that waits for them: go now, or stop. */
+  | { kind: "jump_answer"; id: number; go: boolean };
 
 /** Messages a device receives. */
 export type ServerMessage =
@@ -72,6 +75,8 @@ export type ServerMessage =
   | { type: "lan"; url: string }
   /** Local band server only: whether the hosted room is reachable again. */
   | { type: "hosted"; live: boolean }
+  /** An AI jump to another song waiting for the leader; null once it's settled. */
+  | { type: "jump_hold"; data: JumpHoldNotice | null }
   /** The library, whole or (through the online relay) in parts 0…parts-1. */
   | { type: "library"; data: LibrarySong[]; part?: number; parts?: number };
 
@@ -84,6 +89,7 @@ export type ClientMessage =
 /** Event names the desktop app emits (must match `band.rs`). */
 export const BAND_COMMAND_EVENT = "band://command";
 export const BAND_CLIENTS_EVENT = "band://clients";
+export const BAND_LEADERS_EVENT = "band://leaders";
 
 export function isBandCommand(v: unknown): v is BandCommand {
   if (!v || typeof v !== "object") return false;
@@ -93,6 +99,7 @@ export function isBandCommand(v: unknown): v is BandCommand {
     return typeof c.itemId === "string" && Number.isInteger(c.slideIdx) && (c.slideIdx as number) >= 0;
   }
   if (c.kind === "set_blank") return typeof c.on === "boolean";
+  if (c.kind === "jump_answer") return Number.isInteger(c.id) && typeof c.go === "boolean";
   if (c.kind === "add_song") {
     return (
       typeof c.songId === "string" &&
