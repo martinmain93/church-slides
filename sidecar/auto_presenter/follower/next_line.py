@@ -144,6 +144,10 @@ class PhoneHead:
 
     def __init__(self, weights: dict[str, np.ndarray]) -> None:
         w = {k: np.asarray(v, np.float32) for k, v in weights.items()}
+        #: Per-channel standardisation of the encoder frames, when the model
+        #: was trained with it (the Qwen3-ASR head); None for the Whisper head.
+        self.mu = w.get("mu")
+        self.sd = w.get("sd")
         # conv as one matmul over the 5 shifted copies: (5 * 768, 512)
         cw = w["conv.0.weight"]  # (out, in, k)
         self.conv_w = cw.transpose(2, 1, 0).reshape(-1, cw.shape[0])
@@ -189,6 +193,8 @@ class PhoneHead:
 
     def __call__(self, feats: np.ndarray) -> np.ndarray:
         x = np.asarray(feats, np.float32)
+        if self.mu is not None and self.sd is not None:
+            x = (x - self.mu) / self.sd
         n_t = x.shape[0]
         p = self.k // 2
         xp = np.pad(x, ((p, p), (0, 0)))
