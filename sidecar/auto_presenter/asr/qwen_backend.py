@@ -96,6 +96,11 @@ EDGE_MARGIN_SECONDS = float(os.environ.get("AUTO_PRESENTER_QWEN_EDGE_MARGIN", "0
 #: newest audio. The matcher reads final words only, and agreement costs a
 #: whole step (Qwen first hears a word ~1.1 s before it agrees). `None` keeps
 #: LocalAgreement-2. Read from the environment for quick trials only.
+#: Set once a streaming step has run: the model's arrays (and the mel
+#: features' cached tables) are then evaluated and safe to read from the
+#: next-line check's thread (`follower.next_line.qwen_encoder`).
+FIRST_STEP = threading.Event()
+
 _FIRST = os.environ.get("AUTO_PRESENTER_QWEN_FIRST_HEARING", "")
 FIRST_HEARING_SECONDS: float | None = float(_FIRST) if _FIRST else None
 
@@ -143,8 +148,9 @@ def _install_probability_hook() -> None:
         return
     original_window = st._decode_window
 
-    def decode_tokens(*, model, cache, initial_logits, start_pos, max_new_tokens,
-                      eos_token_ids, pos_dtype):
+    def decode_tokens(
+        *, model, cache, initial_logits, start_pos, max_new_tokens, eos_token_ids, pos_dtype
+    ):
         logits = initial_logits
         generated: list[int] = []
         probs: list[float] = []
@@ -437,8 +443,11 @@ class QwenStreamingBackend:
         rng = np.random.default_rng(0)
         noise = (rng.standard_normal(2 * SAMPLE_RATE) * 1e-3).astype(np.float32)
         frames = [
-            AudioFrame(samples=noise[i : i + SAMPLE_RATE], t_start=i / SAMPLE_RATE,
-                       t_end=(i + SAMPLE_RATE) / SAMPLE_RATE)
+            AudioFrame(
+                samples=noise[i : i + SAMPLE_RATE],
+                t_start=i / SAMPLE_RATE,
+                t_end=(i + SAMPLE_RATE) / SAMPLE_RATE,
+            )
             for i in range(0, len(noise), SAMPLE_RATE)
         ]
         list(self.streamer().transcribe(frames))
@@ -594,6 +603,7 @@ class QwenStreamer:
                     self._state._prefix_cache = None
                 before = self._window_start()
                 b.feed(self._state, audio)
+                FIRST_STEP.set()
                 self._fed += len(audio)
                 start = self._window_start()
                 committed = start != before
@@ -609,7 +619,7 @@ class QwenStreamer:
         if committed:
             # the package froze the old window: what it still held is final
             yield from self._emit(
-                _drop_squeezed(self._prev[self._final:]), True, available_at, ends_segment=True
+                _drop_squeezed(self._prev[self._final :]), True, available_at, ends_segment=True
             )
             self._prev, self._final = [], 0
 
@@ -654,7 +664,9 @@ class QwenStreamer:
     def _flush(self, end_t: float) -> Iterator[TranscriptEvent]:
         if self._state is not None:
             yield from self._emit(
-                _drop_squeezed(self._prev[self._final:]), True, end_t + self._last_pass_seconds,
+                _drop_squeezed(self._prev[self._final :]),
+                True,
+                end_t + self._last_pass_seconds,
                 ends_segment=True,
             )
         self._prev, self._final = [], 0
@@ -663,8 +675,10 @@ class QwenStreamer:
         self, words: list[_Aligned], final: bool, available_at: float, *, ends_segment: bool = False
     ) -> Iterator[TranscriptEvent]:
         out = self.junk.keep(
-            [Word(text=w.text, t_start=w.t_start, t_end=w.t_end, confidence=w.confidence)
-             for w in words]
+            [
+                Word(text=w.text, t_start=w.t_start, t_end=w.t_end, confidence=w.confidence)
+                for w in words
+            ]
         )
         if not out:
             return

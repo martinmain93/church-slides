@@ -138,8 +138,11 @@ def cpu_path_enabled() -> bool:
     from auto_presenter.follower import scorer_models
 
     v = saved_verdict()
-    return v is not None and v.verdict == "full" and v.backend == "whisper" and (
-        scorer_models.is_downloaded()
+    return (
+        v is not None
+        and v.verdict == "full"
+        and v.backend == "whisper"
+        and (scorer_models.is_downloaded())
     )
 
 
@@ -241,8 +244,10 @@ def build_session_followers(content: SetlistContent, backend: object) -> LiveFol
         "score follower engaged for %d of %d songs%s",
         len(followers.songs),
         len(content.items),
-        "" if on_gpu
-        else f" (span scorer {followers.scorer.repo})" if followers.scorer is not None
+        ""
+        if on_gpu
+        else f" (span scorer {followers.scorer.repo})"
+        if followers.scorer is not None
         else " (words and chords, no span scorer)",
     )
     if tunables is not None and tunables.in_service_learning:
@@ -253,33 +258,51 @@ def build_session_followers(content: SetlistContent, backend: object) -> LiveFol
 
 
 def start_next_line_check(followers: LiveFollowers, backend: object) -> None:
-    """The next-line check (`follower.next_line`): Apple silicon with the
-    small.en model, which its phone model was trained on, and the phone model
-    on disk. Anywhere else the follower runs without it."""
+    """The next-line check (`follower.next_line`), on Apple silicon with its
+    phone model on disk. A Qwen3-ASR session reads phones from Qwen's audio
+    tower (`next_line.QWEN_MODEL_FILE`); a Whisper one needs small.en, which
+    the Whisper phone model was trained on. Anywhere else the follower runs
+    without it."""
     from auto_presenter.asr.mlx_backend import MLXWhisperBackend
+    from auto_presenter.asr.qwen_backend import QwenStreamingBackend
     from auto_presenter.follower import next_line
 
-    backend = _whisper_of(backend)
-    if (
-        not isinstance(backend, MLXWhisperBackend)
-        or backend._model_name != "mlx-whisper-small.en"
-    ):
-        log.info("next-line check needs MLX small.en; off this session")
-        return
-    head = next_line.load_head()
-    if head is None:
-        log.warning(
-            "next-line model missing (%s); check off this session", next_line.model_dir()
-        )
-        return
-    try:
-        encode = next_line.mlx_encoder(backend._repo)
-    except Exception:
-        log.exception("next-line check could not start; off this session")
-        return
+    if isinstance(backend, QwenStreamingBackend):
+        head = next_line.load_head(next_line.QWEN_MODEL_FILE)
+        if head is None:
+            log.warning(
+                "Qwen next-line model missing (%s); check off this session",
+                next_line.model_dir() / next_line.QWEN_MODEL_FILE,
+            )
+            return
+        encode, tuning = next_line.qwen_encoder(backend), next_line.qwen_tuning()
+    else:
+        backend = _whisper_of(backend)
+        if (
+            not isinstance(backend, MLXWhisperBackend)
+            or backend._model_name != "mlx-whisper-small.en"
+        ):
+            log.info("next-line check needs MLX small.en; off this session")
+            return
+        head = next_line.load_head()
+        if head is None:
+            log.warning(
+                "next-line model missing (%s); check off this session", next_line.model_dir()
+            )
+            return
+        try:
+            encode = next_line.mlx_encoder(backend._repo)
+        except Exception:
+            log.exception("next-line check could not start; off this session")
+            return
+        tuning = next_line.WHISPER_TUNING
     followers.band_playing = lambda: _state.band.playing
-    followers.start_next_line(encode, head)
-    log.info("next-line check on for %d songs", len(followers.songs))
+    followers.start_next_line(encode, head, tuning)
+    log.info(
+        "next-line check on for %d songs (%s phones)",
+        len(followers.songs),
+        "Qwen" if tuning is not next_line.WHISPER_TUNING else "Whisper",
+    )
 
 
 def start_service_learning(followers: LiveFollowers) -> None:
@@ -479,10 +502,17 @@ async def apply_follower_decision(decision: MatcherDecision) -> None:
     # While the room sounds like talk, a move needs the target slide's words,
     # from the follower as from the matcher (`decision.plan_gate`).
     gate = matcher.scheduler.plan_gate
-    if gate is not None and matcher._screen is not None and not gate.allows(
-        matcher.scheduler.setlist, matcher._screen,
-        (decision.item_idx, decision.slide_idx), decision.t_seconds,
-        matcher.scheduler.talking_score, _state.band.playing,
+    if (
+        gate is not None
+        and matcher._screen is not None
+        and not gate.allows(
+            matcher.scheduler.setlist,
+            matcher._screen,
+            (decision.item_idx, decision.slide_idx),
+            decision.t_seconds,
+            matcher.scheduler.talking_score,
+            _state.band.playing,
+        )
     ):
         held = True
     # Same rule as a transcript decision: while nobody is singing these words,
@@ -627,7 +657,9 @@ def probation_step(current: int | None, gain: float, t: float) -> bool | None:
         return None
     log.info(
         "song %d not heard since the change (mean gain %.2f over %d passes); blanking",
-        item, sum(gains) / len(gains), len(gains),
+        item,
+        sum(gains) / len(gains),
+        len(gains),
     )
     _state.song_unconfirmed = True
     return True
