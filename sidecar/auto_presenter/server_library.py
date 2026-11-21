@@ -9,7 +9,9 @@ logic. The matcher is re-indexed here; the UI is told via
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
+import os
 
 from auto_presenter.decision.director import Director
 from auto_presenter.decision.engine import MatchingEngine
@@ -31,6 +33,11 @@ from auto_presenter.server_state import (
 )
 
 log = logging.getLogger(__name__)
+
+#: Development only: log every input the spontaneous watcher sees, one JSON
+#: line per transcript event, so a trigger can be replayed offline exactly
+#: (nothing before the first import depends on the watcher).
+_DEBUG_OFFLIST = bool(os.environ.get("AUTO_PRESENTER_DEBUG_OFFLIST"))
 
 
 def load_library_index() -> FingerprintIndex | None:
@@ -153,10 +160,24 @@ async def observe_off_setlist(
     belief = _matcher_belief(matcher)
     if setlist is None or belief is None:
         return
+    if _DEBUG_OFFLIST:
+        log.info("offlist_dbg «%s»", json.dumps({
+            "t": round(event.t_end, 2),
+            "words": [w.text for w in event.words],
+            "item": belief.item_idx, "slide": belief.slide_idx,
+            "display_marginal": round(float(belief.display_marginal), 4),
+            "song_share": round(float(getattr(belief, "song_share", 1.0)), 4),
+            "evidence": round(float(belief.evidence), 4),
+            "talking": round(float(_state.singing.score), 4),
+            "silent": bool(_state.singing.silent),
+            "chord": _state.last_chord, "chord_t": _state.last_chord_t,
+            "chords_enabled": bool(_state.music_chords),
+            "mode": director.mode,
+            "setlist": [i.song_id for i in setlist.items],
+        }))
     imported = watcher.observe(
         words=[w.text for w in event.words],
         t_seconds=event.t_end,
-        display_marginal=float(getattr(belief, "display_marginal", 1.0)),
         talking_score=_state.singing.score,
         silent=_state.singing.silent,
         setlist=setlist,
