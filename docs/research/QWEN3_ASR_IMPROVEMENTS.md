@@ -12,9 +12,10 @@ songs.
 > **Update 2026-11-21:** idea 4 is built (`asr_qwen_streaming`, off by
 > default) and has been through the follower in real time. See
 > [In the follower](#in-the-follower-2026-11-20-21): Qwen beats Whisper on
-> slides (wrong-slide 0.256 vs 0.277 on the 8 goldens); its word-time tail is
-> fixed by reading times off the decoder's attention; and the next-line check
-> now runs on Qwen's own audio with a phone model trained for it.
+> slides; its word-time tail is fixed by reading times off the decoder's
+> attention; and the next-line check now runs on Qwen's own audio with a
+> phone model trained for it. Full gate with all of that (50f15ff): wrong-slide
+> 0.249 vs Whisper's 0.272, hidden lag 0.156 vs 0.176, 179 vs 169 of 225 cues.
 
 **Two of the five ideas are worth building, and they fit together.**
 
@@ -245,9 +246,26 @@ wrong-slide.
 
 | Run | Wrong-slide | Hidden | Perceived |
 |---|---|---|---|
-| 8 goldens, Whisper (c9e78a1) | 0.277 | 0.212 | 0.178 |
-| 8 goldens, Qwen (c9e78a1) | **0.256** | **0.168** | 0.194 |
-| Talk-only negatives, 16 min, both | 0 changes | | |
+| 9 goldens, Whisper (c9e78a1) | 0.277 | 0.212 | 0.178 |
+| 9 goldens, Qwen (c9e78a1) | 0.256 | 0.168 | 0.194 |
+| 9 goldens, Whisper (50f15ff) | 0.272 | 0.176 | 0.181 |
+| **9 goldens, Qwen (50f15ff): attention times, Qwen check, no aligner** | **0.249** | **0.156** | **0.174** |
+| Talk-only negatives, 16 min (c9e78a1) | 0 changes, both | | |
+| Talk-only negatives, 16 min (50f15ff) | Whisper 0, Qwen 1 | | |
+
+Hidden is over the 8 goldens that have a transcript. At 50f15ff Qwen also
+hits more cues (179 vs 169 of 225), anticipates less (+734 vs +1,017 ms
+median), keeps ASR lag p90 at 0.18 s (Whisper 0.29 s), and costs the same
+engine CPU (39% of a core). Its wrong-slide is lower on 6 of 9 goldens.
+Two of the other three are within 0.004. The third is the worst golden
+(20261002, only 11% of its singing measured), at 0.438 vs 0.421.
+
+The one talk-only change was the scripture read-along jumping on a meeting
+clip (`IB4001…_828`, "reading room" said near the passage). Whisper's
+read-along jumped on the same clip without moving a slide. Four replays of
+that clip on Qwen, two with the next-line check and two without, moved
+nothing. So it is a rare read-along fault, not the Qwen check. It's noted
+as a follow-up.
 
 **What the Whisper-era parts still do.** Ablations, quick set, Qwen on:
 
@@ -330,9 +348,10 @@ The check costs about 6 ms a tick for the head, beside the audio tower on its
 own MLX stream. As float16 the model is 10 MB; logits move at most 0.014 from
 float32.
 
-**Caveat:** the margin scale was picked on the same 3 recordings it was
-measured on. Hold it to the full goldens and the talk-only negatives before
-it ships.
+The margin scale was picked on the same 3 recordings it was measured on.
+The full gate above (50f15ff) holds it to all 9 goldens and the talk-only
+negatives: on the 6 goldens outside the sweep, Qwen is 0.258 vs Whisper's
+0.267.
 
 ## Recommendation
 
