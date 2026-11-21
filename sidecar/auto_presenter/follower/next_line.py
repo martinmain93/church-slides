@@ -325,11 +325,12 @@ WHISPER_TUNING = Tuning()
 
 def qwen_tuning() -> Tuning:
     """The Qwen3-ASR head (13 frames a second, not 50): its garbage cost and
-    blank push tuned on the spike's 1,905 checks (docs/research/
-    QWEN3_ASR_IMPROVEMENTS.md), the margins scaled by how much wider its
-    2%-false-alarm threshold was there (about 1.3x).
-    `AUTO_PRESENTER_QWEN_CHECK_SCALE` scales the margins for trials."""
-    k = float(os.environ.get("AUTO_PRESENTER_QWEN_CHECK_SCALE", "1.3"))
+    blank push tuned on the spike's 1,905 checks, the margins twice the
+    Whisper head's: in real time on 3 church goldens, 1.0x / 1.3x / 1.6x /
+    2.0x / 2.5x gave wrong-slide 0.260 / 0.252 / 0.236 / 0.241 / 0.260, and
+    2.0x the best perceived score with the fewest moves (docs/research/
+    QWEN3_ASR_IMPROVEMENTS.md). `AUTO_PRESENTER_QWEN_CHECK_SCALE` for trials."""
+    k = float(os.environ.get("AUTO_PRESENTER_QWEN_CHECK_SCALE", "2.0"))
     return Tuning(
         g=3.0,
         blank_push=4.0,

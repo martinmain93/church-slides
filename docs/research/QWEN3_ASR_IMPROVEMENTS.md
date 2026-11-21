@@ -9,6 +9,13 @@ songs.
 
 ## The answer
 
+> **Update 2026-11-21:** idea 4 is built (`asr_qwen_streaming`, off by
+> default) and has been through the follower in real time. See
+> [In the follower](#in-the-follower-2026-11-20-21): Qwen beats Whisper on
+> slides (wrong-slide 0.256 vs 0.277 on the 8 goldens); its word-time tail is
+> fixed by reading times off the decoder's attention; and the next-line check
+> now runs on Qwen's own audio with a phone model trained for it.
+
 **Two of the five ideas are worth building, and they fit together.**
 
 1. **Streaming Qwen that keeps its earlier work (idea 4)** beats the app's
@@ -224,6 +231,82 @@ training stays on this Mac; DALI can't ship. Not started: it should wait
 until idea 4 has been through the follower and we know words are still the
 limit.
 
+## In the follower (2026-11-20/21)
+
+`QwenStreamingBackend` (`sidecar/auto_presenter/asr/qwen_backend.py`) runs
+idea 4 inside the app, behind the `asr_qwen_streaming` tunable. The session
+still loads Whisper small.en beside it, for the lyric-span scorer.
+
+All numbers here come from the real-time eval
+(`research/eval/run_follower_eval.py`, nosheet config), on an M1 on mains
+power with Low Power Mode off and no other evals running. "Quick" means 3
+short church goldens, about 12 min. Run-to-run noise there is about ±0.01–0.015
+wrong-slide.
+
+| Run | Wrong-slide | Hidden | Perceived |
+|---|---|---|---|
+| 8 goldens, Whisper (c9e78a1) | 0.277 | 0.212 | 0.178 |
+| 8 goldens, Qwen (c9e78a1) | **0.256** | **0.168** | 0.194 |
+| Talk-only negatives, 16 min, both | 0 changes | | |
+
+**What the Whisper-era parts still do.** Ablations, quick set, Qwen on:
+
+- With the next-line check off, wrong-slide is 0.299 and cues 31/47.
+- With the span scorer off, wrong-slide is 0.457, and the engine overloads (4 unhealthy).
+- So both still matter. Replacing Whisper outright needs a Qwen stand-in for the
+  span scorer, and that doesn't exist yet.
+
+**Ideas tried on the Qwen side** (quick set unless noted):
+
+| Idea | Result | Verdict |
+|---|---|---|
+| Word confidence from the decoder's token probabilities (min per word) | Free to compute. Dropping flushed words under 0.5 (`QWEN_FLUSH_MIN_CONF`) cuts errors; WER 0.237 together with current-song lyrics as context. | Keep |
+| Word times from decoder attention instead of the forced aligner (`QWEN_ATTN_TIMES`): peak of 8 chosen heads' attention over the audio tokens | Words more than 1 s off: 28% → 1.8% (aligner → attention). WER unchanged (0.357). Real time on the quick set: 0.269 alone, 0.259 with lyrics; level with the other Qwen variants (0.263–0.278). | Keep; it also lets the aligner go (memory) |
+| Lines before/after the current one as context | WER 0.52–1.25 | Rejected |
+| Qwen closed-set line scoring as the next-line check (idea 2) | Loses to the shipped phone check early (2% false alarms, +0.7 s: 49% vs 73%), and 661 vs 114 ms a check | Rejected |
+| **Phone model on Qwen's audio tower** (below) | Quick set 0.241 vs 0.269 for the same run on the Whisper check | **Built** |
+
+### The next-line check on Qwen's audio
+
+The shipped check reads phones from Whisper's encoder. Qwen's audio tower
+gives 13 frames a second (33 per 2.5 s window, 1024 wide) instead of 50. We
+trained the same phone model (conv + 2-layer GRU-512, CTC over 41 phones) on
+those frames, using the same public FMA windows as the shipped head. Training ran on
+Kaggle (`research/spikes/qwen_improve/phone_head/kaggle_run.py`) and took
+85 min on a T4. Our recordings never left this Mac. Held-out phone error: 37.7%.
+
+On the spike's 1,905 checks, at 2 false alarms per 100 mid-line checks, line
+changes caught by time after the first word:
+
+| | +0.3 s | +0.5 s | +0.7 s | +1.0 s | +1.5 s | +2.0 s |
+|---|---|---|---|---|---|---|
+| Qwen phone model (FMA only) | **69%** | **81%** | **83%** | **78%** | 61% | 52% |
+| Shipped Whisper check (FMA + our recordings) | 57% | 72% | 75% | 67% | 54% | 45% |
+
+The garbage cost g (3.0 for Qwen, 0.6 for Whisper) was tuned on these same
+checks for both models, so both rows flatter a little.
+
+**Live** (`next_line.qwen_encoder`, `QWEN_MODEL_FILE`, `qwen_tuning()`; quick
+set, attention times, flush conf 0.5). The decision's margins are sums over
+frames, so they needed a new scale for Qwen:
+
+| Margins (x Whisper's) | Wrong-slide | Hidden | Perceived | Moves (held) |
+|---|---|---|---|---|
+| Whisper check, same run | 0.269 | 0.251 | 0.173 | 27 (72) |
+| 1.0x | 0.260 | 0.201 | 0.173 | 38 (107) |
+| 1.3x | 0.252 | 0.196 | 0.165 | 31 (102) |
+| 1.6x | 0.236 | 0.175 | 0.167 | 31 (62) |
+| **2.0x (default)** | **0.241** | **0.180** | **0.147** | 23 (59) |
+| 2.5x | 0.260 | 0.232 | 0.160 | 18 (46) |
+
+The check costs about 6 ms a tick for the head, beside the audio tower on its
+own MLX stream. As float16 the model is 10 MB; logits move at most 0.014 from
+float32.
+
+**Caveat:** the margin scale was picked on the same 3 recordings it was
+measured on. Hold it to the full goldens and the talk-only negatives before
+it ships.
+
 ## Recommendation
 
 1. **Build idea 4 as an `ASRBackend`** (`QwenStreamingBackend`, Apple
@@ -250,6 +333,13 @@ Open:
   run here.
 
 ## Files
+
+- Backend and check: `sidecar/auto_presenter/asr/qwen_backend.py`,
+  `sidecar/auto_presenter/follower/next_line.py` (`qwen_encoder`, `Tuning`).
+- Phone-model training and scoring: `research/spikes/qwen_improve/phone_head/`;
+  attention timing: `research/spikes/qwen_improve/attn_timing.py`.
+- Real-time runs: `../auto-presenter-research/work/qwen_backend/` (`q_*`,
+  `rt_*`); phone features and heads: `../auto-presenter-research/work/qhead/`.
 
 - Scripts: [research/spikes/qwen_improve/](../../research/spikes/qwen_improve/)
   (`speed_eval.py`, `nextline_eval.py`, `whisper_nextline.py`,
