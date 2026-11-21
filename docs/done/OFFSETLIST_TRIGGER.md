@@ -68,15 +68,17 @@ engine. Times are from the song's first lyric cue to the import.
 
 | Recording | Old watcher | New, live | New, replayed on the earlier capture |
 | --- | --- | --- | --- |
-| 213825_312 | never | +21 s | +16 s |
-| 215943_266 | never | never (Whisper heard 99 words) | +65 s (174 words) |
-| 225539_315 | never | +59 s | +43 s |
-| 213617_974 | never | +175 s | +87 s |
-| 214054_974 | never | never | never: Whisper heard 62 words in 8 min |
+| 213825_312 | never | +19 s | +16 s |
+| 215943_266 | never | +66 s | +65 s |
+| 225539_315 | never | +44 s | +43 s |
+| 213617_974 | never | +120 s | +87 s |
+| 214054_974 | never | +16 s | never: Whisper heard 62 words in 8 min |
 | 214759_057 | never | +24 s | +20 s |
 | 115044_425, 2nd song | never | +534 s | +516 s |
 
-Every import was the right song: 5 of 7 live, 6 of 7 replayed. The live and
+Every import was the right song: 7 of 7 live, 6 of 7 replayed. The first five
+live rows are a rerun: the first live pass overlapped another real-time
+benchmark on the same Mac, and there two of them never imported. The live and
 replayed columns differ because Whisper hears the same recording differently
 from run to run. In 115044_425 the dropped song is sung briefly at 38 s and
 weakly heard. It is sung properly from 547 s, so the import came about 25 s
@@ -107,7 +109,7 @@ there is 0.93–0.99.
 - Recovery takes 20–60 s, or minutes when Whisper hears little. The two-win
   confirmation costs about 5–70 s of that. Removing it made no wrong imports
   on these sets, but the sets are small.
-- One recording (214054_974) gets almost no words from Whisper when its song
-  isn't in the setlist. No trigger built on words can work there.
+- On one recording (214054_974), Whisper sometimes hears almost nothing (62
+  words in 8 minutes on one run), and then no trigger built on words can work.
 - Checked on engine broadcasts (`import_library_song`), not on the operator's
   screen. The interface path that applies an import didn't change.
