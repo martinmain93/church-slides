@@ -1472,7 +1472,33 @@ def _qwen_follow_song(matcher: Any, session: Any) -> None:
     if _QWEN_LYRICS is None:
         _QWEN_LYRICS = json.loads(Path(path).read_text())
     item = matcher.setlist.item(getattr(matcher, "current_item_idx", -1))
-    backend.context = _QWEN_LYRICS.get(item.song_id, "") if item is not None else ""
+    text = _QWEN_LYRICS.get(item.song_id, "") if item is not None else ""
+    near = os.environ.get("AUTO_PRESENTER_QWEN_LYRICS_NEAR")
+    belief = getattr(matcher, "belief", None)
+    if text and near and belief is not None and item is not None:
+        before, after = (int(x) for x in near.split(","))
+        top = belief.top_hypothesis[1]
+        slide = item.slides[top] if 0 <= top < len(item.slides) else None
+        text = _near_lines(text, slide.words if slide is not None else (), before, after)
+    backend.context = text
+
+
+def _near_lines(text: str, slide_words: tuple[str, ...], before: int, after: int) -> str:
+    """Trial: the lines of `text` around where `slide_words` start."""
+    def norm(w: str) -> str:
+        return "".join(c for c in w.lower() if c.isalnum())
+
+    lines = [ln for ln in text.splitlines() if ln.strip()]
+    want = [norm(w) for w in slide_words if norm(w)][:4]
+    if not lines or not want:
+        return text
+    best, at = -1, 0
+    for i, ln in enumerate(lines):
+        got = [norm(w) for w in ln.split() if norm(w)][: len(want)]
+        hit = sum(a == b for a, b in zip(got, want, strict=False))
+        if hit > best:
+            best, at = hit, i
+    return "\n".join(lines[max(0, at - before) : at + after + 1])
 
 
 async def _maybe_qwen_backend(

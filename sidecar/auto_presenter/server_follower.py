@@ -227,7 +227,9 @@ def build_session_followers(content: SetlistContent, backend: object) -> LiveFol
         identical=identical,
         # Apple silicon: MLX; elsewhere ONNX Runtime when its models are here,
         # or words and chords only
-        scorer=span_scorer_for(backend),
+        scorer=(
+            None if os.environ.get("AUTO_PRESENTER_NO_SPAN_SCORER") else span_scorer_for(backend)
+        ),
         # chords come from the session's own analyser (`follower_frame_observer`)
         chord_analyser=None,
         without_sheet=without_sheet,

@@ -106,12 +106,221 @@ SQUEEZED_SECONDS = float(os.environ.get("AUTO_PRESENTER_QWEN_DROP_SQUEEZED", "0"
 
 
 def _drop_squeezed(words: list[_Aligned]) -> list[_Aligned]:
+    if FLUSH_MIN_CONF > 0:
+        words = [w for w in words if w.confidence >= FLUSH_MIN_CONF]
     if SQUEEZED_SECONDS <= 0:
         return words
     end = len(words)
     while end > 0 and words[end - 1].t_end - words[end - 1].t_start < SQUEEZED_SECONDS:
         end -= 1
     return words[:end]
+
+
+#: Trial: a word heard once goes final at once when Qwen gave every token of
+#: it at least this probability (and it sits `FIRST_HEARING_SECONDS`, else
+#: 0.3 s, behind the newest audio). `None` is off.
+_FC = os.environ.get("AUTO_PRESENTER_QWEN_FIRST_CONF", "")
+FIRST_CONF: float | None = float(_FC) if _FC else None
+#: Trial: flushed (never agreed) words below this probability are dropped.
+FLUSH_MIN_CONF = float(os.environ.get("AUTO_PRESENTER_QWEN_FLUSH_MIN_CONF", "0") or 0)
+
+
+# ------------------------------------------------------------- token probabilities
+#
+# The package decodes greedily and keeps only the token ids. These two
+# replacements keep each generated token's probability as well, in
+# `state._ap_probs`, parallel to `state._window_raw_ids` (forced prefix
+# tokens keep the probability they had when they were generated).
+
+_GEN_PROBS = threading.local()
+
+
+def _install_probability_hook() -> None:
+    import mlx.core as mx
+    import mlx_qwen3_asr.streaming as st
+
+    if getattr(st, "_ap_probability_hook", False):
+        return
+    original_window = st._decode_window
+
+    def decode_tokens(*, model, cache, initial_logits, start_pos, max_new_tokens,
+                      eos_token_ids, pos_dtype):
+        logits = initial_logits
+        generated: list[int] = []
+        probs: list[float] = []
+        position = int(start_pos)
+        for _ in range(max_new_tokens):
+            flat = logits.reshape(-1).astype(mx.float32)
+            top = mx.argmax(flat)
+            p = mx.exp(flat[top] - mx.logsumexp(flat))
+            mx.eval(top, p)
+            token = int(top.item())
+            if token in eos_token_ids:
+                break
+            generated.append(token)
+            probs.append(float(p.item()))
+            if st.detect_repetition(generated):
+                break
+            logits = model.step(
+                input_ids=mx.array([[token]]),
+                position_ids=st._build_position_ids(position, 1, dtype=pos_dtype),
+                cache=cache,
+                validate_input_ids=False,
+            )
+            position += 1
+        _GEN_PROBS.value = probs
+        return generated
+
+    def decode_window(window_audio, state, model=None):
+        old_ids = list(state._window_raw_ids)
+        old_probs = list(getattr(state, "_ap_probs", []))
+        _GEN_PROBS.value = []
+        out = original_window(window_audio, state, model=model)
+        gen = _GEN_PROBS.value
+        raw = state._window_raw_ids
+        n_prefix = max(0, len(raw) - len(gen))
+        if old_ids[:n_prefix] == raw[:n_prefix]:
+            prefix = old_probs[:n_prefix]
+        else:
+            prefix = []
+        prefix += [1.0] * (n_prefix - len(prefix))
+        state._ap_probs = prefix + gen
+        return out
+
+    st._decode_tokens_incremental = decode_tokens
+    st._decode_window = decode_window
+    st._ap_probability_hook = True
+
+
+def _word_probabilities(state: Any, n_words: int) -> list[float]:
+    """Each word's lowest token probability in the window's text, in the
+    order `_sentence_ends` counts words; all 1.0 when they can't be lined up."""
+    ids = list(getattr(state, "_window_raw_ids", []) or [])
+    probs = list(getattr(state, "_ap_probs", []) or [])
+    tok = getattr(state, "_tokenizer", None)
+    if tok is None or not ids or len(probs) != len(ids):
+        return [1.0] * n_words
+    words: list[float] = []
+    cur: float | None = None
+    for t, p in zip(ids, probs, strict=True):
+        piece = tok.decode([t])
+        if piece[:1].isspace() and cur is not None:
+            words.append(cur)
+            cur = None
+        if any(c.isalnum() for c in piece):
+            cur = p if cur is None else min(cur, p)
+        elif cur is not None:
+            cur = min(cur, p)
+    if cur is not None:
+        words.append(cur)
+    if len(words) != n_words:
+        return [1.0] * n_words
+    return words
+
+
+#: Trial: word times from Qwen3-ASR's own attention instead of the forced
+#: aligner. Spike (research/spikes/qwen_improve/attn_timing.py, 3 held-out
+#: public songs, reference words forced): these decoder heads' mean attention
+#: peak put word starts p50 0.09 s, >1 s off 4%, where the aligner was p50
+#: 0.11 s, >1 s off 26%. Read from the environment for trials only.
+ATTN_TIMES = os.environ.get("AUTO_PRESENTER_QWEN_ATTN_TIMES") == "1"
+#: (layer, head) picked on 3 other songs.
+ATTN_HEADS = ((6, 6), (6, 10), (6, 7), (6, 13), (12, 6), (11, 11), (2, 11), (11, 12))
+
+_ATTN = threading.local()
+
+
+class _StopForwardError(Exception):
+    pass
+
+
+def _install_attention_capture() -> None:
+    """Keep the attention of text tokens over audio tokens at `ATTN_HEADS`'
+    layers, and stop the forward pass after the last of them."""
+    import mlx.core as mx
+    import mlx_qwen3_asr.decoder as dec
+
+    if getattr(dec, "_ap_attention_capture", False):
+        return
+    original_sdpa = dec._scaled_dot_product_attention
+    original_call = dec.TextAttention.__call__
+    layers = sorted({li for li, _ in ATTN_HEADS})
+
+    def call(self, x, cos, sin, mask=None, cache=None, layer_idx=0):
+        cap = getattr(_ATTN, "cap", None)
+        if cap is not None:
+            cap["layer"] = layer_idx
+        out = original_call(self, x, cos, sin, mask=mask, cache=cache, layer_idx=layer_idx)
+        if cap is not None and layer_idx >= layers[-1]:
+            raise _StopForwardError
+        return out
+
+    def sdpa(q, k, v, mask=None, scale=None):
+        cap = getattr(_ATTN, "cap", None)
+        if cap is not None and cap["layer"] in layers:
+            t0, a0, n_a = cap["t0"], cap["a0"], cap["n_a"]
+            heads = [h for li, h in ATTN_HEADS if li == cap["layer"]]
+            rep = q.shape[1] // k.shape[1]
+            qh = q[0, heads, t0:, :]  # (h, T, D)
+            kh = k[0, [h // rep for h in heads], :, :]  # (h, S, D)
+            sc = (qh * (scale or q.shape[-1] ** -0.5)) @ kh.transpose(0, 2, 1)
+            # causal: text row i sees keys up to t0 + i
+            n_t, n_s = sc.shape[1], sc.shape[2]
+            allowed = mx.arange(n_s)[None, :] <= (t0 + mx.arange(n_t))[:, None]
+            sc = mx.where(allowed[None], sc.astype(mx.float32), -1e9)
+            w = mx.softmax(sc, axis=-1)[:, :, a0 : a0 + n_a]
+            cap["rows"].append(w)
+        return original_sdpa(q, k, v, mask=mask, scale=scale)
+
+    dec.TextAttention.__call__ = call
+    dec._scaled_dot_product_attention = sdpa
+    dec._ap_attention_capture = True
+
+
+def _attention_times(
+    model: Any, tok: Any, audio: np.ndarray, text: str
+) -> list[tuple[str, float, float]]:
+    """(word, start, end) for `text`'s words from the attention peaks."""
+    import mlx.core as mx
+    from mlx_qwen3_asr.audio import compute_features
+
+    words = [w.strip(string.punctuation) for w in text.split() if any(c.isalnum() for c in w)]
+    if not words or len(audio) < SAMPLE_RATE // 4:
+        return []
+    mel, lens = compute_features(audio.astype(np.float32))
+    feats, _ = model.audio_tower(mel.astype(mx.float16), lens)
+    n_a = int(feats.shape[1])
+    prompt = list(tok.build_prompt_tokens(n_audio_tokens=n_a, language="English", context=""))
+    a0 = prompt.index(int(model.audio_token_id))
+    raw = [w for w in text.split() if any(c.isalnum() for c in w)]
+    ends, toks = [], []
+    for i in range(len(raw)):
+        toks = tok.encode(" ".join(raw[: i + 1]))
+        ends.append(len(toks))
+    ids = prompt + toks
+    pos = mx.arange(len(ids))[None, :]
+    _ATTN.cap = {"layer": -1, "t0": len(prompt), "a0": a0, "n_a": n_a, "rows": []}
+    try:
+        cache = model.create_cache()
+        model.prefill(mx.array([ids]), feats, mx.stack([pos, pos, pos], axis=1), cache)
+    except _StopForwardError:
+        pass
+    finally:
+        rows, _ATTN.cap = _ATTN.cap["rows"], None
+    a = np.concatenate([np.array(r) for r in rows], axis=0)  # (heads, T, A)
+    spt = len(audio) / SAMPLE_RATE / n_a
+    starts, s0 = [], 0
+    for e in ends:
+        m = a[:, s0:e].sum(1)
+        m = (m / (m.sum(-1, keepdims=True) + 1e-9)).mean(0)
+        starts.append(float(np.argmax(m)) * spt)
+        s0 = e
+    dur = len(audio) / SAMPLE_RATE
+    out = []
+    for i, (w, st) in enumerate(zip(words, starts, strict=True)):
+        nxt = starts[i + 1] if i + 1 < len(starts) else min(dur, st + 0.4)
+        out.append((w, st, min(st + 1.0, max(st + 0.1, nxt))))
+    return out
 
 
 _SENTENCE_END = (".", "?", "!")
@@ -129,6 +338,8 @@ class _Aligned:
     t_end: float
     #: The raw decoded token ended a sentence (".", "?", "!").
     sentence_end: bool = False
+    #: Qwen's lowest token probability within the word.
+    confidence: float = 1.0
 
 
 def _sentence_ends(text: str, n_words: int) -> list[bool]:
@@ -204,6 +415,10 @@ class QwenStreamingBackend:
             from mlx_qwen3_asr.load_models import load_model
 
             _configure_mlx_memory()
+            if os.environ.get("AUTO_PRESENTER_QWEN_NO_PROBS") != "1":
+                _install_probability_hook()
+            if ATTN_TIMES:
+                _install_attention_capture()
             with GPU_LOCK:
                 self._model_path = local_snapshot(QWEN_REPO)
                 self._model, _ = load_model(self._model_path)
@@ -261,6 +476,11 @@ class QwenStreamingBackend:
         feed_audio(audio, state, model=self._model)
 
     def align(self, audio: np.ndarray, text: str) -> list[tuple[str, float, float]]:
+        if ATTN_TIMES:
+            from mlx_qwen3_asr.tokenizer import _TokenizerHolder
+
+            tok = _TokenizerHolder.get(self._model_path)
+            return _attention_times(self._model, tok, audio, text)
         return [
             (w.text, float(w.start_time), float(w.end_time))
             for w in self._aligner.align(audio, text, "English")
@@ -394,9 +614,10 @@ class QwenStreamer:
             self._prev, self._final = [], 0
 
         ends = _sentence_ends(text, len(aligned))
+        conf = _word_probabilities(self._state, len(aligned))
         words = [
-            _Aligned(t, start + s, start + e, end)
-            for (t, s, e), end in zip(aligned, ends, strict=True)
+            _Aligned(t, start + s, start + e, end, c)
+            for (t, s, e), end, c in zip(aligned, ends, conf, strict=True)
         ]
         settled = start + len(self._state.audio_accum) / SAMPLE_RATE - b.edge_margin_seconds
         agree = 0
@@ -410,6 +631,16 @@ class QwenStreamer:
             heard = start + len(self._state.audio_accum) / SAMPLE_RATE - b.first_hearing_seconds
             agree = max(agree, self._final)
             while agree < len(words) and words[agree].t_end <= heard:
+                agree += 1
+        if FIRST_CONF is not None:
+            margin = b.first_hearing_seconds if b.first_hearing_seconds is not None else 0.3
+            heard = start + len(self._state.audio_accum) / SAMPLE_RATE - margin
+            agree = max(agree, self._final)
+            while (
+                agree < len(words)
+                and words[agree].confidence >= FIRST_CONF
+                and words[agree].t_end <= heard
+            ):
                 agree += 1
         if agree > self._final:
             yield from self._emit(words[self._final : agree], True, available_at)
@@ -431,7 +662,10 @@ class QwenStreamer:
     def _emit(
         self, words: list[_Aligned], final: bool, available_at: float, *, ends_segment: bool = False
     ) -> Iterator[TranscriptEvent]:
-        out = self.junk.keep([Word(text=w.text, t_start=w.t_start, t_end=w.t_end) for w in words])
+        out = self.junk.keep(
+            [Word(text=w.text, t_start=w.t_start, t_end=w.t_end, confidence=w.confidence)
+             for w in words]
+        )
         if not out:
             return
         event = TranscriptEvent(
