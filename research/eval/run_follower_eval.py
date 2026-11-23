@@ -57,6 +57,8 @@ ONNX_SCORER: Path | None = None
 ONNX_THREADS = 0
 #: Set from --capture: broadcasts worth reading after the run, on the audio clock.
 CAPTURE: Path | None = None
+#: a real library.db whose songs go into every run's library (--song-library)
+SONG_LIBRARY: Path | None = None
 #: Set from --tunable key=value: production tunables to override for every run.
 TUNABLE_OVERRIDES: dict = {}
 CAPTURE_KINDS = ("singing_state", "transcript_partial", "spoken_instruction", "slide_change", "flow_position")
@@ -146,8 +148,24 @@ def make_library(tmp: Path, rec, golden: Golden, sheets: bool = True) -> Path:
         )
     con.commit()
     con.close()
+    if SONG_LIBRARY is not None:
+        add_song_library(db, SONG_LIBRARY)
     (tmp / "recordings").mkdir(exist_ok=True)
     return db
+
+
+def add_song_library(db: Path, src: Path) -> None:
+    """Copy a real library's songs (not its lead sheets) into `db`, so the
+    off-setlist watcher has something to search. Without this every gate runs
+    with an empty song table and the watcher never does anything."""
+    s = sqlite3.connect(f"{src.as_uri()}?mode=ro", uri=True)
+    rows = s.execute("SELECT id, title, body_text, slide_order FROM songs").fetchall()
+    s.close()
+    con = sqlite3.connect(db)
+    con.execute("CREATE TABLE IF NOT EXISTS songs (id TEXT PRIMARY KEY, title TEXT, body_text TEXT, slide_order TEXT)")
+    con.executemany("INSERT OR REPLACE INTO songs VALUES (?, ?, ?, ?)", rows)
+    con.commit()
+    con.close()
 
 
 async def run_once(
@@ -363,6 +381,7 @@ def main() -> int:
     ap.add_argument("--onnx-threads", type=int, default=0, help="ONNX Runtime threads (0: its default)")
     ap.add_argument("--no-blank", action="store_true", help="blank_when_idle off for the run")
     ap.add_argument("--capture", type=Path, help="write singing/transcript/slide broadcasts here (a .jsonl file, or a folder: one file per run)")
+    ap.add_argument("--song-library", type=Path, help="a library.db whose songs every run's library holds, so off-setlist import can fire")
     ap.add_argument("--trace-dir", type=Path, help="write the follower's evidence trace per run (diagnostics)")
     ap.add_argument("--tunable", action="append", default=[], metavar="KEY=VALUE",
                     help="override a ParticleFilterTunables field for every run (JSON value)")
@@ -372,7 +391,8 @@ def main() -> int:
         if k not in ParticleFilterTunables.model_fields:
             raise SystemExit(f"unknown tunable {k}")
         TUNABLE_OVERRIDES[k] = json.loads(v)
-    global LEARNING_DB, ONNX_SCORER, ONNX_THREADS, CAPTURE, NO_BLANK
+    global LEARNING_DB, ONNX_SCORER, ONNX_THREADS, CAPTURE, NO_BLANK, SONG_LIBRARY
+    SONG_LIBRARY = args.song_library.expanduser().resolve() if args.song_library else None
     LEARNING_DB = args.learning_db
     CAPTURE = args.capture
     NO_BLANK = args.no_blank

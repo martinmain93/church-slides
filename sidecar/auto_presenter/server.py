@@ -13,6 +13,7 @@ import asyncio
 import dataclasses
 import json
 import logging
+import os
 import shutil
 import threading
 import time
@@ -31,6 +32,7 @@ from auto_presenter.api_keys import (
 from auto_presenter.asr.backend import ASRBackend
 from auto_presenter.asr.groq_backend import GroqWhisperBackend
 from auto_presenter.asr.junk import DoubtfulWordFilter
+from auto_presenter.asr.machine_check import ASSIST_TRANSCRIBE_EVERY_S
 from auto_presenter.asr.mlx_backend import MLXWhisperBackend
 from auto_presenter.asr.model_manager import (
     DownloadProgressEvent,
@@ -42,7 +44,6 @@ from auto_presenter.asr.model_manager import (
 )
 from auto_presenter.asr.streaming import SlidingWindowWrapper
 from auto_presenter.asr.types import TranscriptEvent
-from auto_presenter.asr.machine_check import ASSIST_TRANSCRIBE_EVERY_S
 from auto_presenter.asr.whisper_backend import SHORT_CONTEXT_PAD_S, WhisperBackend
 from auto_presenter.audio.capture import AudioCapture
 from auto_presenter.audio.live_capture import LiveCapture
@@ -84,6 +85,7 @@ from auto_presenter.protocol import (
     DownloadInstructionModelRequest,
     EngineTelemetryMessage,
     ExportRecordingRequest,
+    FindScriptureReferencesRequest,
     FlowPositionMessage,
     GetHymnRequest,
     GetLearningStateRequest,
@@ -104,6 +106,7 @@ from auto_presenter.protocol import (
     ModelStatusResponse,
     ParseLeadSheetRequest,
     ParticleFilterTunables,
+    PassageContextsRequest,
     PingMessage,
     PipelineHealthMessage,
     PongMessage,
@@ -117,8 +120,6 @@ from auto_presenter.protocol import (
     RemoveScriptureTranslationRequest,
     ReplayRecordingRequest,
     ResolvePassagesRequest,
-    FindScriptureReferencesRequest,
-    PassageContextsRequest,
     SaveGoldenRequest,
     SearchHymnsRequest,
     SearchScriptureCatalogRequest,
@@ -150,6 +151,7 @@ from auto_presenter.recording.sink import (
 )
 from auto_presenter.server_chords import _handle_suggest_chords, _handle_voice_chart
 from auto_presenter.server_follower import (
+    assist_tier,
     build_session_followers,
     build_session_openings,
     cpu_path_enabled,
@@ -160,7 +162,6 @@ from auto_presenter.server_follower import (
     note_operator_move,
     onnx_scorer_dir,
     saved_verdict,
-    assist_tier,
     session_side_pass,
 )
 from auto_presenter.server_follower import observe_health as observe_follower_health
@@ -207,26 +208,26 @@ from auto_presenter.server_recordings import (
 )
 from auto_presenter.server_scripture import (
     _handle_commit_scripture_import,
+    _handle_find_scripture_references,
     _handle_install_scripture_translation,
     _handle_list_scripture_translations,
+    _handle_passage_contexts,
     _handle_preview_scripture_import,
     _handle_remove_scripture_translation,
     _handle_resolve_passages,
-    _handle_find_scripture_references,
-    _handle_passage_contexts,
     _handle_search_scripture,
     _handle_search_scripture_catalog,
 )
 from auto_presenter.server_state import (
     _broadcast,
-    check_ai_move_landed,
-    deliver_decision,
-    restore_screen_record,
     _indexed_setlist,
     _matcher_belief,
     _send,
     _send_error,
     _state,
+    check_ai_move_landed,
+    deliver_decision,
+    restore_screen_record,
     sync_transcribing,
 )
 from auto_presenter.tracker.types import BeliefState
@@ -935,6 +936,7 @@ async def _start_audio_session(
             await asyncio.to_thread(backend.warm)
         except Exception as exc:
             log.warning("mlx-whisper warm failed (first live pass will retry): %s", exc)
+        backend = await _maybe_qwen_backend(backend, msg.tunables or _state.tunables)
     elif msg.backend == "groq":
         api_key = get_instruction_api_key("groq")
         if not api_key:
@@ -1455,6 +1457,74 @@ def _session_state_handler(learning, setlist_id: str | None = None, generation: 
     return on_state
 
 
+_QWEN_LYRICS: dict[str, str] | None = None
+
+
+def _qwen_follow_song(matcher: Any, session: Any) -> None:
+    """Trial: give a Qwen session the lyrics of the song the tracker is on, as
+    its context prompt. Lyrics come from a JSON map (song id -> text) named by
+    AUTO_PRESENTER_QWEN_LYRICS; nothing happens without it."""
+    global _QWEN_LYRICS
+    path = os.environ.get("AUTO_PRESENTER_QWEN_LYRICS")
+    backend = getattr(session, "_backend", None)
+    if not path or backend is None or not hasattr(backend, "context"):
+        return
+    if _QWEN_LYRICS is None:
+        _QWEN_LYRICS = json.loads(Path(path).read_text())
+    item = matcher.setlist.item(getattr(matcher, "current_item_idx", -1))
+    text = _QWEN_LYRICS.get(item.song_id, "") if item is not None else ""
+    near = os.environ.get("AUTO_PRESENTER_QWEN_LYRICS_NEAR")
+    belief = getattr(matcher, "belief", None)
+    if text and near and belief is not None and item is not None:
+        before, after = (int(x) for x in near.split(","))
+        top = belief.top_hypothesis[1]
+        slide = item.slides[top] if 0 <= top < len(item.slides) else None
+        text = _near_lines(text, slide.words if slide is not None else (), before, after)
+    backend.context = text
+
+
+def _near_lines(text: str, slide_words: tuple[str, ...], before: int, after: int) -> str:
+    """Trial: the lines of `text` around where `slide_words` start."""
+    def norm(w: str) -> str:
+        return "".join(c for c in w.lower() if c.isalnum())
+
+    lines = [ln for ln in text.splitlines() if ln.strip()]
+    want = [norm(w) for w in slide_words if norm(w)][:4]
+    if not lines or not want:
+        return text
+    best, at = -1, 0
+    for i, ln in enumerate(lines):
+        got = [norm(w) for w in ln.split() if norm(w)][: len(want)]
+        hit = sum(a == b for a, b in zip(got, want, strict=False))
+        if hit > best:
+            best, at = hit, i
+    return "\n".join(lines[max(0, at - before) : at + after + 1])
+
+
+async def _maybe_qwen_backend(
+    whisper: MLXWhisperBackend, tunables: ParticleFilterTunables | None
+) -> ASRBackend:
+    """Qwen3-ASR streaming in place of Whisper's transcription, when the
+    `asr_qwen_streaming` tunable asks for it (off by default). Whisper stays
+    loaded for the follower. Any failure leaves the session on Whisper: the
+    service never waits on an experiment."""
+    if tunables is None or not tunables.asr_qwen_streaming:
+        return whisper
+    from auto_presenter.asr.qwen_backend import QwenStreamingBackend
+
+    if not QwenStreamingBackend.is_available():
+        log.warning("asr_qwen_streaming is on but mlx-qwen3-asr isn't installed; using Whisper")
+        return whisper
+    qwen = QwenStreamingBackend(whisper)
+    try:
+        await asyncio.to_thread(qwen.warm)
+    except Exception:
+        log.exception("Qwen3-ASR failed to load; using Whisper")
+        return whisper
+    log.info("speech: Qwen3-ASR 0.6B streaming (follower scores with %s)", whisper.name())
+    return qwen
+
+
 def _follow_readings(tunables: ParticleFilterTunables | None) -> bool:
     """Whether to follow a passage read aloud this session.
 
@@ -1785,6 +1855,7 @@ def _make_transcript_handler(
         except Exception:  # pragma: no cover - defensive
             log.exception("matcher.update raised; dropping event")
             return
+        _qwen_follow_song(matcher, session)
         # Reporting and side features. None may abort the decision (each is
         # guarded: an optional feature failing used to skip
         # `director.on_decision` and drop a real slide change), and none may

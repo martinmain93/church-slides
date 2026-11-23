@@ -3,10 +3,10 @@
 Two callers, one ranking:
 
   * Spontaneous singing — the band starts a chorus that was never planned.
-    The watcher waits until we are still producing sung words, match
-    confidence on the setlist has collapsed, and (when the chord analyser
-    is on) harmony is present. Then it queries the fingerprint index and
-    imports a clear winner.
+    The watcher keeps asking the fingerprint index, with the setlist's own
+    slides in the contest, and imports a library song that keeps winning
+    clearly while we hear singing (and, when the chord analyser is on,
+    harmony).
   * Spoken `search_library` — "let's bring up Agnus Dei". Title-first,
     lyrics as a fallback, same clear-winner bar.
 
@@ -24,9 +24,11 @@ from typing import Literal
 from auto_presenter.index.fingerprint import (
     CatalogSong,
     FingerprintIndex,
+    fingerprints_from_words,
     pick_clear_winner,
 )
 from auto_presenter.index.library import build_index
+from auto_presenter.index.phonetic import normalize
 from auto_presenter.index.types import IndexedSetlist
 from auto_presenter.protocol import SetlistContent, SetlistItemContent
 
@@ -62,25 +64,43 @@ class ImportSong:
 class LibrarySearchConfig:
     min_score: float = 0.55
     min_gap: float = 0.12
-    #: Spontaneous (unprompted) imports need a clearer winner than a spoken
-    #: request, which already says the operator wants a song. Raised
-    #: 2026-09-28 with the rest of this block after background conversation
-    #: moved the screen in live use; the one genuine spontaneous import
-    #: measured scored 0.84 against a 0.68 runner-up, so it still passes.
+    #: `search_lyrics(reason="spontaneous")` needs a clearer winner than a
+    #: spoken request. The watcher no longer calls it (it ranks by votes).
     spontaneous_min_score: float = 0.65
-    #: How long the setlist match has to stay collapsed before we search.
-    min_lost_seconds: float = 8.0
-    max_display_marginal: float = 0.18
-    #: Enough words that a fingerprint query is about a line, not a shout.
-    min_words: int = 12
-    query_window_words: int = 20
-    #: Smoothed talking score must stay below this — we want singing, not a
-    #: sermon that also fails to match the setlist. Lowered from 0.55 on
-    #: 2026-09-28. Sung events run median 0.03 / p95 0.41, and the score
-    #: rises when the setlist match is lost (low evidence is one of its two
-    #: terms) — exactly when this watcher runs — so going much lower than
-    #: this risks refusing a genuinely sung off-setlist song.
-    max_talking_score: float = 0.45
+    #: Spontaneous recovery: how often to ask the library, and over how much
+    #: of what was just heard.
+    check_every_seconds: float = 2.0
+    window_seconds: float = 12.0
+    #: Content words (3+ letters) in the window before a check is worth it.
+    min_words: int = 8
+    #: Query fingerprints the winning song must share (over all its slides)...
+    min_votes: int = 4
+    #: ...spread over at least this many different words. A Whisper loop
+    #: ("hi it's hi it's ...") repeats one pair, and a lyric that repeats the
+    #: same word matches it; measured 2026-11-20 on a meeting recording.
+    min_distinct_words: int = 4
+    #: ...as at least this share of the query's pairs. Chance wins on talk
+    #: hold 6-9% of them, wrong-song wins on singing 14-15%, genuine ones
+    #: mostly 22-100% (2026-11-20 probe and speech clips).
+    min_share: float = 0.2
+    #: ...and how many times more than any other song, setlist included.
+    vote_ratio: float = 2.0
+    #: Consecutive winning checks for the same song, at least this far apart
+    #: from first to last, before it goes on screen.
+    confirm_checks: int = 2
+    confirm_span_seconds: float = 3.0
+    #: Two songs sharing this share of the smaller one's word pairs are the
+    #: same song — the library holds 53 such pairs ("Song", "Song (2)",
+    #: "Song - Artist") — and count as one. If any of them is in the setlist,
+    #: the setlist song is being sung. Judged on whole songs, not on the
+    #: query: a library copy can hold a bridge tonight's copy leaves out.
+    same_song: float = 0.5
+    #: Smoothed talking score at or above which no check counts. Not the
+    #: 0.45 of the old watcher: the score rises when the setlist match is
+    #: lost (low evidence is one of its terms), which is exactly when an
+    #: off-setlist song is being sung, and at 0.45 it held recovery back by
+    #: up to 100 s. Sung events run p95 0.41 / p99 0.67 (2026-09-28).
+    max_talking_score: float = 0.6
     cooldown_seconds: float = 20.0
     #: Chord evidence is required only when the analyser has been producing
     #: it. Rooms with the music panel off still recover from lyrics.
@@ -89,26 +109,49 @@ class LibrarySearchConfig:
 
 @dataclass
 class OffSetlistWatcher:
-    """Decides when a lost, still-singing performance should search the library."""
+    """Notices a song the band is singing that is not in tonight's set.
+
+    It asks the library directly. Every couple of seconds of sound, the last
+    few seconds of words are fingerprinted and matched against every library
+    song *and* every setlist item. A library song that holds clearly more of
+    those word pairs than anything else — the setlist included — and keeps
+    winning for a few seconds is imported.
+
+    It used to wait for the tracker to look lost (`display_marginal` under
+    0.18 for 8 s) before searching. That never happened on real recordings:
+    the marginal is conditional on the top song, so inside the wrong song it
+    stays above about one over its slide count (2026-11-20, 7 church
+    recordings with the sung song taken out of the setlist: refused on
+    93-100% of events, no import in any). Putting the setlist in the contest
+    answers the question that gate stood in for — "is this a setlist song?" —
+    from the words themselves.
+    """
 
     index: FingerprintIndex
     config: LibrarySearchConfig = field(default_factory=LibrarySearchConfig)
 
-    _lost_since: float | None = field(default=None, init=False)
     _recent: list[tuple[float, str]] = field(default_factory=list, init=False)
+    _last_check: float = field(default=-1e9, init=False)
+    _wins: list[tuple[float, str]] = field(default_factory=list, init=False)
     _cooldown_until: float = field(default=0.0, init=False)
+    _setlist_key: object = field(default=None, init=False)
+    _setlist_index: FingerprintIndex | None = field(default=None, init=False)
+    _fps_cache: dict[tuple[str, int], frozenset] = field(default_factory=dict, init=False)
 
     def reset(self) -> None:
-        self._lost_since = None
         self._recent.clear()
+        self._last_check = -1e9
+        self._wins.clear()
         self._cooldown_until = 0.0
+        self._setlist_key = None
+        self._setlist_index = None
+        self._fps_cache.clear()
 
     def observe(
         self,
         *,
         words: Sequence[str],
         t_seconds: float,
-        display_marginal: float,
         talking_score: float,
         silent: bool,
         setlist: IndexedSetlist,
@@ -116,36 +159,129 @@ class OffSetlistWatcher:
         chord_t: float | None,
         chords_enabled: bool,
     ) -> ImportSong | None:
+        cfg = self.config
         self._recent.extend((t_seconds, w) for w in words)
-        if len(self._recent) > 80:
-            self._recent = self._recent[-80:]
+        self._recent = [(t, w) for t, w in self._recent if t_seconds - t <= cfg.window_seconds]
 
-        if silent or talking_score >= self.config.max_talking_score:
-            self._lost_since = None
-            return None
-        if display_marginal > self.config.max_display_marginal:
-            self._lost_since = None
-            return None
-        if self._lost_since is None:
-            self._lost_since = t_seconds
-            return None
-        if t_seconds - self._lost_since < self.config.min_lost_seconds:
+        if silent or t_seconds - self._last_check < cfg.check_every_seconds:
             return None
         if t_seconds < self._cooldown_until:
             return None
+        if talking_score >= cfg.max_talking_score:
+            self._wins.clear()
+            return None
         if not self._hearing_music(chords_enabled, chord, chord_t, t_seconds):
             return None
-
-        query = [w for _t, w in self._recent[-self.config.query_window_words :]]
-        if len(query) < self.config.min_words:
+        query = [w for _t, w in self._recent]
+        if sum(1 for w in query if len(normalize(w)) >= 3) < cfg.min_words:
             return None
+        self._last_check = t_seconds
 
-        result = search_lyrics(
-            self.index, query, setlist=setlist, config=self.config, reason="spontaneous"
+        winner = self._contest(query, setlist)
+        if winner is None:
+            self._wins.clear()
+            return None
+        song_id, slide_idx, votes, rival, n_fps = winner
+        if self._wins and self._wins[-1][1] != song_id:
+            self._wins.clear()
+        self._wins.append((t_seconds, song_id))
+        if len(self._wins) < cfg.confirm_checks:
+            return None
+        if t_seconds - self._wins[0][0] < cfg.confirm_span_seconds:
+            return None
+        self._wins.clear()
+        self._cooldown_until = t_seconds + cfg.cooldown_seconds
+        return _to_import(
+            self.index, song_id, setlist, section_key="", slide_idx=slide_idx,
+            query=" ".join(query), score=votes / n_fps, runner_up=rival / n_fps,
+            reason="spontaneous",
         )
-        self._cooldown_until = t_seconds + self.config.cooldown_seconds
-        self._lost_since = None
-        return result
+
+    def _contest(
+        self, query: Sequence[str], setlist: IndexedSetlist
+    ) -> tuple[str, int, int, int, int] | None:
+        """(song, slide, its votes, best rival's votes, query fingerprints) for
+        a clear off-setlist winner, else None."""
+        cfg = self.config
+        fps = frozenset(fp for fp, _slot in fingerprints_from_words(query))
+        if not fps:
+            return None
+        # Per song, every query pair any of its slides holds. Pooled over the
+        # song, not its best slide: twelve seconds of singing often spans two
+        # slides, and the same lines split into smaller slides (tonight's copy
+        # of a song vs the library's) must not look like a weaker match. That
+        # made a library duplicate outvote the setlist copy being sung (two
+        # church recordings, 2026-11-20).
+        pooled: dict[str, set] = {}
+        slide_of: dict[str, tuple[int, int]] = {}
+
+        def take(matches, prefix=""):
+            for (sid, slide_idx), m in matches.items():
+                sid = sid.removeprefix(prefix)
+                pooled.setdefault(sid, set()).update(m)
+                if not prefix and len(m) > slide_of.get(sid, (0, -1))[1]:
+                    slide_of[sid] = (slide_idx, len(m))
+
+        take(self.index.slide_matches(fps))
+        # The setlist's own slides too: an item may not be a library song, or
+        # may have been edited for tonight.
+        take(self._setlist_fingerprints(setlist).slide_matches(fps), "set:")
+        if not pooled:
+            return None
+        in_set = {item.song_id for item in setlist.items}
+        ranked = sorted(pooled.items(), key=lambda kv: (-len(kv[1]), kv[0] not in in_set))
+        top, top_m = ranked[0]
+        group = {top} | {
+            sid for sid, _m in ranked[1:] if self._same_song(top, sid, setlist)
+        }
+        if group & in_set:
+            return None
+        rival = max((len(m) for sid, m in ranked if sid not in group), default=0)
+        votes = len(top_m)
+        if votes < cfg.min_votes or votes < cfg.vote_ratio * rival:
+            return None
+        if votes < cfg.min_share * len(fps):
+            return None
+        if len({code for a, b, _k in top_m for code in (a, b)}) < cfg.min_distinct_words:
+            return None
+        if top not in self.index.songs:
+            return None
+        return top, slide_of.get(top, (0, 0))[0], votes, rival, len(fps)
+
+    def _same_song(self, a: str, b: str, setlist: IndexedSetlist) -> bool:
+        fa, fb = self._song_fps(a, setlist), self._song_fps(b, setlist)
+        if not fa or not fb:
+            return False
+        return len(fa & fb) / min(len(fa), len(fb)) >= self.config.same_song
+
+    def _song_fps(self, song_id: str, setlist: IndexedSetlist) -> frozenset:
+        """Every word pair in a song: tonight's copy and the library's."""
+        key = (song_id, id(setlist))
+        if key not in self._fps_cache:
+            fps: set = set()
+            set_index = self._setlist_fingerprints(setlist)
+            for idx, sid in ((self.index, song_id), (set_index, "set:" + song_id)):
+                song = idx.songs.get(sid)
+                for words in song.slides if song else ():
+                    fps.update(fp for fp, _slot in fingerprints_from_words(words))
+            if len(self._fps_cache) > 2000:
+                self._fps_cache.clear()
+            self._fps_cache[key] = frozenset(fps)
+        return self._fps_cache[key]
+
+    def _setlist_fingerprints(self, setlist: IndexedSetlist) -> FingerprintIndex:
+        if self._setlist_key is not setlist or self._setlist_index is None:
+            self._setlist_key = setlist
+            self._setlist_index = FingerprintIndex.from_songs(
+                CatalogSong(
+                    song_id="set:" + item.song_id,
+                    title=item.title,
+                    slides=tuple(slide.words for slide in item.slides),
+                    slide_sections=tuple(slide.section_key for slide in item.slides),
+                )
+                for item in setlist.items
+            )
+        return self._setlist_index
 
     def _hearing_music(
         self,

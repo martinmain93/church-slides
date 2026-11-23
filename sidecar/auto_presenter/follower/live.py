@@ -377,12 +377,18 @@ class LiveFollowers:
 
     # ------------------------------------------------------------ next-line check
 
-    def start_next_line(self, encode, head: next_line.PhoneHead) -> None:
-        """Run the next-line check for every followed song: `encode` is
-        Whisper's encoder (`next_line.mlx_encoder`), `head` the phone model."""
+    def start_next_line(
+        self,
+        encode,
+        head: next_line.PhoneHead,
+        tuning: next_line.Tuning = next_line.WHISPER_TUNING,
+    ) -> None:
+        """Run the next-line check for every followed song: `encode` is the
+        encoder `head` was trained on (`next_line.mlx_encoder` for Whisper's,
+        `qwen_encoder` for Qwen3-ASR's), `tuning` its decision constants."""
         with self._lock:
             for sf in self.songs.values():
-                sf.check = next_line.NextLineCheck(sf.ref.slide_words)
+                sf.check = next_line.NextLineCheck(sf.ref.slide_words, tuning)
         self.listener = next_line.PhoneListener(encode, head, self._on_phones)
 
     def _on_phones(self, t_end: float, logits: np.ndarray) -> None:

@@ -11,6 +11,7 @@ PACKAGE = Path(__file__).resolve().parents[1] / "auto_presenter"
 GPL = {
     "cmudict": "auto_presenter.index.phonemic.load_cmudict (its data is BSD-style)",
     "av": "nothing: the engine passes Whisper arrays, never files",
+    "soynlp": "nothing: mlx-qwen3-asr's aligner needs it for Korean only; English never imports it",
 }
 
 

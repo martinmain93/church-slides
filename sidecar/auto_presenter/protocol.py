@@ -747,6 +747,12 @@ class ParticleFilterTunables(BaseModel):
     #: (`WhisperBackend._transcribe_short`, scripts/bench_whisper.py). Off
     #: until the real-time gold eval says the words are as good. Not shown.
     asr_short_context: bool = False
+    #: Apple silicon: transcribe with Qwen3-ASR 0.6B streamed incrementally
+    #: (`asr.qwen_backend`) instead of Whisper small.en's sliding window. The
+    #: follower still scores with Whisper. Needs the sidecar's `qwen` extra;
+    #: without it the session runs on Whisper. Off until the real-time gold
+    #: eval says it is better (docs/research/QWEN3_ASR_IMPROVEMENTS.md). Not shown.
+    asr_qwen_streaming: bool = False
     #: Let a key or tempo change in the music (`music.change_watch`) lower the
     #: bar for a song change the words propose. The kill switch, like
     #: `score_follower`; not shown in the Tunables panel.

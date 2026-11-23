@@ -78,6 +78,9 @@ fast = [
 mlx = [
     { name = "mlx-whisper" },
 ]
+qwen = [
+    { name = "mlx-qwen3-asr" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -95,6 +98,7 @@ requires-dist = [
     { name = "cryptography", marker = "platform_machine == 'x86_64' and sys_platform == 'darwin'", specifier = "<49" },
     { name = "faster-whisper", specifier = ">=1.2.1" },
     { name = "metaphone", specifier = ">=0.6" },
+    { name = "mlx-qwen3-asr", marker = "extra == 'qwen'", specifier = ">=0.4.4" },
     { name = "mlx-whisper", marker = "extra == 'mlx'", specifier = ">=0.4" },
     { name = "numpy", specifier = ">=2.4.4" },
     { name = "pdfminer-six", specifier = ">=20250506" },
@@ -992,6 +996,21 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/f7/ab/ba1952908c5d2a5070cf1cfbfea0161c4751ea62299e2776819810917483/mlx_metal-0.32.2-py3-none-macosx_14_0_arm64.whl", hash = "sha256:3825fff379dbc107dd3413e564a06caeaa24819910ec49c0439e454c06a1b9b8", size = 42516623 },
     { url = "https://files.pythonhosted.org/packages/79/ec/34f37376e26d537fadffb99af3a760d6545e37f5e1a30a552baadf237fc5/mlx_metal-0.32.2-py3-none-macosx_15_0_arm64.whl", hash = "sha256:55a369250d220b2cf10213a87a2ac1b1a420608c5b35b1df4e7147ac8e32f121", size = 42512323 },
     { url = "https://files.pythonhosted.org/packages/dd/cd/4e50bf325100e7165e13d025f264362bf0009196269f9eaf87f2c6e738a2/mlx_metal-0.32.2-py3-none-macosx_26_0_arm64.whl", hash = "sha256:e6abeac9ac5265830c9c1541b6f96e9be37a85c2446763a46ad466c63a3837ab", size = 64367860 },
+]
+
+[[package]]
+name = "mlx-qwen3-asr"
+version = "0.4.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "huggingface-hub" },
+    { name = "mlx" },
+    { name = "numpy" },
+    { name = "regex" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/33/43/e22f816218dafba76c3c5b58ef5a685e2c418368cccaa690f6804ca9cfc7/mlx_qwen3_asr-0.4.4.tar.gz", hash = "sha256:1431a900bd9e7c0ed5f0c7a021424bedb28fbb81dda1133685ba27d88bba39ff", size = 283264 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/52/34/739a65c4ce4c5de51e53a943fe75d8702a6259286cedef8f8eb7356e42d4/mlx_qwen3_asr-0.4.4-py3-none-any.whl", hash = "sha256:37e7db641c93e7eff9880af856d7492800e5559006671b5fa837184166d35630", size = 182115 },
 ]
 
 [[package]]
