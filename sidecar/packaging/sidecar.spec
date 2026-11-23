@@ -36,14 +36,14 @@ def _ships(module: str) -> bool:
 # scripts/build_sidecar.py, which sets SIDECAR_WITH_MLX). Everywhere else it's
 # left out, as is `sherpa_onnx`, which ships its own runtime (see pyproject).
 WITH_MLX = os.environ.get("SIDECAR_WITH_MLX") == "1"
-QWEN_UNUSED = {"cli", "server", "diarization", "__main__"}
+QWEN_UNUSED = {"cli", "server", "__main__"}
 EXCLUDES = [
     "cmudict",  # GPL-3 wrapper; its data ships as auto_presenter/index/data
     *([] if WITH_MLX else ["mlx", "mlx_whisper", "mlx_qwen3_asr"]),
-    # mlx_qwen3_asr's command line, web server and speaker diarization: unused
+    # mlx_qwen3_asr's command line and web server: unused (its diarization
+    # module is imported by the package itself; pyannote only lazily)
     "mlx_qwen3_asr.cli",
     "mlx_qwen3_asr.server",
-    "mlx_qwen3_asr.diarization",
     "mlx_whisper.torch_whisper",  # the one module that imports torch; unused
     "llvmlite",  # real numba's compiler; stubs/numba replaces numba
     "sherpa_onnx",
