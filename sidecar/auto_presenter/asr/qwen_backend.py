@@ -72,6 +72,11 @@ QWEN_REVISION = "5eb144179a02acc5e5ba31e748d22b0cf3e303b0"
 #: The download, in MiB (model.safetensors is 1,876,091,704 bytes; the
 #: tokenizer and configs add about 5 MB).
 QWEN_DOWNLOAD_MB = 1795
+#: The loaded model, by path: one per process, shared by every session, as
+#: the session Whisper is (`server_state.whisper_backend`). The model holds
+#: no session state (each stream has its own). Loaded per session, it grew
+#: the engine about 1.5 GB a session restart in the build's soak.
+_LOADED: dict[str, Any] = {}
 ALIGNER_REPO = "Qwen/Qwen3-ForcedAligner-0.6B"
 
 #: Steps of new audio between decodes. 0.5 s was worse (WER 0.448) and fell
@@ -439,7 +444,12 @@ class QwenStreamingBackend:
                 _install_attention_capture()
             with GPU_LOCK:
                 self._model_path = local_snapshot(QWEN_REPO, QWEN_REVISION)
-                self._model, _ = load_model(self._model_path)
+                model = _LOADED.get(self._model_path)
+                if model is None:
+                    model, _ = load_model(self._model_path)
+                    _LOADED.clear()
+                    _LOADED[self._model_path] = model
+                self._model = model
                 if not ATTN_TIMES:
                     aligner = ForcedAligner(model_path=local_snapshot(ALIGNER_REPO))
                     aligner._ensure_loaded()
