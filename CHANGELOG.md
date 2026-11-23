@@ -10,6 +10,8 @@ refuses to release a version that has no entry here.
 
 ## Unreleased
 
+## 0.2.4 — 23 November 2026
+
 - Fixed: **a song the band starts that isn't in the setlist is found again.** In Auto, the app now recognises it from your library, usually within a minute of singing, and adds it to the setlist. Before, this almost never happened.
 
 ## 0.2.3 — 18 November 2026
