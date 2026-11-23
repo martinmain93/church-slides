@@ -353,6 +353,10 @@ def sync_transcribing() -> None:
 
 #: How long an AI move may go unreported before it counts as declined.
 AI_MOVE_ECHO_S = 1.5
+#: The same for a move to another song. With nobody at the laptop, the app
+#: holds one for the band leader's OK for up to 3 s (`jumpHold.ts`), so the
+#: engine has to wait that long before counting it declined.
+AI_MOVE_ECHO_SONG_S = 4.5
 
 
 def restore_screen_record() -> None:
@@ -395,7 +399,9 @@ def check_ai_move_landed() -> None:
         return
     import time
 
-    if time.monotonic() - pending[2] < AI_MOVE_ECHO_S:
+    shown = _state.last_slide
+    other_song = shown is None or shown[0] != pending[0]
+    if time.monotonic() - pending[2] < (AI_MOVE_ECHO_SONG_S if other_song else AI_MOVE_ECHO_S):
         return
     _state.ai_move_pending = None
     if _state.last_slide != pending[:2]:

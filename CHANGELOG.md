@@ -10,6 +10,8 @@ refuses to release a version that has no entry here.
 
 ## Unreleased
 
+- New: **the worship leader can stop a surprise song jump.** With nobody on the operator view, when the AI goes to a different song (not just the next one at the end of a song), the leader's screen shows "Going to …" and the words it heard for 3 seconds, with Go now and Stop. If nobody answers, it goes.
+
 ## 0.2.4 — 23 November 2026
 
 - Fixed: **a song the band starts that isn't in the setlist is found again.** In Auto, the app now recognises it from your library, usually within a minute of singing, and adds it to the setlist. Before, this almost never happened.

@@ -48,6 +48,8 @@ pub const PREFERRED_PORT: u16 = 7777;
 pub const COMMAND_EVENT: &str = "band://command";
 /// Event carrying the number of connected band devices.
 pub const CLIENTS_EVENT: &str = "band://clients";
+/// Event carrying the number of devices with the leader controls unlocked.
+pub const LEADERS_EVENT: &str = "band://leaders";
 
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct BandInfo {
@@ -57,6 +59,8 @@ pub struct BandInfo {
     /// Required to use the leader controls. Musicians' view is open.
     pub pin: String,
     pub clients: usize,
+    /// Devices with the leader controls unlocked.
+    pub leaders: usize,
 }
 
 struct Shared {
@@ -69,8 +73,12 @@ struct Shared {
     /// room is reachable. A device that fell back here from the hosted room
     /// goes back to it when this says so.
     hosted: Mutex<Option<Value>>,
+    /// `{"type":"jump_hold","data":…}`: an AI jump to another song waiting
+    /// for the leader. Kept so a leader who reconnects mid-countdown sees it.
+    jump_hold: Mutex<Option<Value>>,
     tx: broadcast::Sender<String>,
     clients: AtomicUsize,
+    leaders: AtomicUsize,
     /// Wrong leader PINs per device address (`PinGuard`).
     pins: Mutex<PinGuard>,
 }
@@ -183,6 +191,7 @@ impl BandServer {
     pub fn info(&self) -> Option<BandInfo> {
         self.inner.lock().unwrap().as_ref().map(|(shared, info)| BandInfo {
             clients: shared.clients.load(Ordering::Relaxed),
+            leaders: shared.leaders.load(Ordering::Relaxed),
             urls: current_urls(info.port),
             ..info.clone()
         })
@@ -213,11 +222,13 @@ impl BandServer {
             setlist: Mutex::new(None),
             position: Mutex::new(None),
             hosted: Mutex::new(None),
+            jump_hold: Mutex::new(None),
             tx,
             clients: AtomicUsize::new(0),
+            leaders: AtomicUsize::new(0),
             pins: Mutex::new(PinGuard::default()),
         });
-        let info = BandInfo { port, urls: current_urls(port), pin: shared.pin.clone(), clients: 0 };
+        let info = BandInfo { port, urls: current_urls(port), pin: shared.pin.clone(), clients: 0, leaders: 0 };
 
         let router = Router::new()
             .route("/", get(|| async { Redirect::temporary("/band") }))
@@ -264,6 +275,13 @@ impl BandServer {
                 let _ = shared.tx.send(msg.to_string());
                 return Ok(());
             }
+            // Null when nothing waits: sent so the bar goes, but not kept.
+            "jump_hold" => {
+                let msg = json!({ "type": "jump_hold", "data": payload });
+                *shared.jump_hold.lock().unwrap() = if payload.is_null() { None } else { Some(msg.clone()) };
+                let _ = shared.tx.send(msg.to_string());
+                return Ok(());
+            }
             other => return Err(format!("unknown band snapshot kind {other:?}")),
         };
         let msg = json!({ "type": kind, "data": payload });
@@ -278,6 +296,7 @@ impl BandServer {
         let Some((shared, _)) = guard.as_ref() else { return };
         *shared.setlist.lock().unwrap() = None;
         *shared.position.lock().unwrap() = None;
+        *shared.jump_hold.lock().unwrap() = None;
         let _ = shared.tx.send(json!({ "type": "idle" }).to_string());
     }
 }
@@ -356,6 +375,19 @@ fn emit_clients(shared: &Shared) {
     let _ = shared.app.emit(CLIENTS_EVENT, shared.clients.load(Ordering::Relaxed));
 }
 
+/// Count this device in or out of the unlocked leaders, and tell the app.
+fn set_leader(shared: &Shared, was: bool, now: bool) {
+    if was == now {
+        return;
+    }
+    if now {
+        shared.leaders.fetch_add(1, Ordering::Relaxed);
+    } else {
+        shared.leaders.fetch_sub(1, Ordering::Relaxed);
+    }
+    let _ = shared.app.emit(LEADERS_EVENT, shared.leaders.load(Ordering::Relaxed));
+}
+
 async fn client_session(mut socket: WebSocket, shared: Arc<Shared>, from: IpAddr) {
     shared.clients.fetch_add(1, Ordering::Relaxed);
     emit_clients(&shared);
@@ -372,7 +404,8 @@ async fn client_session(mut socket: WebSocket, shared: Arc<Shared>, from: IpAddr
         ok = socket.send(Message::Text(json!({ "type": "idle" }).to_string())).await.is_ok();
     }
     let hosted = shared.hosted.lock().unwrap().clone();
-    for msg in snapshot.into_iter().chain(hosted) {
+    let held = shared.jump_hold.lock().unwrap().clone();
+    for msg in snapshot.into_iter().chain(hosted).chain(held) {
         if !ok {
             break;
         }
@@ -397,7 +430,9 @@ async fn client_session(mut socket: WebSocket, shared: Arc<Shared>, from: IpAddr
             },
             incoming = socket.recv() => match incoming {
                 Some(Ok(Message::Text(text))) => {
+                    let was_leader = leader;
                     let reply = handle_client_message(&shared, &text, &mut leader, from);
+                    set_leader(&shared, was_leader, leader);
                     if let Some(r) = reply {
                         ok = socket.send(Message::Text(r.to_string())).await.is_ok();
                     }
@@ -408,6 +443,7 @@ async fn client_session(mut socket: WebSocket, shared: Arc<Shared>, from: IpAddr
         }
     }
 
+    set_leader(&shared, leader, false);
     shared.clients.fetch_sub(1, Ordering::Relaxed);
     emit_clients(&shared);
 }

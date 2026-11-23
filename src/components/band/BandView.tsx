@@ -13,6 +13,7 @@
  * and come from the operator.
  */
 
+import { JumpHoldBar } from "@/components/band/JumpHoldBar";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, Monitor, MonitorOff } from "lucide-react";
 
@@ -405,6 +406,12 @@ export function BandView({ member }: { member?: MemberView } = {}) {
           <Waiting status={conn.status} idle={false} hosted={hosted} />
         )}
       </main>
+      {leaderReady && conn.jumpHold && (
+        <JumpHoldBar
+          hold={conn.jumpHold}
+          onAnswer={(go) => conn.send({ kind: "jump_answer", id: conn.jumpHold!.id, go })}
+        />
+      )}
       {conn.lastError && (
         <div className="border-t border-destructive bg-destructive/20 px-4 py-2 text-sm">{conn.lastError}</div>
       )}
