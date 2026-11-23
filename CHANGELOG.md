@@ -13,6 +13,7 @@ refuses to release a version that has no entry here.
 - Changed: **the AI hears the band better and sooner** on Macs with Apple silicon. It uses a newer speech engine: on our test services the wrong slide was up a little less often, and 179 of 225 slide changes landed on time, up from 169. Its speech model is a bigger one-time download, about 2.2 GB.
 - Changed: **live AI now needs a Mac with Apple silicon (M1 or newer) on macOS 14 or later.** On other computers, including Intel Macs and Windows, the AI is off and you present by hand, as always. The app says so before offering any download.
 - Removed: **Groq's online speech** in Settings. Its free tier couldn't keep up with a service. Spoken requests still use a Groq key for now.
+- Changed: the [terms](https://churchslides.app/terms.html) now say plainly that the app's own source code is under the MIT licence, which they don't limit, and the [privacy page](https://churchslides.app/privacy.html) that a service's live audio stays on your computer.
 - New: **the worship leader can stop a surprise song jump.** With nobody on the operator view, when the AI goes to a different song (not just the next one at the end of a song), the leader's screen shows "Going to …" and the words it heard for 3 seconds, with Go now and Stop. If nobody answers, it goes.
 
 ## 0.2.4 — 23 November 2026
