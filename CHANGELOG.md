@@ -10,6 +10,8 @@ refuses to release a version that has no entry here.
 
 ## Unreleased
 
+## 0.3.0 — 23 November 2026
+
 - Changed: **the AI hears the band better and sooner** on Macs with Apple silicon. It uses a newer speech engine: on our test services the wrong slide was up a little less often, and 179 of 225 slide changes landed on time, up from 169. Its speech model is a bigger one-time download, about 2.2 GB.
 - Changed: **live AI now needs a Mac with Apple silicon (M1 or newer) on macOS 14 or later.** On other computers, including Intel Macs and Windows, the AI is off and you present by hand, as always. The app says so before offering any download.
 - Removed: **Groq's online speech** in Settings. Its free tier couldn't keep up with a service. Spoken requests still use a Groq key for now.
