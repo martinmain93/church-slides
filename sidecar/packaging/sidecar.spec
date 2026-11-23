@@ -36,9 +36,14 @@ def _ships(module: str) -> bool:
 # scripts/build_sidecar.py, which sets SIDECAR_WITH_MLX). Everywhere else it's
 # left out, as is `sherpa_onnx`, which ships its own runtime (see pyproject).
 WITH_MLX = os.environ.get("SIDECAR_WITH_MLX") == "1"
+QWEN_UNUSED = {"cli", "server", "diarization", "__main__"}
 EXCLUDES = [
     "cmudict",  # GPL-3 wrapper; its data ships as auto_presenter/index/data
-    *([] if WITH_MLX else ["mlx", "mlx_whisper"]),
+    *([] if WITH_MLX else ["mlx", "mlx_whisper", "mlx_qwen3_asr"]),
+    # mlx_qwen3_asr's command line, web server and speaker diarization: unused
+    "mlx_qwen3_asr.cli",
+    "mlx_qwen3_asr.server",
+    "mlx_qwen3_asr.diarization",
     "mlx_whisper.torch_whisper",  # the one module that imports torch; unused
     "llvmlite",  # real numba's compiler; stubs/numba replaces numba
     "sherpa_onnx",
@@ -91,6 +96,7 @@ hiddenimports = (
     + (
         [m for m in collect_submodules("mlx_whisper") if not m.endswith("torch_whisper")]
         + collect_submodules("mlx")
+        + [m for m in collect_submodules("mlx_qwen3_asr") if m.rsplit(".", 1)[-1] not in QWEN_UNUSED]
         + ["numba"]  # stubs/numba
         # scipy.signal (mlx_whisper's medfilt) reaches these by name at import
         + collect_submodules("scipy._external.array_api_compat")
@@ -111,9 +117,16 @@ datas = (
     # need their dist-info copied too.
     + copy_metadata("faster_whisper")
     + copy_metadata("tokenizers")
-    # MLX's Metal shaders (mlx.metallib) and mlx_whisper's mel filters and
-    # tokenizer files.
-    + (collect_data_files("mlx") + collect_data_files("mlx_whisper") if WITH_MLX else [])
+    # MLX's Metal shaders (mlx.metallib), mlx_whisper's mel filters and
+    # tokenizer files, and mlx_qwen3_asr's mel filters (not its Korean
+    # dictionary, which only its aligner's Korean word splitting reads).
+    + (
+        collect_data_files("mlx")
+        + collect_data_files("mlx_whisper")
+        + collect_data_files("mlx_qwen3_asr", includes=["assets/mel_filters.npz"])
+        if WITH_MLX
+        else []
+    )
 )
 
 # The chord model (BTC, MIT) and the library search model (e5-small-v2, MIT),
@@ -132,8 +145,8 @@ for required in (
     "chords/btc_chords.json",
     "search/model.onnx",
     "search/tokenizer.json",
-    # the next-line check's phone model: MLX builds only, the ones that run it
-    *(["next_line/next_line_head.npz"] if WITH_MLX else []),
+    # the next-line check's phone models: MLX builds only, the ones that run it
+    *(["next_line/next_line_head.npz", "next_line/next_line_head_qwen.npz"] if WITH_MLX else []),
 ):
     if not (Path(MODELS_DIR) / required).is_file():
         raise SystemExit(f"missing bundled model {required} in {MODELS_DIR}")

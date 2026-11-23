@@ -34,7 +34,7 @@ import {
   type AudioInputSource,
 } from "@/lib/audioInputPrefs";
 import { useModelRecommendation } from "@/lib/modelRecommendation";
-import { type AiAvailability, useAiAvailability } from "@/lib/aiAvailability";
+import { type AiAvailability, sizeText, useAiAvailability } from "@/lib/aiAvailability";
 import { useTranscriptStream } from "@/lib/transcriptStream";
 import { Button } from "@/components/ui/button";
 import { VuMeter } from "@/components/ui/VuMeter";
@@ -472,7 +472,7 @@ function modelNote(a: AiAvailability): string {
     case "needs_download":
     case "download_failed":
       return (
-        `The AI's speech model (about ${a.kind === "needs_download" ? `${a.mb} MB` : "a few hundred MB"}) ` +
+        `The AI's speech model (about ${a.kind === "needs_download" ? sizeText(a.mb) : "2 GB"}) ` +
         "downloads when you finish. It needs the internet this once; the home screen shows how far it's got."
       );
     case "downloading":
@@ -481,6 +481,8 @@ function modelNote(a: AiAvailability): string {
       return a.hosted
         ? "Speech is recognised online, so live AI needs the internet during the service."
         : "The speech model is already on this computer, so live AI works offline.";
+    case "too_slow":
+      return `${a.reason} Presenting by hand works as always.`;
     default:
       return "The speech model is picked for this computer automatically.";
   }

@@ -1418,7 +1418,7 @@ export const DEFAULT_PARTICLE_FILTER_TUNABLES: ParticleFilterTunables = {
   score_follower_cpu: false,
   assist_tier: false,
   asr_short_context: false,
-  asr_qwen_streaming: false,
+  asr_qwen_streaming: true,
   music_change_watch: true,
   song_openings_watch: true,
   openings_mid_song_nudge: 0.5,

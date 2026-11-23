@@ -27,21 +27,20 @@ describe("assessMachine", () => {
     expect(assessMachine(rec({ backend: "mlx", has_mps: true })).level).toBe("good");
   });
 
-  it("calls the processor path limited, and suggests macOS 14 on Apple silicon", () => {
+  it("on an older macOS, says updating to macOS 14 turns live AI on", () => {
     const mac = assessMachine(rec({ has_mps: true }));
-    expect(mac.level).toBe("limited");
+    expect(mac.level).toBe("weak");
     expect(mac.summary).toMatch(/macOS 14/);
-    expect(mac.summary).toMatch(/Groq/);
-    expect(assessMachine(rec({})).summary).not.toMatch(/macOS 14/);
+    expect(mac.summary).not.toMatch(/Groq/);
   });
 
-  it("calls few cores or little memory weak, and says which", () => {
-    const twoCores = assessMachine(rec({ cpu_count: 2, model_size: "tiny.en" }));
-    expect(twoCores.level).toBe("weak");
-    expect(twoCores.summary).toMatch(/2 processor cores/);
-    const lowMemory = assessMachine(rec({ total_ram_gb: 4 }));
-    expect(lowMemory.level).toBe("weak");
-    expect(lowMemory.summary).toMatch(/4 GB of memory/);
+  it("off Apple silicon, says live AI needs it, however fast the computer", () => {
+    for (const r of [rec({}), rec({ cpu_count: 16, total_ram_gb: 64 })]) {
+      const pc = assessMachine(r);
+      expect(pc.level).toBe("weak");
+      expect(pc.summary).toMatch(/Apple silicon/);
+      expect(pc.summary).not.toMatch(/Groq|macOS 14/);
+    }
   });
 });
 
@@ -102,15 +101,14 @@ describe("AIStatusPill on a slow computer", () => {
     vi.clearAllMocks();
   });
 
-  it("recommends online speech once, when the AI is switched on", async () => {
+  it("says once that live AI needs Apple silicon, when the AI is switched on", async () => {
     mockPower.mockReturnValue(assessMachine(rec({ cpu_count: 2 })));
     mockStatus.mockReturnValue({ mode: "off", state: "idle" });
     render(<ToastProvider><AIStatusPill /></ToastProvider>);
     await act(async () => {
       fireEvent.click(screen.getByTestId("ai-toggle"));
     });
-    expect(screen.getByText(/likely to fall behind/)).toBeTruthy();
-    expect(screen.getByText(/Settings → AI that follows the songs/)).toBeTruthy();
+    expect(screen.getByText(/needs a Mac with Apple silicon/)).toBeTruthy();
 
     // Off and on again: no second warning.
     cleanup();
@@ -118,10 +116,10 @@ describe("AIStatusPill on a slow computer", () => {
     await act(async () => {
       fireEvent.click(screen.getByTestId("ai-toggle"));
     });
-    expect(screen.queryByText(/likely to fall behind/)).toBeNull();
+    expect(screen.queryByText(/needs a Mac with Apple silicon/)).toBeNull();
   });
 
-  it("says nothing on a fast computer, or with online speech chosen", async () => {
+  it("says nothing on a fast computer, or before the engine has answered", async () => {
     mockStatus.mockReturnValue({ mode: "off", state: "idle" });
     for (const power of [assessMachine(rec({ backend: "mlx", has_mps: true })), null]) {
       mockPower.mockReturnValue(power);
@@ -129,7 +127,7 @@ describe("AIStatusPill on a slow computer", () => {
       await act(async () => {
         fireEvent.click(screen.getByTestId("ai-toggle"));
       });
-      expect(screen.queryByText(/Groq/)).toBeNull();
+      expect(screen.queryByText(/Apple silicon|Groq/)).toBeNull();
       cleanup();
     }
   });
@@ -158,8 +156,8 @@ describe("AIStatusPill on a slow computer", () => {
     expect(low).toMatch(/battery is very low \(4%\).*even on the charger/);
     expect(low).not.toMatch(/Groq/);
     expect(behindMessage({ ...base, batteryPercent: 4, onBattery: true })).toMatch(/Plug it in/);
-    expect(behindMessage({ ...base, batteryPercent: 60, onBattery: true })).toMatch(/Groq/);
-    expect(behindMessage({ ...base, batteryPercent: null })).toMatch(/Groq/);
+    expect(behindMessage({ ...base, batteryPercent: 60, onBattery: true })).toMatch(/busy apps/);
+    expect(behindMessage({ ...base, batteryPercent: null })).toMatch(/busy apps/);
   });
 
   it("says once when Groq turns requests away, on any computer", () => {

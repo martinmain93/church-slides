@@ -638,10 +638,18 @@ def model_packages(with_engine: bool, engine_arch: str = "") -> list[Package]:
                 url="https://github.com/snakers4/silero-vad",
             ),
         ]
-    if engine_arch in ("arm64", "aarch64"):  # bundled with the MLX engine only
+    if engine_arch in ("arm64", "aarch64"):  # the MLX engine only
         out.append(
             Package(
-                "model", "Next-line phone model", "", "Own work; trained on Free Music Archive audio",
+                "model", "Qwen3-ASR 0.6B speech model (Qwen)", "", "Apache-2.0",
+                texts=[read_text(NOTICES / "supplements" / "qwen3-asr.txt")],
+                notes=["Not in the installer: downloaded on first use. Apple-silicon engine only."],
+                url="https://huggingface.co/Qwen/Qwen3-ASR-0.6B",
+            )
+        )
+        out.append(
+            Package(
+                "model", "Next-line phone models", "", "Own work; trained on Free Music Archive audio",
                 texts=[read_text(NOTICES / "supplements" / "next-line-model.txt")],
                 notes=["Apple-silicon engine only."],
                 url="https://github.com/mdeff/fma",

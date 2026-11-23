@@ -40,9 +40,9 @@ way, follow the links into [done/](done/) and [research/](research/).
   for what's on screen. The engine only suggests moves, and the shell
   doesn't depend on it, so if the engine crashes or restarts the slides and
   band screens carry on.
-- **Everything runs locally.** Audio never leaves the computer unless the
-  church turns on a hosted feature (spoken requests and voice charting can
-  use Groq; see Settings → AI).
+- **Everything runs locally.** A service's audio never leaves the computer.
+  Spoken requests, chord suggestions and voice charting can use Groq, which
+  is deprecated (its free tier can't carry a church's use).
 - **The library lives in the shell.** The Rust side owns `library.db`. The
   engine only reads it (for off-setlist songs), and the MCP server opens it
   directly, while the app notices changes and refreshes (`library_watch.rs`).
@@ -73,7 +73,7 @@ microphone ─► capture ─► Whisper, sliding 6 s window ─► timed words
 | Stage | Code | Notes |
 | --- | --- | --- |
 | Capture | `audio/`, `pipeline/audio_session.py` | One capture thread fans frames out to the stages below. |
-| Speech | `asr/` | Whisper: MLX on Apple silicon, CTranslate2 (faster-whisper) elsewhere. A machine check (`asr/machine_check.py`) picks the model, or offers Assist only. |
+| Speech | `asr/` | Qwen3-ASR 0.6B streamed on the GPU (`asr/qwen_backend.py`), with Whisper small.en kept for the follower's lyric scorer and as the fallback. Apple silicon on macOS 14+ only: the machine check (`asr/machine_check.py`) says no live AI anywhere else. The CPU path (faster-whisper) is kept for research, and Groq's hosted speech is deprecated. |
 | Next-line check | `follower/next_line.py` | Listens for the first sounds of each likely next line, so the slide can change about a second after the line starts rather than waiting ~3 s for Whisper's words. Apple silicon only. |
 | Where are we | `tracker/forward.py` | A dense forward filter over every word position in the setlist, with repeats and jumps built into its transitions. Built by `decision/production.py`. |
 | Score follower | `follower/` | Follows a song's melody and chords against its lead sheet, or against what it learned from the slides alone. |
@@ -93,8 +93,9 @@ of these to the WebSocket.
 
 | Model | Used for | Where it comes from |
 | --- | --- | --- |
-| Whisper (base.en, small.en) | Speech | Downloaded on first use into the app's data folder |
-| Next-line phone model | Next-line check | Bundled; trained by this project, MIT ([release](https://github.com/martinmain93/church-slides-releases/releases/tag/models-next-line-ngru512x2)) |
+| Qwen3-ASR 0.6B | Speech | Downloaded on first use into the app's data folder, pinned revision (Apache 2.0) |
+| Whisper small.en (MLX) | Lyric scorer, speech fallback | Downloaded on first use with Qwen (about 2.2 GB together) |
+| Next-line phone models | Next-line check | Bundled; trained by this project, MIT: one on Qwen's audio ([release](https://github.com/martinmain93/church-slides-releases/releases/tag/models-next-line-qwen-gru512x2)), one on Whisper's ([release](https://github.com/martinmain93/church-slides-releases/releases/tag/models-next-line-ngru512x2)) |
 | BTC chord model | Chords and beats | Bundled (`scripts/setup_chord_model.py`) |
 | e5-small-v2 | Library search by meaning | Bundled (`scripts/setup_search_model.py`) |
 

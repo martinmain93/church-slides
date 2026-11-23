@@ -1,5 +1,9 @@
 """Suggest the next chord, or a whole phrase, and refuse what does not anchor.
 
+Deprecated (2026-11-23): Groq's free tier can't carry a church's use and
+paid tiers aren't available, so Groq integrations are on their way out.
+Its Groq calls stay until chord suggestions have another home.
+
 Editor-time only. One short call after a chord is placed — never during a
 service. The model may return a single next chord or, when it is sure, every
 chord in the next phrase (including a phrase that runs from one verse into

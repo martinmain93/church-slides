@@ -66,6 +66,12 @@ from auto_presenter.audio.types import SAMPLE_RATE, AudioFrame
 log = logging.getLogger(__name__)
 
 QWEN_REPO = "Qwen/Qwen3-ASR-0.6B"
+#: The weights measured in docs/research/QWEN3_ASR_IMPROVEMENTS.md, pinned so
+#: an upstream change can't reach a service unmeasured.
+QWEN_REVISION = "5eb144179a02acc5e5ba31e748d22b0cf3e303b0"
+#: The download, in MiB (model.safetensors is 1,876,091,704 bytes; the
+#: tokenizer and configs add about 5 MB).
+QWEN_DOWNLOAD_MB = 1795
 ALIGNER_REPO = "Qwen/Qwen3-ForcedAligner-0.6B"
 
 #: Steps of new audio between decodes. 0.5 s was worse (WER 0.448) and fell
@@ -432,7 +438,7 @@ class QwenStreamingBackend:
             if ATTN_TIMES:
                 _install_attention_capture()
             with GPU_LOCK:
-                self._model_path = local_snapshot(QWEN_REPO)
+                self._model_path = local_snapshot(QWEN_REPO, QWEN_REVISION)
                 self._model, _ = load_model(self._model_path)
                 if not ATTN_TIMES:
                     aligner = ForcedAligner(model_path=local_snapshot(ALIGNER_REPO))

@@ -143,7 +143,7 @@ def repo_for(model_size: str) -> str:
         ) from None
 
 
-def local_snapshot(repo: str) -> str:
+def local_snapshot(repo: str, revision: str | None = None) -> str:
     """The cached snapshot folder for `repo` if it's downloaded, else `repo`.
 
     Given a repo id, `mlx_whisper` calls `snapshot_download` on the first
@@ -156,7 +156,7 @@ def local_snapshot(repo: str) -> str:
     try:
         from huggingface_hub import snapshot_download
 
-        return snapshot_download(repo_id=repo, local_files_only=True)
+        return snapshot_download(repo_id=repo, revision=revision, local_files_only=True)
     except Exception:  # not cached (or no huggingface_hub): download on use
         return repo
 

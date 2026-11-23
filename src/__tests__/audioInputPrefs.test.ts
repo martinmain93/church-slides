@@ -64,14 +64,15 @@ describe("resolveLiveAsr", () => {
     expect(asr).toEqual({ backend: "whisper", model: CPU_PATH_MODEL });
   });
 
-  it("treats groq as explicit even without asr_chosen", async () => {
+  it("ignores a saved Groq choice: hosted speech is deprecated", async () => {
+    requestSidecar.mockResolvedValue({ backend: "mlx", model_size: "small.en" });
     const asr = await resolveLiveAsr({
       ...factory,
       asr_backend: "groq",
       asr_model: "whisper-large-v3-turbo",
+      asr_chosen: true,
     });
-    expect(asr.backend).toBe("groq");
-    expect(requestSidecar).not.toHaveBeenCalled();
+    expect(asr).toEqual({ backend: "mlx", model: "small.en" });
   });
 
   it("falls back to stored prefs when the sidecar is down", async () => {

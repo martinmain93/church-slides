@@ -937,7 +937,7 @@ async def _start_audio_session(
         except Exception as exc:
             log.warning("mlx-whisper warm failed (first live pass will retry): %s", exc)
         backend = await _maybe_qwen_backend(backend, msg.tunables or _state.tunables)
-    elif msg.backend == "groq":
+    elif msg.backend == "groq":  # deprecated (2026-11-23): the app no longer asks for it
         api_key = get_instruction_api_key("groq")
         if not api_key:
             await _send_error(
@@ -2327,14 +2327,11 @@ async def _handle_model_status(ws: ServerConnection, msg: ModelStatusRequest) ->
     from auto_presenter.follower import scorer_models
 
     hosted = msg.backend == "groq"
-    downloaded = (
-        False
+    downloaded, mb = (
+        (False, 0)
         if hosted
-        else await asyncio.to_thread(
-            _state.model_manager.is_downloaded, msg.model_size, msg.backend
-        )
+        else await asyncio.to_thread(_local_model_status, msg.model_size, msg.backend)
     )
-    mb = 0 if hosted or downloaded else download_size_mb(msg.model_size)
     if _scorer_with_speech_model(msg.backend):
         scorer_here = await asyncio.to_thread(scorer_models.is_downloaded)
         downloaded = downloaded and scorer_here
@@ -2352,6 +2349,43 @@ async def _handle_model_status(ws: ServerConnection, msg: ModelStatusRequest) ->
     )
 
 
+def _mlx_speech_parts(model_size: str) -> list[tuple[str, str, str | None, int]]:
+    """What "the speech model" is on Apple silicon, as (model-manager
+    backend, Hugging Face repo, pinned revision, MiB): Whisper small.en's MLX
+    weights (the follower's lyric scorer, and the fallback) and, where the
+    engine carries it, Qwen3-ASR 0.6B (the speech engine)."""
+    from auto_presenter.asr.mlx_backend import repo_for
+    from auto_presenter.asr.qwen_backend import (
+        QWEN_DOWNLOAD_MB,
+        QWEN_REPO,
+        QWEN_REVISION,
+        QwenStreamingBackend,
+    )
+
+    parts = [("mlx", repo_for(model_size), None, download_size_mb(model_size))]
+    if QwenStreamingBackend.is_available():
+        parts.append(("qwen", QWEN_REPO, QWEN_REVISION, QWEN_DOWNLOAD_MB))
+    return parts
+
+
+def _missing_mlx_parts(model_size: str) -> list[tuple[str, str, str | None, int]]:
+    return [
+        p
+        for p in _mlx_speech_parts(model_size)
+        if not _state.model_manager.is_downloaded(model_size, p[0])
+    ]
+
+
+def _local_model_status(model_size: str, backend: str) -> tuple[bool, int]:
+    """(on this computer, MiB still to download) for a local speech model."""
+    if backend == "mlx":
+        missing = _missing_mlx_parts(model_size)
+        return not missing, sum(p[3] for p in missing)
+    if _state.model_manager.is_downloaded(model_size, backend):
+        return True, 0
+    return False, download_size_mb(model_size)
+
+
 async def _download_mlx_model(model_size: str) -> None:
     """Fetch the MLX weights if they aren't on disk, with progress events.
 
@@ -2362,7 +2396,7 @@ async def _download_mlx_model(model_size: str) -> None:
     # On disk already: return without queueing behind another size's
     # download. Checked again under the lock, for a download of this size
     # that finishes while we wait.
-    if await asyncio.to_thread(_state.model_manager.is_downloaded, model_size, "mlx"):
+    if not await asyncio.to_thread(_missing_mlx_parts, model_size):
         return
     lock = _mlx_download_locks.setdefault(model_size, asyncio.Lock())
     async with lock:
@@ -2370,13 +2404,14 @@ async def _download_mlx_model(model_size: str) -> None:
 
 
 async def _download_mlx_model_locked(model_size: str) -> None:
-    if await asyncio.to_thread(_state.model_manager.is_downloaded, model_size, "mlx"):
+    parts = await asyncio.to_thread(_missing_mlx_parts, model_size)
+    if not parts:
         return
     from huggingface_hub import snapshot_download
 
-    from auto_presenter.asr.mlx_backend import repo_for
-
-    total = download_size_mb(model_size) * 1024 * 1024
+    # One bar for the parts still missing: each part's bytes continue from
+    # the ones before it, so the bar never runs backwards.
+    total = sum(p[3] for p in parts) * 1024 * 1024
 
     def event(state, detail="", done=0):
         return DownloadProgressEvent(
@@ -2390,19 +2425,25 @@ async def _download_mlx_model_locked(model_size: str) -> None:
     await _broadcast_model_progress(event("starting", "downloading model from Hugging Face"))
     loop = asyncio.get_running_loop()
 
-    def report(progress: DownloadProgressEvent) -> None:
-        asyncio.run_coroutine_threadsafe(_broadcast_model_progress(progress), loop)
+    offset = 0
+    for backend, repo, revision, mb in parts:
 
-    def download() -> None:
-        with _state.model_manager.watch_download(model_size, "mlx", total, report):
-            snapshot_download(repo_id=repo_for(model_size))
+        def report(progress: DownloadProgressEvent, offset: int = offset) -> None:
+            done = min(total, offset + progress.bytes_downloaded)
+            moved = event("downloading", progress.detail, done)
+            asyncio.run_coroutine_threadsafe(_broadcast_model_progress(moved), loop)
 
-    try:
-        await asyncio.to_thread(download)
-    except Exception as exc:
-        detail = download_failed_message(model_size, total) if looks_offline(exc) else str(exc)
-        await _broadcast_model_progress(event("failed", detail))
-        raise RuntimeError(detail) from exc
+        def download(backend: str = backend, repo: str = repo, revision: str | None = revision):
+            with _state.model_manager.watch_download(model_size, backend, total, report):
+                snapshot_download(repo_id=repo, revision=revision)
+
+        try:
+            await asyncio.to_thread(download)
+        except Exception as exc:
+            detail = download_failed_message(model_size, total) if looks_offline(exc) else str(exc)
+            await _broadcast_model_progress(event("failed", detail))
+            raise RuntimeError(detail) from exc
+        offset += mb * 1024 * 1024
     await _broadcast_model_progress(event("completed", "downloaded", total))
 
 
@@ -2572,9 +2613,7 @@ async def _handle_recommend_model(
     """
     profile = await asyncio.to_thread(detect_hardware)
     rec = recommend_model(profile)
-    downloaded = await asyncio.to_thread(
-        _state.model_manager.is_downloaded, rec.model_size, rec.backend
-    )
+    downloaded, mb = await asyncio.to_thread(_local_model_status, rec.model_size, rec.backend)
     await _send(
         ws,
         RecommendModelResponse(
@@ -2589,7 +2628,7 @@ async def _handle_recommend_model(
             total_ram_gb=profile.total_ram_gb,
             backend=rec.backend,
             model_downloaded=downloaded,
-            download_mb=download_size_mb(rec.model_size),
+            download_mb=mb,
         ),
     )
 

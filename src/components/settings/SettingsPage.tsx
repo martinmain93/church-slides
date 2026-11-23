@@ -35,7 +35,7 @@ import {
 } from "@/lib/recordingClient";
 import { Input } from "@/components/ui/input";
 import { AiRequirements } from "@/components/settings/AiRequirements";
-import { GroqKeyField, SpeechSettings } from "@/components/settings/AISettings";
+import { GroqKeyField } from "@/components/settings/AISettings";
 import { InstructionModelPicker } from "@/components/debug/InstructionModelPicker";
 import { DisplayLookControls } from "@/components/presentation/DisplayLookDialog";
 import { AssistantConnect } from "@/components/settings/AssistantConnect";
@@ -143,9 +143,6 @@ export function SettingsPage({
                     <AiRequirements />
                     <ModelDownloadProgress />
                   </Section>
-                  <Section>
-                    <SpeechSettings />
-                  </Section>
                   {FEATURES.spokenInstructions && (
                     <Section>
                       <div className="space-y-1.5">
@@ -155,8 +152,7 @@ export function SettingsPage({
                             While the AI is on, the worship leader can say &ldquo;go to the
                             chorus&rdquo; or &ldquo;let&rsquo;s sing Way Maker&rdquo; and the
                             slides follow. It uses Groq&rsquo;s online model, so it needs the
-                            internet during the service and a free Groq key: the same key as
-                            Groq&rsquo;s online speech above.
+                            internet during the service and a free Groq key.
                           </InfoTip>
                         </div>
                         <SpokenRequestsToggle

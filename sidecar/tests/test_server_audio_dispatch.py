@@ -751,9 +751,11 @@ async def test_mlx_backend_is_built_when_selected(fake_capture, fake_ws):
     axes over the seven approved goldens — wrong-slide 0.330 -> 0.276 and
     median cue delay 1.4 s -> 0.8 s — so `recommend_model` now defaults to
     it when mlx-whisper is installed. This pins that selecting `backend=mlx`
-    still constructs the Metal backend.
+    still constructs the Metal backend (here without Qwen3-ASR, the engine's
+    fallback when Qwen isn't there or fails to load).
     """
     from auto_presenter.asr.mlx_backend import MLXWhisperBackend
+    from auto_presenter.asr.qwen_backend import QwenStreamingBackend
     from auto_presenter.protocol import StartAudioSessionRequest
 
     async def already_downloaded(_size):
@@ -762,6 +764,7 @@ async def test_mlx_backend_is_built_when_selected(fake_capture, fake_ws):
     with (
         patch.object(MLXWhisperBackend, "is_available", staticmethod(lambda: True)),
         patch.object(MLXWhisperBackend, "warm", lambda self: None),
+        patch.object(QwenStreamingBackend, "is_available", staticmethod(lambda: False)),
         patch.object(server_mod, "_download_mlx_model", already_downloaded),
     ):
         await server_mod._handle_start_audio(
@@ -772,6 +775,33 @@ async def test_mlx_backend_is_built_when_selected(fake_capture, fake_ws):
     assert session is not None
     assert isinstance(session._wrapper.backend, MLXWhisperBackend)
     assert session._wrapper.backend.name() == "mlx-whisper-small.en"
+
+
+@pytest.mark.asyncio
+async def test_an_mlx_session_transcribes_with_qwen_by_default(fake_capture, fake_ws):
+    """Qwen3-ASR is the on-device speech engine (2026-11-23): an mlx session
+    with no tunables runs on it, with Whisper kept for the follower."""
+    from auto_presenter.asr.mlx_backend import MLXWhisperBackend
+    from auto_presenter.asr.qwen_backend import QwenStreamingBackend
+    from auto_presenter.protocol import StartAudioSessionRequest
+
+    async def already_downloaded(_size):
+        return None
+
+    with (
+        patch.object(MLXWhisperBackend, "is_available", staticmethod(lambda: True)),
+        patch.object(MLXWhisperBackend, "warm", lambda self: None),
+        patch.object(QwenStreamingBackend, "is_available", staticmethod(lambda: True)),
+        patch.object(QwenStreamingBackend, "warm", lambda self: None),
+        patch.object(server_mod, "_download_mlx_model", already_downloaded),
+    ):
+        await server_mod._handle_start_audio(
+            fake_ws, StartAudioSessionRequest(id=1, backend="mlx", model_size="small.en")
+        )
+
+    session = server_mod._state.audio_session
+    assert session is not None
+    assert isinstance(session._wrapper.backend, QwenStreamingBackend)
 
 
 @pytest.mark.asyncio
