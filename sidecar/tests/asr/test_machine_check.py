@@ -123,3 +123,15 @@ def test_one_slow_pass_does_not_flip_the_verdict():
     score = [478.1, 542.3, 466.7, 519.5, 554.5]
     assert mc.speech_load(transcribe, score) == pytest.approx(0.672, abs=0.005)
     assert mc.speech_load(transcribe, score) <= mc.LOAD_LIMIT
+
+
+def test_off_apple_silicon_live_ai_is_not_offered_without_a_download(monkeypatch, tmp_path):
+    """Qwen3-ASR on the GPU is the only on-device engine (2026-11-23):
+    anywhere else the answer is no, at once, with no models and no timing."""
+    from auto_presenter.asr import machine_check
+    from auto_presenter.asr.mlx_backend import MLXWhisperBackend
+
+    monkeypatch.setattr(MLXWhisperBackend, "is_available", staticmethod(lambda: False))
+    a = machine_check.assess(None)
+    assert a.verdict == "insufficient"
+    assert "Apple silicon" in a.reason

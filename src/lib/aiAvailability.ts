@@ -72,23 +72,26 @@ export function describeAiAvailability(
   if (model.needs_internet_while_running) {
     return { kind: "ready", model: model.model_size, hosted: true };
   }
-  if (model.downloaded) {
-    // Off Apple silicon the computer itself has to keep up: the engine's
-    // machine check decides, and below its bar live AI isn't offered at all.
-    switch (machine.state) {
-      case "running":
-        return { kind: "checking_machine" };
-      case "failed":
+  // Off Apple silicon the engine's machine check decides first, before any
+  // download is offered: live AI runs only on Apple silicon (the engine says
+  // so at once), so there is nothing to fetch on a computer that can't use it.
+  switch (machine.state) {
+    case "running":
+      return { kind: "checking_machine" };
+    case "failed":
+      return { kind: "check_unavailable", reason: machine.reason };
+    case "done":
+      if (machine.verdict === "insufficient") return { kind: "too_slow", reason: machine.reason };
+      if (machine.verdict === "unknown") {
         return { kind: "check_unavailable", reason: machine.reason };
-      case "done":
-        if (machine.verdict === "insufficient") return { kind: "too_slow", reason: machine.reason };
-        if (machine.verdict === "unknown") {
-          return { kind: "check_unavailable", reason: machine.reason };
-        }
-        if (machine.verdict === "assist") {
-          return { kind: "ready", model: model.model_size, hosted: false, checked: true, assistOnly: true };
-        }
-        return { kind: "ready", model: model.model_size, hosted: false, checked: true };
+      }
+  }
+  if (model.downloaded) {
+    if (machine.state === "done" && machine.verdict === "assist") {
+      return { kind: "ready", model: model.model_size, hosted: false, checked: true, assistOnly: true };
+    }
+    if (machine.state === "done") {
+      return { kind: "ready", model: model.model_size, hosted: false, checked: true };
     }
     return { kind: "ready", model: model.model_size, hosted: false };
   }
@@ -194,10 +197,10 @@ export function useAiAvailability(): AiAvailabilityApi {
     }
   }, []);
 
-  // Off Apple silicon, once the speech model is here: is this computer fast
-  // enough? The engine keeps the verdict, so this is instant after the first
-  // time. Apple silicon (mlx) and hosted speech (groq) don't need it.
-  const needsCheck = model?.downloaded === true && model.backend === "whisper";
+  // Off Apple silicon: can this computer run live AI? Asked before any
+  // download, and answered at once (only Apple silicon can). Apple silicon
+  // (mlx) doesn't need it.
+  const needsCheck = model?.backend === "whisper";
   useEffect(() => {
     if (!needsCheck) {
       setMachine({ state: "not_needed" });
@@ -243,21 +246,17 @@ export function availabilitySummary(a: AiAvailability): string {
     case "engine_unavailable":
       return a.reason;
     case "needs_download":
-      return `Live AI needs its speech model (${a.model}, about ${a.mb} MB). Downloading it needs an internet connection once; after that it works offline.`;
+      return `Live AI needs its speech model (about ${sizeText(a.mb)}). Downloading it needs an internet connection once; after that it works offline.`;
     case "downloading":
       return a.mbDone === null
-        ? `Downloading the speech model (${a.model}, about ${a.mb} MB)…`
-        : `Downloading the speech model (${a.model}): ${Math.min(a.mbDone, a.mb)} of about ${a.mb} MB…`;
+        ? `Downloading the speech model (about ${sizeText(a.mb)})…`
+        : `Downloading the speech model: ${sizeText(Math.min(a.mbDone, a.mb))} of about ${sizeText(a.mb)}…`;
     case "download_failed":
       return a.message;
     case "checking_machine":
       return "Checking this computer can keep up with live AI (about half a minute, once)…";
     case "too_slow":
-      return (
-        `${a.reason} Live AI is off on this computer so it's never less accurate than it ` +
-        "should be. Presenting by hand works as always, and a cloud option for slower " +
-        "computers is planned."
-      );
+      return `${a.reason} Presenting by hand works as always.`;
     case "check_unavailable":
       return a.reason;
     case "ready":
@@ -269,10 +268,15 @@ export function availabilitySummary(a: AiAvailability): string {
         );
       }
       if (a.checked) {
-        return `Ready — this computer keeps up with live AI, and the speech model (${a.model}) is on it, so it works offline.`;
+        return "Ready — this computer keeps up with live AI, and the speech model is on it, so it works offline.";
       }
       return a.hosted
-        ? `Ready, using hosted transcription (${a.model}) — it needs internet for the whole service.`
-        : `Ready — the speech model (${a.model}) is on this computer, so live AI works offline.`;
+        ? "Ready, using hosted transcription — it needs internet for the whole service."
+        : "Ready — the speech model is on this computer, so live AI works offline.";
   }
+}
+
+/** "464 MB" or "2.2 GB": the speech model is now over a gigabyte. */
+export function sizeText(mb: number): string {
+  return mb >= 1000 ? `${(mb / 1024).toFixed(1)} GB` : `${mb} MB`;
 }

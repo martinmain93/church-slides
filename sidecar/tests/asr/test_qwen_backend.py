@@ -223,3 +223,33 @@ def test_an_edge_margin_holds_words_the_aligner_squeezed_against_the_newest_audi
     assert by_step[0] == ["a"]
     assert by_step[1] == ["b"]  # once "c" took the edge
     assert finals(events) == ["a", "b", "c"]
+
+
+def test_sessions_share_one_loaded_model(monkeypatch):
+    """Loaded per session, Qwen grew the engine about 1.5 GB a restart (the
+    build's soak): every session must reuse the one model."""
+    import pytest
+
+    pytest.importorskip("mlx_qwen3_asr")
+    import mlx_qwen3_asr.load_models as lm
+
+    from auto_presenter.asr import qwen_backend as qb
+
+    loads: list[str] = []
+
+    def fake_load(path):
+        loads.append(path)
+        return object(), None
+
+    monkeypatch.setattr(lm, "load_model", fake_load)
+    monkeypatch.setattr(qb, "local_snapshot", lambda repo, revision=None: "/models/qwen")
+    monkeypatch.setattr(qb, "_LOADED", {})
+    monkeypatch.setattr(qb, "ATTN_TIMES", True)
+    monkeypatch.setattr(qb, "_install_attention_capture", lambda: None)
+    monkeypatch.setattr(qb, "_install_probability_hook", lambda: None)
+    monkeypatch.setattr(qb, "_configure_mlx_memory", lambda: None)
+    first, second = QwenStreamingBackend(None), QwenStreamingBackend(None)
+    first.load()
+    second.load()
+    assert loads == ["/models/qwen"]
+    assert first._model is second._model

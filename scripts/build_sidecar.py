@@ -68,16 +68,18 @@ MODEL_LICENSES = PACKAGING / "model_licenses"
 MACOS_FLOOR = "11.0"
 PYTHON = "3.12"
 
-#: The Apple-silicon engine also carries MLX (Whisper on the GPU), which needs
+#: The Apple-silicon engine also carries MLX (the on-device speech engine,
+#: Qwen3-ASR, with Whisper as its lyric scorer, on the GPU), which needs
 #: macOS 14. It's an optional layer: on macOS 11-13 `import mlx` fails, the
 #: engine reports MLX unavailable and runs faster-whisper on the CPU, exactly
 #: as an engine without it does. The layer is everything the `mlx` extra adds
-#: to the base engine (MLX, mlx-whisper, and numba/llvmlite/scipy for its word
-#: timings, which need macOS 12): nothing else imports them, so all of it is
+#: and `qwen` extras add to the base engine (MLX, mlx-whisper, mlx-qwen3-asr,
+#: and numba/llvmlite/scipy for Whisper's word timings, which need macOS 12):
+#: nothing else imports them, so all of it is
 #: built for MLX_FLOOR and only it may exceed MACOS_FLOOR.
 MLX_FLOOR = "14.0"
 #: Where the layer's files land in the bundle (import names, not dist names).
-MLX_LAYER_DIRS = {"mlx", "mlx_whisper", "scipy", "tiktoken"}
+MLX_LAYER_DIRS = {"mlx", "mlx_whisper", "mlx_qwen3_asr", "scipy", "tiktoken"}
 #: Left out of the build env entirely. The `mlx` extra pulls torch through
 #: mlx-whisper's metadata, but only its unused torch_whisper.py imports it; and
 #: numba (with LLVM, 123 MB) is replaced by sidecar/packaging/stubs/numba.
@@ -154,11 +156,12 @@ def _requirements(env: dict, *extra: str) -> dict[str, str]:
 
 
 def _install_mlx_layer(python: Path, arch: str, env: dict, out: Path) -> None:
-    """What the `mlx` extra adds to the base env, for MLX_FLOOR, without torch.
+    """What the `mlx` and `qwen` extras add to the base env, for MLX_FLOOR, without torch.
     Locked versions, installed without resolving again; base packages untouched."""
     base = _requirements(env)
     skip = [a for p in MLX_SKIP for a in ("--no-emit-package", p)]
-    layer = {k: v for k, v in _requirements(env, "--extra", "mlx", *skip).items() if k not in base}
+    extras = _requirements(env, "--extra", "mlx", "--extra", "qwen", *skip)
+    layer = {k: v for k, v in extras.items() if k not in base}
     path = out / f"requirements-{arch}-mlx.txt"
     path.write_text("\n".join(layer.values()) + "\n")
     subprocess.run(
@@ -206,22 +209,25 @@ def stage_models(next_line: bool) -> Path:
 
     install_search_model(MODELS_STAGE / "search")
 
-    # The next-line check's phone model (trained on public music only), for
-    # MLX builds, the only ones that run the check: where the engine looks in
-    # development, installed by scripts/setup_next_line_model.py. Missing,
-    # the check would be off for every user of the build, so it fails the
-    # build like the chord model.
+    # The next-line check's phone models (trained on public music only), one
+    # for Qwen3-ASR's audio and one for Whisper's, for MLX builds, the only
+    # ones that run the check: where the engine looks in development,
+    # installed by scripts/setup_next_line_model.py. Missing, the check would
+    # be off for every user of the build, so it fails the build like the
+    # chord model.
     if next_line:
-        from auto_presenter.follower.next_line import MODEL_FILE, model_dir
+        from auto_presenter.follower.next_line import MODEL_FILE, QWEN_MODEL_FILE, model_dir
 
         nl_src = model_dir()
-        if not (nl_src / MODEL_FILE).is_file():
-            raise SystemExit(
-                f"next-line model missing: {nl_src / MODEL_FILE}\n"
-                "run: uv run --project sidecar python scripts/setup_next_line_model.py"
-            )
+        for name in (MODEL_FILE, QWEN_MODEL_FILE):
+            if not (nl_src / name).is_file():
+                raise SystemExit(
+                    f"next-line model missing: {nl_src / name}\n"
+                    "run: uv run --project sidecar python scripts/setup_next_line_model.py"
+                )
         (MODELS_STAGE / "next_line").mkdir()
-        for name in (MODEL_FILE, "next_line_head.json"):
+        files = (MODEL_FILE, "next_line_head.json", QWEN_MODEL_FILE, "next_line_head_qwen.json")
+        for name in files:
             if (nl_src / name).is_file():
                 shutil.copy2(nl_src / name, MODELS_STAGE / "next_line" / name)
 

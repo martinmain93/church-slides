@@ -110,6 +110,8 @@ export function describeAiHealth(i: AiHealthInputs): AiHealth {
       },
     };
   }
+  // Deprecated (2026-11-23): only Groq's hosted speech refuses requests, and
+  // it is no longer offered.
   if (i.asrRefused) {
     return {
       kind: "problem",

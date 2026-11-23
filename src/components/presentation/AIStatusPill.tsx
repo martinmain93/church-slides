@@ -33,12 +33,11 @@
  * goes to the sidecar live; the pill then redraws from the status the
  * sidecar broadcasts back, so it never claims a mode the AI isn't in.
  *
- * On a computer that can't comfortably run speech recognition itself
- * (`useMachinePower`), switching the AI on says so once, pointing at Groq's
- * online speech; and if the engine then actually falls behind (dropped audio
- * or a growing lag in `pipeline_health`), it says that once too. Groq turning
- * requests away (its rate limit, `asr_refused`) is said once as well: the AI
- * then hears nothing, and nothing else on screen would show why.
+ * On a computer that can't run live AI (`useMachinePower`), switching the AI
+ * on says so once; and if the engine then actually falls behind (dropped
+ * audio or a growing lag in `pipeline_health`), it says that once too.
+ * Deprecated (2026-11-23, hosted speech is no longer offered): Groq turning
+ * requests away (its rate limit, `asr_refused`) is said once as well.
  */
 
 import { useEffect, useState } from "react";
@@ -57,7 +56,7 @@ import { cn } from "@/lib/utils";
 
 const COOLDOWN_SECONDS = 5;
 
-/** Where the operator switches to cloud speech. */
+/** Where the operator chooses how speech is recognised. */
 const WHERE = "Settings → AI that follows the songs";
 /** Falling behind: this much audio discarded since the AI came on (about 2 s
  * of 100 ms chunks), or this far behind the band. */
@@ -99,7 +98,7 @@ export function behindMessage(health: PipelineHealth): string {
         : ", even on the charger. Give it a few minutes to charge.")
     );
   }
-  return late + `Groq's online speech keeps up on slower computers (${WHERE}).`;
+  return late + "Other busy apps can slow it down: close the ones you don't need.";
 }
 
 export function AIStatusPill({ operator = false }: {
@@ -193,7 +192,7 @@ export function AIStatusPill({ operator = false }: {
       const checked = availability.kind === "ready" && availability.checked === true;
       if (turningOn && power && power.level !== "good" && !checked && toast && !warned.slow) {
         warned.slow = true;
-        toast.show(`${power.summary} (${WHERE}.)`, { duration: 15000 });
+        toast.show(power.summary, { duration: 15000 });
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));

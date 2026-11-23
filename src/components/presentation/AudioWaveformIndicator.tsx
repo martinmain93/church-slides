@@ -100,7 +100,7 @@ export function AudioWaveformIndicator() {
           (health!.droppedChunks > 0
             ? ` and has lost ${health!.droppedChunks} chunk(s) of audio.`
             : ".") +
-          " Speech recognition can't keep up on this computer — Settings can switch it to Groq (online)."
+          " Speech recognition can't keep up on this computer: close other busy apps."
         }
         className="flex items-center gap-1.5 rounded-md bg-amber-500/20 px-2 py-1.5 text-amber-300 backdrop-blur"
       >

@@ -1,5 +1,9 @@
 """Turn a spoken chord instruction into placements on the open song.
 
+Deprecated (2026-11-23): Groq's free tier can't carry a church's use and
+paid tiers aren't available, so Groq integrations are on their way out.
+Its Groq calls stay until voice charting has another home.
+
 Editor-time only. One microphone clip is transcribed, then Groq's
 `openai/gpt-oss-120b` is told to carry out the instruction: a progression
 repeated across a verse, a different one on the chorus, extra bars held at

@@ -16,6 +16,7 @@
 import { trustedServer } from "@/lib/band/memberSignIn";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import type { JumpHoldNotice } from "@/lib/presentation/jumpHold";
 import type { LibrarySong } from "@/lib/band/librarySearch";
 import type {
   BandCommand,
@@ -50,6 +51,8 @@ export interface BandConnection {
   library: LibrarySong[] | null;
   /** Ask for a fresh copy of the library; the current one stays usable meanwhile. */
   requestLibrary: () => void;
+  /** An AI jump to another song waiting for the leader's OK; null otherwise. */
+  jumpHold: JumpHoldNotice | null;
 }
 
 const SILENCE_LIMIT_MS = 12_000;
@@ -142,6 +145,7 @@ export function useBandConnection(role: "band" | "leader", pin: string | null, m
   const [status, setStatus] = useState<ConnectionStatus>("connecting");
   const [setlist, setSetlist] = useState<BandSetlist | null>(null);
   const [position, setPosition] = useState<BandPosition | null>(null);
+  const [jumpHold, setJumpHold] = useState<JumpHoldNotice | null>(null);
   const [idle, setIdle] = useState(false);
   const [isLeader, setIsLeader] = useState(false);
   const [pinRejected, setPinRejected] = useState(false);
@@ -261,8 +265,12 @@ export function useBandConnection(role: "band" | "leader", pin: string | null, m
             setIdle(false);
             setLastError(null);
             break;
+          case "jump_hold":
+            setJumpHold(msg.data);
+            break;
           case "idle":
             setIdle(true);
+            setJumpHold(null);
             setSetlist(null);
             setPosition(null);
             break;
@@ -296,6 +304,8 @@ export function useBandConnection(role: "band" | "leader", pin: string | null, m
         clearTimeout(watchdog);
         clearInterval(pinger);
         socketRef.current = null;
+        // Dropped: the slides computer goes ahead without us.
+        setJumpHold(null);
         if (disposed) return;
         setStatus("reconnecting");
         // A hosted room drops a removed link (4001) and refuses it at the
@@ -386,5 +396,6 @@ export function useBandConnection(role: "band" | "leader", pin: string | null, m
     send,
     library,
     requestLibrary,
+    jumpHold,
   };
 }

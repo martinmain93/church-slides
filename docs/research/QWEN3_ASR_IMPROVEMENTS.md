@@ -9,6 +9,14 @@ songs.
 
 ## The answer
 
+> **Shipped 2026-11-23:** Qwen3-ASR is the app's only on-device speech
+> engine, on Apple silicon with macOS 14 or later (release builds carry the
+> `qwen` extra and both phone models). Whisper small.en stays loaded as the
+> lyric scorer and the fallback. A session's engine peaks at 3.9 GB against
+> 2.4 GB on Whisper alone (one 4.5-minute church recording, M1, 16 GB);
+> 8 GB Macs are allowed but not yet measured. Other computers get no live AI:
+> the CPU path is no longer offered and Groq's hosted speech is deprecated.
+
 > **Update 2026-11-21:** idea 4 is built (`asr_qwen_streaming`, off by
 > default) and has been through the follower in real time. See
 > [In the follower](#in-the-follower-2026-11-20-21): Qwen beats Whisper on
@@ -349,8 +357,7 @@ own MLX stream. As float16 the model is 10 MB; logits move at most 0.014 from
 float32. It is published as the `models-next-line-qwen-gru512x2` asset on the
 releases repo (MIT, with a notice on its training data), and
 `scripts/setup_next_line_model.py` installs it beside the Whisper model.
-Release builds don't carry the Qwen engine yet (the `qwen` extra isn't in
-the build), so they don't bundle this model either.
+Release builds bundle it (Apple silicon) since 2026-11-23.
 
 The margin scale was picked on the same 3 recordings it was measured on.
 The full gate above (50f15ff) holds it to all 9 goldens and the talk-only
