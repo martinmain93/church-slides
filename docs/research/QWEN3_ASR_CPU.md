@@ -148,6 +148,30 @@ The app's step, timed on GitHub's runners with `app_step_bench.py` (encode
 On x86, int8 costs no more time than int4. This is speech alone. The
 lyric scorer has to fit beside it, and the real-time gold eval is the gate.
 
+## Real-time gate (2026-11-24)
+
+The release gate, run on the M1's processor: 9 church goldens, no lead
+sheets, ONNX base.en lyric scorer, ONNX Runtime 1.32, played in real time
+(`run_follower_eval.py`, `score_follower_cpu=true`). Mains power, Low Power
+Mode off.
+
+| Speech on the processor | Wrong-slide | Perceived | Anticipation (median) | Engine CPU | ASR pass p50 / p90 |
+|---|---|---|---|---|---|
+| faster-whisper small.en (today's CPU path) | **0.295** | **0.182** | +190 ms | 114% of a core | 375 / 544 ms |
+| Qwen3-ASR int8 (`asr_qwen_cpu`) | 0.323 | 0.208 | +543 ms | 180% of a core | 543 / 1,203 ms |
+
+Per recording, Qwen was worse on 6 of 9. Neither dropped audio or went
+unhealthy.
+
+- **Qwen on the processor doesn't beat Whisper on the processor.** It reads
+  about 0.35 s sooner but puts up more wrong slides, the opposite of on
+  Apple silicon's GPU, where Qwen wins.
+- **Two likely causes:** the 2 s encoder blocks the processor needs (the
+  GPU path uses 8 s), and the next-line check, which needs MLX and is off
+  for this backend.
+- **Decision:** keep it behind the research tunable. Don't host the model
+  files or wire a download until a change beats Whisper on this gate.
+
 ## What it would take
 
 1. **A CPU backend that streams with `decoder_extend`.** It needs to cache
