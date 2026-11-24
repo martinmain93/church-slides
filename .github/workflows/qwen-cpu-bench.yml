@@ -1,16 +1,16 @@
 # One-off research run: how fast Qwen3-ASR 0.6B (int4 ONNX) runs a live pass
 # on GitHub's x86 runners' processors (research/spikes/qwen_cpu/).
-# Runs only when the bench/qwen-cpu branch is pushed. Public-domain audio only.
+# Runs only when the bench/qwen-cpu or qwen-cpu-backend branch is pushed. Public-domain audio only.
 #
 # 1. export: builds decoder_extend (prefill only the newest audio, reusing the
 #    cache) from the public model with andrewleech/qwen3-asr-onnx (Apache 2.0)
-#    and quantizes it to int4, as the published files are.
-# 2. bench: times a full prefill and the extend on Windows and Linux.
+#    and quantizes it to int8 (the app's) and int4.
+# 2. bench: times the app's step (app_step_bench.py) on Windows and Linux.
 name: Qwen CPU bench
 
 on:
   push:
-    branches: [bench/qwen-cpu]
+    branches: [bench/qwen-cpu, qwen-cpu-backend]
 
 permissions:
   contents: read
@@ -37,14 +37,15 @@ jobs:
         env:
           QWEN_ONNX_TOOL: ${{ github.workspace }}/qwen3-asr-onnx
       - run: >-
-          python qwen3-asr-onnx/quantize_nbits.py --input extend --output extend
-          --bits 4 --block-size 64 --accuracy-level 4 --decoders decoder_extend
+          python research/spikes/qwen_cpu/quantize_extend.py extend/decoder_extend.onnx
+          q/decoder_extend.int8.onnx --bits 8 --accuracy-level 4
+      - run: >-
+          python research/spikes/qwen_cpu/quantize_extend.py extend/decoder_extend.onnx
+          q/decoder_extend.int4.onnx --bits 4 --accuracy-level 4
       - uses: actions/upload-artifact@v4
         with:
-          name: decoder-extend-int4
-          path: |
-            extend/decoder_extend.int4.onnx
-            extend/decoder_extend.int4.onnx.data
+          name: decoder-extend
+          path: q/
           retention-days: 3
 
   bench:
@@ -62,8 +63,9 @@ jobs:
       - run: python -m pip install --quiet onnxruntime==1.32.0 numpy huggingface_hub
       - uses: actions/download-artifact@v4
         with:
-          name: decoder-extend-int4
-          path: extend
+          name: decoder-extend
+          path: q
       - name: Download the published int4 model
         run: python -c "from huggingface_hub import snapshot_download as d; import sys; sys.path.insert(0, 'research/spikes/qwen_cpu'); from step_bench import FILES, REPO; print(d(REPO, allow_patterns=FILES, local_dir='model'))"
-      - run: python research/spikes/qwen_cpu/extend_bench.py model extend/decoder_extend.int4.onnx 0 4
+      - run: python research/spikes/qwen_cpu/app_step_bench.py model q/decoder_extend.int8.onnx 0 4
+      - run: python research/spikes/qwen_cpu/app_step_bench.py model q/decoder_extend.int4.onnx 0 4

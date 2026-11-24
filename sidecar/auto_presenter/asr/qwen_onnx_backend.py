@@ -1,4 +1,4 @@
-"""Qwen3-ASR 0.6B on the processor, through ONNX Runtime (int4). Research.
+"""Qwen3-ASR 0.6B on the processor, through ONNX Runtime (int8 decoder). Research.
 
 The Apple-silicon backend (`qwen_backend`) runs Qwen3-ASR on the GPU with
 `mlx_qwen3_asr.streaming`. This runs the same model and the same streaming
@@ -18,7 +18,8 @@ same way: word error 0.371 -> 0.381 (research/spikes/qwen_cpu/block_eval.py).
 **The model files.** The published int4 export, andrewleech/qwen3-asr-0.6b-onnx
 (Apache 2.0): `encoder.int4.onnx`, `embed_tokens.bin`, `tokenizer.json`. Its
 prefill graph can't continue from a cache, so the decoder is one graph of our
-own, `decoder_extend.int4.onnx` (research/spikes/qwen_cpu/export_extend.py):
+own, `decoder_extend.int8.onnx` (research/spikes/qwen_cpu/export_extend.py,
+quantize_extend.py --bits 8 --accuracy-level 4; int4 cost 0.09 word error):
 any number of new tokens onto a key/value cache, returning the next token's
 logits, the new cache, and the attention of the eight heads word times come
 from (`qwen_backend.ATTN_HEADS`). Prefill and every decoded token use it.
@@ -51,7 +52,7 @@ from auto_presenter.audio.types import SAMPLE_RATE
 log = logging.getLogger(__name__)
 
 ENCODER_FILE = "encoder.int4.onnx"
-DECODER_FILE = "decoder_extend.int4.onnx"
+DECODER_FILE = "decoder_extend.int8.onnx"
 EMBED_FILE = "embed_tokens.bin"
 TOKENIZER_FILE = "tokenizer.json"
 FILES = (ENCODER_FILE, DECODER_FILE, DECODER_FILE + ".data", EMBED_FILE, TOKENIZER_FILE)
@@ -337,7 +338,7 @@ class QwenOnnxBackend(QwenStreamingBackend):
         return model_dir() is not None
 
     def name(self) -> str:
-        return "onnx-qwen3-asr-0.6b-int4"
+        return "onnx-qwen3-asr-0.6b-int8"
 
     def load(self) -> None:
         with self._onnx_lock:
