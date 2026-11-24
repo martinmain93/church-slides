@@ -377,6 +377,12 @@ pub fn run() {
         .manage(keep_awake::KeepAwake::default())
         .manage(assistant_link::AssistantLink::default())
         .setup(move |app| {
+            // A development run (`pnpm tauri:dev`) says so on its Dock icon,
+            // so it's never mistaken for an installed copy.
+            #[cfg(all(debug_assertions, target_os = "macos"))]
+            if let Some(main) = app.get_webview_window("main") {
+                let _ = main.set_badge_label(Some("DEV".into()));
+            }
             // Open / migrate / seed the library DB before exposing commands.
             let app_data_dir = app
                 .path()
