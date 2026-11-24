@@ -909,6 +909,7 @@ async def _start_audio_session(
             else None
         )
         backend.min_step_seconds = ASSIST_TRANSCRIBE_EVERY_S if assist else 0.0
+        backend = await _maybe_qwen_cpu_backend(backend, tun)
     elif msg.backend == "mlx":
         if not MLXWhisperBackend.is_available():
             await _send_error(
@@ -1522,6 +1523,30 @@ async def _maybe_qwen_backend(
         log.exception("Qwen3-ASR failed to load; using Whisper")
         return whisper
     log.info("speech: Qwen3-ASR 0.6B streaming (follower scores with %s)", whisper.name())
+    return qwen
+
+
+async def _maybe_qwen_cpu_backend(
+    whisper: ASRBackend, tunables: ParticleFilterTunables | None
+) -> ASRBackend:
+    """Qwen3-ASR on the processor (`asr.qwen_onnx_backend`) in place of
+    faster-whisper's transcription, when the `asr_qwen_cpu` tunable asks for
+    it. faster-whisper stays loaded beside it. Any failure leaves the session
+    on faster-whisper."""
+    if tunables is None or not tunables.asr_qwen_cpu:
+        return whisper
+    from auto_presenter.asr.qwen_onnx_backend import QwenOnnxBackend
+
+    if not QwenOnnxBackend.is_available():
+        log.warning("asr_qwen_cpu is on but the Qwen3-ASR ONNX files aren't here; using Whisper")
+        return whisper
+    qwen = QwenOnnxBackend(whisper)
+    try:
+        await asyncio.to_thread(qwen.warm)
+    except Exception:
+        log.exception("Qwen3-ASR (processor) failed to load; using Whisper")
+        return whisper
+    log.info("speech: Qwen3-ASR 0.6B on the processor (ONNX Runtime)")
     return qwen
 
 

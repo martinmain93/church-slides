@@ -9,7 +9,8 @@ needs a multi-token step: `decoder_extend`.
     input_embeds [1, S, 1024]  token embeddings, audio features at audio positions
     position_ids [1, S]
     past_keys / past_values [28, 1, 8, P, 128]
-    -> logits [1, 1, vocab] (last token only), present_keys/values [28, 1, 8, P+S, 128]
+    -> logits [1, 1, vocab] (last token only), present_keys/values [28, 1, 8, P+S, 128],
+       attention [8, S, P+S]: the softmaxed attention of `ATTN_HEADS`, for word times
 
 A causal mask lets new token i see all P cached tokens and new tokens <= i.
 
@@ -35,10 +36,13 @@ TOOL = Path(os.environ.get(
 sys.path.insert(0, str(TOOL))
 
 from export import load_model  # noqa: E402
-from src.decoder_wrapper import _decoder_layer_forward  # noqa: E402
+from src.decoder_wrapper import _apply_rotary_pos_emb, _decoder_layer_forward  # noqa: E402
 from src.onnx_fixup import fix_reshape_allowzero  # noqa: E402
 
 MODEL = "Qwen/Qwen3-ASR-0.6B"
+#: (layer, query head) whose attention over the audio gives word times: the
+#: Apple-silicon backend's `qwen_backend.ATTN_HEADS`, kept in step by hand.
+ATTN_HEADS = ((6, 6), (6, 10), (6, 7), (6, 13), (12, 6), (11, 11), (2, 11), (11, 12))
 
 
 class DecoderExtendWrapper(nn.Module):
@@ -63,16 +67,35 @@ class DecoderExtendWrapper(nn.Module):
         mask = mask.unsqueeze(0).unsqueeze(0)
         hidden = input_embeds
         keys, values = [], []
+        attn_rows: dict[tuple[int, int], torch.Tensor] = {}
         for i, layer in enumerate(self.layers):
+            heads = [h for li, h in ATTN_HEADS if li == i]
+            if heads:
+                q = self._queries(layer, hidden, cos, sin)
             hidden, k, v = _decoder_layer_forward(
                 layer, hidden, cos, sin, mask,
                 past_key=past_keys[i], past_value=past_values[i],
                 num_kv_groups=self.num_kv_groups,
             )
+            for h in heads:
+                sc = q[0, h] @ k[0, h // self.num_kv_groups].transpose(0, 1)
+                sc = sc * layer.self_attn.scaling + mask[0, 0]
+                attn_rows[(i, h)] = torch.softmax(sc.float(), dim=-1)
             keys.append(k)
             values.append(v)
         logits = self.lm_head(self.norm(hidden[:, -1:, :]))
-        return logits, torch.stack(keys, dim=0), torch.stack(values, dim=0)
+        attn = torch.stack([attn_rows[lh] for lh in ATTN_HEADS], dim=0)
+        return logits, torch.stack(keys, dim=0), torch.stack(values, dim=0), attn
+
+    @staticmethod
+    def _queries(layer, hidden, cos, sin):
+        a = layer.self_attn
+        normed = layer.input_layernorm(hidden)
+        shape = (*normed.shape[:-1], -1, a.head_dim)
+        q = a.q_norm(a.q_proj(normed).view(shape)).transpose(1, 2)
+        k = a.k_norm(a.k_proj(normed).view(shape)).transpose(1, 2)
+        q, _ = _apply_rotary_pos_emb(q, k, cos, sin)
+        return q
 
 
 def main() -> None:
@@ -93,7 +116,7 @@ def main() -> None:
         torch.onnx.export(
             w, args, str(path),
             input_names=["input_embeds", "position_ids", "past_keys", "past_values"],
-            output_names=["logits", "present_keys", "present_values"],
+            output_names=["logits", "present_keys", "present_values", "attention"],
             dynamic_axes={
                 "input_embeds": {1: "seq_len"},
                 "position_ids": {1: "seq_len"},
@@ -101,6 +124,7 @@ def main() -> None:
                 "past_values": {3: "past_seq_len"},
                 "present_keys": {3: "total_seq_len"},
                 "present_values": {3: "total_seq_len"},
+                "attention": {1: "seq_len", 2: "total_seq_len"},
             },
             opset_version=17,
             do_constant_folding=True,

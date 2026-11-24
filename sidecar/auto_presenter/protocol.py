@@ -754,6 +754,13 @@ class ParticleFilterTunables(BaseModel):
     #: it beat Whisper on the real-time gold eval, 0.249 vs 0.272 wrong-slide
     #: (docs/research/QWEN3_ASR_IMPROVEMENTS.md). The kill switch; not shown.
     asr_qwen_streaming: bool = True
+    #: Off Apple silicon, on the CPU path: transcribe with Qwen3-ASR 0.6B on
+    #: the processor through ONNX Runtime (`asr.qwen_onnx_backend`) instead
+    #: of faster-whisper. The follower still scores with the ONNX base.en
+    #: scorer. Needs the model files in AUTO_PRESENTER_QWEN_ONNX_DIR; without
+    #: them, or if they fail to load, the session runs on faster-whisper.
+    #: Research until the real-time gold eval passes it; not shown.
+    asr_qwen_cpu: bool = False
     #: Let a key or tempo change in the music (`music.change_watch`) lower the
     #: bar for a song change the words propose. The kill switch, like
     #: `score_follower`; not shown in the Tunables panel.

@@ -265,8 +265,12 @@ def start_next_line_check(followers: LiveFollowers, backend: object) -> None:
     without it."""
     from auto_presenter.asr.mlx_backend import MLXWhisperBackend
     from auto_presenter.asr.qwen_backend import QwenStreamingBackend
+    from auto_presenter.asr.qwen_onnx_backend import QwenOnnxBackend
     from auto_presenter.follower import next_line
 
+    if isinstance(backend, QwenOnnxBackend):
+        log.info("next-line check needs Apple silicon; off this session")
+        return
     if isinstance(backend, QwenStreamingBackend):
         head = next_line.load_head(next_line.QWEN_MODEL_FILE)
         if head is None:

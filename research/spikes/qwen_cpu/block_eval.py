@@ -29,7 +29,7 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "qwen_improve"))
-from common import MAIN6, MODELS, SR, audio_of, load_clip, norm, song_lines  # noqa: E402
+from common import MAIN6, MODELS, SR, audio_of, load_clip, norm, song_lines
 
 
 def wer(ref: list[str], hyp: list[str]) -> float:
