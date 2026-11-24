@@ -4,11 +4,13 @@
 on Apple silicon's GPU also run live on the processor of an Intel Mac or a
 Windows PC, so live AI isn't Apple-silicon only?
 
-**Answer so far: only on fast desktops, and only with more work.** The model
-runs and transcribes correctly through ONNX Runtime, with no PyTorch, but one
-live pass costs 0.62–1.21 of a 2-second step on a 4-core x86 server CPU,
-for speech alone. The old processor path's bar for *everything* (speech plus
-the lyric scorer) was 0.75. A typical church laptop would not keep up.
+**Answer so far: plausible on a decent 4-core machine, once prefill reuses
+its cache.** The model runs and transcribes correctly through ONNX Runtime,
+with no PyTorch. As first timed, one live pass cost 0.62–1.21 of a 2-second
+step on a 4-core x86 server CPU, for speech alone, against the old processor
+path's bar of 0.75 for *everything* (speech plus the lyric scorer). Prefilling
+only the newest audio (below) cuts that to 0.28–0.56. The lyric scorer still
+has to fit in what's left.
 
 ## How it was measured
 
@@ -45,14 +47,50 @@ the lyric scorer) was 0.75. A typical church laptop would not keep up.
 - **Rosetta:** it isn't a stand-in for a real Intel chip. It can't use the vector instructions ONNX Runtime's fast kernels need.
 - **Windows runner:** it is markedly slower than Linux on the same CPU, mostly in prefill. Shared virtual machines are noisy, so treat 0.91–1.21 as a range.
 
+## Cutting prefill (2026-11-24)
+
+Prefill re-read the whole 6 s prompt (96 tokens) every pass, and it was the
+largest cost on x86. The published `decoder_init` always starts from an
+empty cache and `decoder_step` takes one token, so neither can continue from
+a cached prefix. `research/spikes/qwen_cpu/export_extend.py` exports a third
+graph, `decoder_extend`: it takes any number of new tokens plus the cache,
+as the Apple-silicon backend's streaming does. Only the newest audio and the
+closing text are prefilled, and the cache of the prompt head and older audio
+comes from earlier passes. It was quantized to int4 the same way as the
+published files (RTN, block 64), about 340 MB.
+
+- **Correct:** at full precision the logits match a full prefill exactly
+  (difference 0.0). At int4 every machine decoded the same 8 tokens.
+- **Timed:** with `extend_bench.py`. The workflow builds the graph on a Linux
+  runner from the public model, then times it on Windows and Linux.
+
+Load = (encode 2 s + prefill + decode 7) / 2 s step:
+
+| Machine | Threads | Full prefill (96 tokens) | Newest 2 s (35) | Newest 4 s (61) | Load, full | Load, newest 2 s | Load, newest 4 s |
+|---|---|---|---|---|---|---|---|
+| GitHub Windows, EPYC 7763 | default | 1,627 ms | 461 ms | 802 ms | 1.15 | **0.56** | 0.73 |
+| GitHub Windows, EPYC 7763 | 4 | 1,031 ms | 318 ms | 533 ms | 0.92 | **0.56** | 0.67 |
+| GitHub Linux, Xeon 6973P | default | 466 ms | 157 ms | 268 ms | 0.43 | **0.28** | 0.34 |
+| M1 processor, battery + Low Power Mode | default | 439 ms | 147 ms | 238 ms | 0.54 | **0.39** | 0.44 |
+
+- Prefill is about 3× cheaper. On Windows the whole pass drops from about 1.0
+  to 0.56 of the step.
+- The Linux runner landed on a newer Xeon this time, not the EPYC of the
+  first run, so compare its rows only with each other. Its 4-thread row was
+  noisy (encode 437 ms against 192 ms) and is left out.
+- How much is "newest" depends on the streaming design. The Apple-silicon
+  backend caches finished 8 s blocks, so its tail runs from 0 to 8 s. A CPU
+  backend could keep the cache at every pass (tail 2 s) as long as the
+  window has not slid. Once the window slides, the oldest audio drops out of
+  the cache. The rotary positions of what's left still work, because they are
+  relative.
+
 ## What it would take
 
-1. **Prefill dominates on x86.** It re-reads the whole 6 s prompt every
-   pass. Two ways to cut it, neither measured:
-   - A shorter window (4 s, about 64 tokens).
-   - An export whose prefill can continue from a cached prefix. The
-     published `decoder_init` always starts from scratch, and
-     `decoder_step` takes one token at a time.
+1. **A CPU backend that streams with `decoder_extend`.** It needs to cache
+   per pass, encode only new audio, and reset the cache when the window
+   slides. It also needs a hosted copy of the int4 graph, since the published
+   export has none.
 2. **The follower's lyric scorer also needs the processor.** It is Whisper,
    run with ONNX on the CPU path. Speech plus scorer must fit under the bar
    together.
