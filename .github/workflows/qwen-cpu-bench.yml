@@ -1,0 +1,26 @@
+# One-off research run: how fast Qwen3-ASR 0.6B (int4 ONNX) runs a live pass
+# on GitHub's x86 runners' processors (research/spikes/qwen_cpu/step_bench.py).
+# Runs only when the bench/qwen-cpu branch is pushed. Public-domain audio only.
+name: Qwen CPU bench
+
+on:
+  push:
+    branches: [bench/qwen-cpu]
+
+permissions:
+  contents: read
+
+jobs:
+  bench:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --quiet onnxruntime numpy huggingface_hub
+      - run: python research/spikes/qwen_cpu/step_bench.py
