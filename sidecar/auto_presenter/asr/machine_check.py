@@ -140,9 +140,10 @@ def check_id() -> str:
 
     # v2: median timings (v1 judged on the p90 of fewer repeats); v3: the
     # Assist-only tier, so a computer judged too slow before is judged again;
-    # v4: no CPU path, so a CPU verdict of "full" or "assist" is judged again
+    # v4: no CPU path, so a CPU verdict of "full" or "assist" is judged again;
+    # v5: the reason names the fix (the Apple-silicon download, a macOS update)
     return (
-        f"v4;limit={LOAD_LIMIT};assist={ASSIST_LOAD_LIMIT}@{ASSIST_TRANSCRIBE_EVERY_S};"
+        f"v5;limit={LOAD_LIMIT};assist={ASSIST_LOAD_LIMIT}@{ASSIST_TRANSCRIBE_EVERY_S};"
         f"tokens={TOKENS_PER_PASS};scorer={CPU_SCORER.name}"
     )
 
@@ -343,6 +344,52 @@ def assess_cpu(model, scorer, pad_s: float) -> Assessment:
 
 #: Why live AI isn't offered off Apple silicon. Read by the operator.
 NOT_HERE_REASON = "Live AI needs a Mac with Apple silicon (M1 or newer) on macOS 14 or later."
+#: The Intel build running on an Apple-silicon Mac (under Rosetta), where the
+#: GPU engine can't load: the fix is the other download, not another Mac.
+INTEL_BUILD_REASON = (
+    "This is the Intel version of Church Slides, and this Mac has Apple silicon. "
+    "Install the Apple-silicon version from churchslides.app to use live AI."
+)
+#: Apple silicon on macOS 13 or older: the fix is a macOS update.
+OLD_MACOS_REASON = "Live AI needs macOS 14 or later on this Mac. Updating macOS turns it on."
+
+
+def _under_rosetta() -> bool:
+    """Whether this process is Intel code translated on an Apple-silicon Mac."""
+    import subprocess
+    import sys
+
+    if sys.platform != "darwin":
+        return False
+    try:
+        out = subprocess.run(
+            ["sysctl", "-n", "sysctl.proc_translated"],
+            capture_output=True, text=True, timeout=2,
+        ).stdout.strip()
+    except Exception:
+        return False
+    return out == "1"
+
+
+def _apple_silicon_on_old_macos() -> bool:
+    import platform
+    import sys
+
+    if sys.platform != "darwin" or platform.machine() != "arm64":
+        return False
+    try:
+        return int(platform.mac_ver()[0].split(".")[0]) < 14
+    except ValueError:
+        return False
+
+
+def not_here_reason() -> str:
+    """Why live AI isn't offered on this computer, in the operator's terms."""
+    if _under_rosetta():
+        return INTEL_BUILD_REASON
+    if _apple_silicon_on_old_macos():
+        return OLD_MACOS_REASON
+    return NOT_HERE_REASON
 
 
 def assess(onnx_dir: Path | None, whisper_model_size: str = CPU_PATH_MODEL) -> Assessment:
@@ -361,7 +408,7 @@ def assess(onnx_dir: Path | None, whisper_model_size: str = CPU_PATH_MODEL) -> A
             "full", "mlx",
             "Apple silicon: live following runs on the graphics chip, measured on the M1.",
         )
-    return Assessment("insufficient", "whisper", NOT_HERE_REASON)
+    return Assessment("insufficient", "whisper", not_here_reason())
 
 
 def assess_cpu_path(onnx_dir: Path | None, whisper_model_size: str = CPU_PATH_MODEL) -> Assessment:
