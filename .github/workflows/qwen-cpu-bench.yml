@@ -1,6 +1,11 @@
 # One-off research run: how fast Qwen3-ASR 0.6B (int4 ONNX) runs a live pass
-# on GitHub's x86 runners' processors (research/spikes/qwen_cpu/step_bench.py).
+# on GitHub's x86 runners' processors (research/spikes/qwen_cpu/).
 # Runs only when the bench/qwen-cpu branch is pushed. Public-domain audio only.
+#
+# 1. export: builds decoder_extend (prefill only the newest audio, reusing the
+#    cache) from the public model with andrewleech/qwen3-asr-onnx (Apache 2.0)
+#    and quantizes it to int4, as the published files are.
+# 2. bench: times a full prefill and the extend on Windows and Linux.
 name: Qwen CPU bench
 
 on:
@@ -11,7 +16,39 @@ permissions:
   contents: read
 
 jobs:
+  export:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: andrewleech/qwen3-asr-onnx
+          ref: 4aee2ae0c355c7bc33bd5c09befec9e9eabd4b50
+          path: qwen3-asr-onnx
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: >-
+          python -m pip install --quiet
+          --extra-index-url https://download.pytorch.org/whl/cpu
+          torch==2.15.0 transformers==4.57.6 qwen-asr==0.0.6 accelerate==1.12.0
+          onnx==1.23.2 onnxruntime==1.32.0 onnxscript==0.7.2 numpy
+      - run: python research/spikes/qwen_cpu/export_extend.py extend
+        env:
+          QWEN_ONNX_TOOL: ${{ github.workspace }}/qwen3-asr-onnx
+      - run: >-
+          python qwen3-asr-onnx/quantize_nbits.py --input extend --output extend
+          --bits 4 --block-size 64 --accuracy-level 4 --decoders decoder_extend
+      - uses: actions/upload-artifact@v4
+        with:
+          name: decoder-extend-int4
+          path: |
+            extend/decoder_extend.int4.onnx
+            extend/decoder_extend.int4.onnx.data
+          retention-days: 3
+
   bench:
+    needs: export
     strategy:
       fail-fast: false
       matrix:
@@ -22,5 +59,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: python -m pip install --quiet onnxruntime numpy huggingface_hub
-      - run: python research/spikes/qwen_cpu/step_bench.py
+      - run: python -m pip install --quiet onnxruntime==1.32.0 numpy huggingface_hub
+      - uses: actions/download-artifact@v4
+        with:
+          name: decoder-extend-int4
+          path: extend
+      - name: Download the published int4 model
+        run: python -c "from huggingface_hub import snapshot_download as d; import sys; sys.path.insert(0, 'research/spikes/qwen_cpu'); from step_bench import FILES, REPO; print(d(REPO, allow_patterns=FILES, local_dir='model'))"
+      - run: python research/spikes/qwen_cpu/extend_bench.py model extend/decoder_extend.int4.onnx 0 4
