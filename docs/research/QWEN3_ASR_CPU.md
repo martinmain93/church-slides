@@ -85,6 +85,30 @@ Load = (encode 2 s + prefill + decode 7) / 2 s step:
   the cache. The rotary positions of what's left still work, because they are
   relative.
 
+### Is reusing the cache accurate? Shorter encoder blocks (2026-11-24)
+
+The cache can only be reused exactly at encoder block boundaries. The
+encoder attends within 8 s blocks (`n_window_infer`), and the app's window is
+10 s, so in exact streaming nearly every step re-encodes and re-prefills
+the whole window. Reusing everything before the newest 2 s means 2 s
+encoder blocks, each heard without the audio around it.
+`research/spikes/qwen_cpu/block_eval.py` streams the six public songs through
+`mlx_qwen3_asr.streaming` with the block shortened and scores the
+whole-song word error rate (fp16, M1 GPU, 10 s window):
+
+| Encoder block | Step | Word error | Step p50 |
+|---|---|---|---|
+| 8 s (as shipped) | 1 s | 0.371 | 338 ms |
+| 8 s | 2 s | 0.374 | 433 ms |
+| 4 s | 2 s | 0.378 | 380 ms |
+| **2 s** | **2 s** | **0.381** | 355 ms |
+| 2 s | 1 s | 0.392 | 274 ms |
+
+2 s blocks with 2 s steps cost +0.01 in word error, less than the
+song-to-song spread. That is the design a processor backend can afford.
+A 2 s step instead of 1 s also makes words arrive up to 1 s later. Only the
+real-time eval can say what that costs in slide timing.
+
 ## What it would take
 
 1. **A CPU backend that streams with `decoder_extend`.** It needs to cache
