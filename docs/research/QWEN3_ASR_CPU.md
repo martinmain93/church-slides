@@ -109,6 +109,45 @@ song-to-song spread. That is the design a processor backend can afford.
 A 2 s step instead of 1 s also makes words arrive up to 1 s later. Only the
 real-time eval can say what that costs in slide timing.
 
+## The processor backend (2026-11-24)
+
+`sidecar/auto_presenter/asr/qwen_onnx_backend.py` (`QwenOnnxBackend`, behind
+the `asr_qwen_cpu` research tunable) runs that design. It uses 2 s blocks,
+each cached the step it arrives. The prompt head is prefilled once per
+context. Word times come from the decoder's attention while decoding. Its
+prompt and log-mel features match `mlx_qwen3_asr` exactly.
+`research/spikes/qwen_cpu/onnx_eval.py` scores it on the six songs (M1
+processor, ONNX Runtime 1.32):
+
+| Decoder | Size | Word error | Step p50 (M1 CPU) |
+|---|---|---|---|
+| MLX GPU, 2 s blocks (target) | - | 0.381 | 355 ms (GPU) |
+| int4 (RTN, block 64) | 374 MB | 0.466 | 693 ms |
+| int4, vocabulary layer kept full precision | 866 MB | 0.501 (2 songs) | 514 ms |
+| full precision | 2.6 GB | 0.340 (2 songs; MLX 0.340 on the same 2) | 812 ms |
+| int8, ONNX Runtime's default compute | 645 MB | 0.345 (2 songs) | 2,235 ms |
+| **int8, int8 compute (`--accuracy-level 4`)** | **645 MB** | **0.386** | **545 ms** |
+
+- **The port is exact.** At full precision it reproduces the MLX numbers
+  song for song.
+- **int4 is what cost accuracy,** about 0.09. int8 with int8 compute gets it
+  back and is the fastest variant.
+- **Quantizing:** `quantize_extend.py`. The export tool's own
+  quantize_nbits.py ignores `--bits` with an algorithm config, and overwrites
+  its output when the output folder differs.
+
+The app's step, timed on GitHub's runners with `app_step_bench.py` (encode
+2 s, prefill 55 tokens onto a 114-token cache, decode 6):
+
+| Runner (4 cores) | Threads | int8 load | int4 load |
+|---|---|---|---|
+| Windows, Xeon Platinum 8573C | default | **0.44** | 0.43 |
+| Windows, Xeon Platinum 8573C | 4 | 0.48 | 0.47 |
+| Linux, Xeon 6975P | default | **0.34** | 0.32 |
+
+On x86, int8 costs no more time than int4. This is speech alone. The
+lyric scorer has to fit beside it, and the real-time gold eval is the gate.
+
 ## What it would take
 
 1. **A CPU backend that streams with `decoder_extend`.** It needs to cache
