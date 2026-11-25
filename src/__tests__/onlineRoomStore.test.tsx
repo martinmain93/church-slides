@@ -89,7 +89,7 @@ describe("the app-wide online room", () => {
 
 function Panel() {
   const online = useOnlineRoom({ getPin: async () => "2468" });
-  const band: BandHostApi = { info: null, clients: 0, start: async () => undefined, error: null, online };
+  const band: BandHostApi = { info: null, clients: 0, leaders: 0, start: async () => undefined, error: null, online };
   return <BandScreensButton band={band} />;
 }
 
@@ -131,7 +131,7 @@ describe("band screens panel: the online room page", () => {
     function HostedPanel() {
       const online = useOnlineRoom({ getPin: async () => "2468" });
       const band: BandHostApi = {
-        info: null, clients: 0, start: async () => undefined, error: null, online,
+        info: null, clients: 0, leaders: 0, start: async () => undefined, error: null, online,
         hosted: { org: { orgId: "o1", orgName: "Grace Chapel" }, connection: "live", clients: 2 },
       };
       return <BandScreensButton band={band} />;

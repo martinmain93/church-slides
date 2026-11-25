@@ -24,4 +24,5 @@ public repo.
 | [MUSIC_MODELS_2026](MUSIC_MODELS_2026.md) | Which beat, downbeat and chord models to use | Review; BTC chosen |
 | [CHORD_DOWNBEAT](CHORD_DOWNBEAT.md) | Chord charts as a position signal | +2–3% at best; chords shipped as a diagnostic, later used by the follower |
 | [MUSIC_ONLY_MATCHING](MUSIC_ONLY_MATCHING.md) | Find the song and place from music alone | Works offline; led to the score follower |
+| [STREAMING_ASR_SPIKE](STREAMING_ASR_SPIKE.md) | Streaming speech services (Deepgram, AssemblyAI) or Qwen3-ASR instead of chunked Whisper? | Services are fast but deaf to sung band mixes: dropped. Qwen3-ASR 0.6B hears more than Whisper small.en, 0.5 s sooner: bigger trial |
 | [DECISION_MODELS_2026_11](DECISION_MODELS_2026_11.md) | Do the new small decision / tool-calling models belong in the app? | Not as decision models; the offline spoken-request fallback (20/45) needs re-picking |

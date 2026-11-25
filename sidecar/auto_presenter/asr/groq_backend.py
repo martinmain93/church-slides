@@ -1,5 +1,10 @@
 """Groq-hosted Whisper backend.
 
+Deprecated (2026-11-23): Groq's free tier can't carry a church's use and
+paid tiers aren't available, so Groq integrations are on their way out.
+Live speech no longer offers it: the app ignores a saved Groq choice and
+runs the on-device engine (Apple silicon) or no live AI.
+
 The ASR analogue of `decision.instructions`'s `GenericLLMBackend`: wrap a
 hosted API behind the exact `ASRBackend` Protocol (`asr.backend`) the local
 `WhisperBackend` already satisfies, so `SlidingWindowWrapper` — and

@@ -288,7 +288,15 @@ build_arch() {
   [[ -f "$update" && -f "$update.sig" ]] || die "no signed updater bundle in $bundle/macos"
   cp "$update" "$OUT/Church-Slides-$label.app.tar.gz"
   cp "$update.sig" "$OUT/sigs/$label.sig"
+  # The built .app has served its purpose (the DMG and the updater archive
+  # carry it). Left in target/, Spotlight and Launchpad list it as another
+  # identical "Church Slides", easy to open by mistake instead of the
+  # installed one (2026-11-24: the Intel build, opened on an M1). Try a build
+  # from build/release's DMG instead.
+  "$LSREGISTER" -u "$app" 2>/dev/null || true
+  rm -rf "$app"
 }
+LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
 
 # Run the engine that was just frozen on the fixture service and report CPU,
 # memory, timings and slide accuracy against what's expected for this Mac

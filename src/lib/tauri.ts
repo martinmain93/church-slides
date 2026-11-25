@@ -491,6 +491,8 @@ export interface BandInfo {
   /** Unlocks the leader controls. */
   pin: string;
   clients: number;
+  /** Devices with the leader controls unlocked. */
+  leaders: number;
 }
 
 export async function bandStart(): Promise<BandInfo> {
@@ -501,7 +503,7 @@ export async function bandInfo(): Promise<BandInfo | null> {
   return invoke<BandInfo | null>("band_info");
 }
 
-export async function bandPublish(kind: "setlist" | "position" | "hosted", payload: unknown): Promise<void> {
+export async function bandPublish(kind: "setlist" | "position" | "hosted" | "jump_hold", payload: unknown): Promise<void> {
   await invoke<void>("band_publish", { kind, payload });
 }
 

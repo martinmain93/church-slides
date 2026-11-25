@@ -344,7 +344,7 @@ function bodyFromSlides(slides: string[]): string {
     .map((s) =>
       s
         .split("\n")
-        .map((line) => (/^\s*\[[^\]]+\]\s*$/.test(line) ? `​${line}` : line))
+        .map((line) => (/^\s*\[[^\]]+\]\s*$/.test(line) ? `\u200B${line}` : line))
         .join("\n"),
     )
     .join("\n\n");

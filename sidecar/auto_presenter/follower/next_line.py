@@ -92,6 +92,9 @@ def line_phones(words: tuple[str, ...]) -> tuple[int, ...]:
 #: Where a release build carries the model (`sidecar.spec`), and where
 #: `scripts/setup_next_line_model.py` installs it for development.
 MODEL_FILE = "next_line_head.npz"
+#: The same model trained on Qwen3-ASR's audio tower (`qwen_encoder`), for
+#: sessions on the Qwen streaming backend (`asr_qwen_streaming`).
+QWEN_MODEL_FILE = "next_line_head_qwen.npz"
 #: The encoder the phone model was trained on, at this many 20 ms frames.
 ENCODER_REPO = "mlx-community/whisper-small.en-mlx"
 WINDOW_S = 2.5
@@ -144,6 +147,10 @@ class PhoneHead:
 
     def __init__(self, weights: dict[str, np.ndarray]) -> None:
         w = {k: np.asarray(v, np.float32) for k, v in weights.items()}
+        #: Per-channel standardisation of the encoder frames, when the model
+        #: was trained with it (the Qwen3-ASR head); None for the Whisper head.
+        self.mu = w.get("mu")
+        self.sd = w.get("sd")
         # conv as one matmul over the 5 shifted copies: (5 * 768, 512)
         cw = w["conv.0.weight"]  # (out, in, k)
         self.conv_w = cw.transpose(2, 1, 0).reshape(-1, cw.shape[0])
@@ -189,6 +196,8 @@ class PhoneHead:
 
     def __call__(self, feats: np.ndarray) -> np.ndarray:
         x = np.asarray(feats, np.float32)
+        if self.mu is not None and self.sd is not None:
+            x = (x - self.mu) / self.sd
         n_t = x.shape[0]
         p = self.k // 2
         xp = np.pad(x, ((p, p), (0, 0)))
@@ -296,6 +305,43 @@ JUMP_BACK_S = 0.5
 TICK_S = 0.25
 
 
+@dataclass(frozen=True)
+class Tuning:
+    """The decision's constants for one phone model. Scores are sums over the
+    window's frames, so they depend on the encoder's frame rate and on how
+    sure its phone model is; the Whisper head's are the ones above."""
+
+    g: float = G
+    blank_push: float = BLANK_PUSH
+    margin: float = MARGIN
+    runner_up: float = RUNNER_UP_MARGIN
+    next_prior: float = NEXT_PRIOR
+    self_margin: float = SELF_MARGIN
+    self_flip: float = SELF_FLIP_MARGIN
+
+
+WHISPER_TUNING = Tuning()
+
+
+def qwen_tuning() -> Tuning:
+    """The Qwen3-ASR head (13 frames a second, not 50): its garbage cost and
+    blank push tuned on the spike's 1,905 checks, the margins twice the
+    Whisper head's: in real time on 3 church goldens, 1.0x / 1.3x / 1.6x /
+    2.0x / 2.5x gave wrong-slide 0.260 / 0.252 / 0.236 / 0.241 / 0.260, and
+    2.0x the best perceived score with the fewest moves (docs/research/
+    QWEN3_ASR_IMPROVEMENTS.md). `AUTO_PRESENTER_QWEN_CHECK_SCALE` for trials."""
+    k = float(os.environ.get("AUTO_PRESENTER_QWEN_CHECK_SCALE", "2.0"))
+    return Tuning(
+        g=3.0,
+        blank_push=4.0,
+        margin=MARGIN * k,
+        runner_up=RUNNER_UP_MARGIN * k,
+        next_prior=NEXT_PRIOR * k,
+        self_margin=SELF_MARGIN * k,
+        self_flip=SELF_FLIP_MARGIN * k,
+    )
+
+
 @dataclass
 class _Line:
     slide: int
@@ -312,6 +358,7 @@ class NextLineCheck:
     `take_flip` hands over a slide to show, at most once."""
 
     slide_words: list[list[str]]
+    tuning: Tuning = WHISPER_TUNING
     fired: int | None = None
     t_fired: float = -1e9
     done: float | None = None
@@ -365,6 +412,7 @@ class NextLineCheck:
         """One tick at audio time `tt`. `mass`: the follower's belief per
         slide; `shown`: the follower's slide on screen; `displayed`: the
         latest read-out's slide."""
+        t = self.tuning
         sub = np.asarray(logits, np.float64)
         pb = np.exp(sub[:, 0] - np.logaddexp.reduce(sub, axis=1))
         self.quiet = self.quiet + dt if float((1 - pb).mean()) < QUIET_SINGING else 0.0
@@ -374,20 +422,20 @@ class NextLineCheck:
         if shown is not None and shown in self._lines:
             now = shown
         sub = sub.copy()
-        sub[:, 0] -= BLANK_PUSH
+        sub[:, 0] -= t.blank_push
         lp = sub - np.logaddexp.reduce(sub, axis=1, keepdims=True)
         # which line is being sung: the line-finder over every distinct line
         uniq = self._distinct
         ph = [self._lines[j].phones for j in uniq]
-        tl = score_chains(lp, ph, G, [len(p) for p in ph]).in_tail
+        tl = score_chains(lp, ph, t.g, [len(p) for p in ph]).in_tail
         j = int(np.argmax(tl))
         now_text = self._text(now)
         base = next((i for i, u in enumerate(uniq) if self._lines[u].text == now_text), None)
-        if base is None or tl[j] - tl[base] >= SELF_MARGIN:
+        if base is None or tl[j] - tl[base] >= t.self_margin:
             now = uniq[j]
             if (
                 self._text(displayed) != self._lines[now].text
-                and tl[j] - tl[base if base is not None else j] >= SELF_FLIP_MARGIN
+                and tl[j] - tl[base if base is not None else j] >= t.self_flip
             ):
                 self.flip = (now, tt)  # the band is on another line than the screen
         cur = self.fired if self.fired is not None and tt - self.t_fired < HOLD_S else now
@@ -403,7 +451,7 @@ class NextLineCheck:
         cp = [self._lines[c].phones for c in cands]
         tail = line.phones
         n = len(cands)
-        ch = score_chains(lp, [tail + x for x in cp], G, [len(tail)] * n, [line.head] * n)
+        ch = score_chains(lp, [tail + x for x in cp], t.g, [len(tail)] * n, [line.head] * n)
         stay = float(ch.in_tail.max())
         best = ch.in_cand
         end_state = 2 * line.before_last + 1
@@ -414,17 +462,17 @@ class NextLineCheck:
         if self.quiet >= QUIET_S:
             self.done, self.done_for = tt, cur  # a break: whatever is sung next is an opening
         if self.done is not None and tt - self.done <= WAIT_S:
-            free = score_chains(lp, cp, G, [0] * n, [0] * n).in_cand
+            free = score_chains(lp, cp, t.g, [0] * n, [0] * n).in_cand
             best = np.maximum(best, free)
-            stay = max(stay, -G * lp.shape[0])
+            stay = max(stay, -t.g * lp.shape[0])
         nxt = next((s for s in range(cur + 1, len(self.slide_words)) if self.slide_words[s]), None)
         nxt_text = self._text(nxt)
-        best = best + np.array([NEXT_PRIOR * (self._lines[c].text == nxt_text) for c in cands])
+        best = best + np.array([t.next_prior * (self._lines[c].text == nxt_text) for c in cands])
         k = int(np.argmax(best))
         texts = [self._lines[c].text for c in cands]
         others = [best[i] for i in range(n) if texts[i] != texts[k]]
         runner = max(others) if others else -1e18
-        if best[k] - stay >= MARGIN and best[k] - runner >= RUNNER_UP_MARGIN and cands[k] != cur:
+        if best[k] - stay >= t.margin and best[k] - runner >= t.runner_up and cands[k] != cur:
             self.fired, self.t_fired = cands[k], tt
             self.done = self.done_for = None
             self.flip = (cands[k], tt)
@@ -499,6 +547,38 @@ def mlx_encoder(repo: str):
             for block in enc.blocks:
                 x, _, _ = block(x)
             out = enc.ln_post(x)[0].astype(mx.float32)
+            mx.eval(out)
+            return np.array(out)
+
+    return encode
+
+
+def qwen_encoder(backend):
+    """Qwen3-ASR's audio tower on `WINDOW_S` of audio (33 frames of 1024),
+    the features `QWEN_MODEL_FILE` was trained on: the streaming backend's own
+    model, on a stream of its own and outside the GPU lock, as `mlx_encoder`
+    reads Whisper's. Returns None until a streaming step has run
+    (`qwen_backend.FIRST_STEP`): the tick is skipped."""
+    import threading
+
+    local = threading.local()
+
+    def encode(audio_16k: np.ndarray) -> np.ndarray | None:
+        import mlx.core as mx
+        from mlx_qwen3_asr.audio import compute_features
+
+        from auto_presenter.asr.qwen_backend import FIRST_STEP
+
+        model = backend._model
+        if not FIRST_STEP.is_set() or model is None:
+            return None
+        stream = getattr(local, "stream", None)
+        if stream is None:
+            stream = local.stream = mx.new_stream(mx.gpu)
+        with mx.stream(stream):
+            mel, lens = compute_features(audio_16k.astype(np.float32))
+            feats, _ = model.audio_tower(mel.astype(mx.float16), lens)
+            out = feats[0].astype(mx.float32)
             mx.eval(out)
             return np.array(out)
 
@@ -586,8 +666,8 @@ class PhoneListener:
         self._stop.set()
 
 
-def load_head() -> PhoneHead | None:
-    p = model_dir() / MODEL_FILE
+def load_head(name: str = MODEL_FILE) -> PhoneHead | None:
+    p = model_dir() / name
     if not p.is_file():
         return None
     try:

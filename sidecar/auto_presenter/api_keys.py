@@ -1,5 +1,8 @@
 """API keys for hosted providers, shared across features.
 
+Deprecated (2026-11-23): Groq's free tier can't carry a church's use and
+paid tiers aren't available, so Groq integrations are on their way out.
+
 Originally written for hosted spoken-instruction models
 (`decision.instructions`); a provider's key is just an account credential,
 not a feature credential, so the same "groq" entry a user saves here also

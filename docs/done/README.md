@@ -28,6 +28,7 @@ and [FEATURES.md](../FEATURES.md).
 | [AI_ASSISTED_MODE](AI_ASSISTED_MODE.md) | Assist: the operator drives, the AI highlights where the band is |
 | [SPOKEN_INSTRUCTIONS](SPOKEN_INSTRUCTIONS.md) | "Go back to verse one": spoken requests |
 | [NEXT_LINE_CHECK](NEXT_LINE_CHECK.md) | Hearing a new line start in about a second |
+| [OFFSETLIST_TRIGGER](OFFSETLIST_TRIGGER.md) | Finding a song that isn't in the setlist: why it never fired, and the vote trigger that replaced it |
 | [LEARNED_REFERENCES](LEARNED_REFERENCES.md) | Following a song with no lead sheet from how the church plays it |
 | [BIBLE_INTEGRATION](BIBLE_INTEGRATION.md) | Scripture: translations, licensing, references |
 | [SERVICE_ITEMS](SERVICE_ITEMS.md) | Prepared scripture and text slides in a service |

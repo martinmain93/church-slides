@@ -18,12 +18,14 @@ import { isInTauri } from "@/lib/invoke";
 import {
   BAND_CLIENTS_EVENT,
   BAND_COMMAND_EVENT,
+  BAND_LEADERS_EVENT,
   clampTranspose,
   isBandCommand,
   type BandCommand,
   type BandPosition,
   type BandSetlist,
 } from "@/lib/band/protocol";
+import type { JumpHoldApi } from "@/lib/presentation/jumpHold";
 import type { BlankMode, PresentationContext } from "@/lib/presentation/state";
 import { onlineRoom } from "@/lib/band/onlineRoom";
 import { hostedRoom, type HostedRoomState } from "@/lib/band/hostedRoom";
@@ -80,12 +82,19 @@ export interface BandHostOptions {
    * screen. Without it a transpose lasts only while the service runs.
    */
   setKey?: (itemId: string, key: string | null) => void;
+  /**
+   * AI jumps waiting for the leader (single-screen view only): shown on the
+   * leader's screen, answered from it, and told how many leaders are on.
+   */
+  jumpHold?: JumpHoldApi;
 }
 
 export interface BandHostApi {
   /** Null until band screens are switched on. */
   info: BandInfo | null;
   clients: number;
+  /** Devices on the local band server with the leader controls unlocked. */
+  leaders: number;
   /** Switch the local band server on; `remember` (default) brings it back next launch. */
   start: (remember?: boolean) => Promise<void>;
   error: string | null;
@@ -142,6 +151,8 @@ export function resolveBandCommand(
     return { type: "add", songId: command.songId, goNow: command.when === "now", key: command.key ?? null };
   }
   if (command.kind === "set_blank") return { type: "blank", on: command.on };
+  // Answered by the waiting jump itself (`applyCommandRef`), not here.
+  if (command.kind === "jump_answer") return null;
   const idx = ctx.items.findIndex((it) => it.itemId === command.itemId);
   if (idx < 0) return null; // the song was removed after the leader's screen drew it
   // Slide 0 is the blank that opens every song.
@@ -164,6 +175,7 @@ export function resolveBandCommand(
 export function useBandServer(): BandHostApi {
   const [info, setInfo] = useState<BandInfo | null>(null);
   const [clients, setClients] = useState(0);
+  const [leaders, setLeaders] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const running = info !== null;
 
@@ -172,6 +184,7 @@ export function useBandServer(): BandHostApi {
       const i = await bandStart();
       setInfo(i);
       setClients(i.clients);
+      setLeaders(i.leaders ?? 0);
       setError(null);
       if (remember) writeAutostart(true);
     } catch (err) {
@@ -190,6 +203,7 @@ export function useBandServer(): BandHostApi {
         if (i) {
           setInfo(i);
           setClients(i.clients);
+          setLeaders(i.leaders ?? 0);
         } else if (readAutostart()) {
           void start();
         }
@@ -207,8 +221,12 @@ export function useBandServer(): BandHostApi {
     let cancelled = false;
     void import("@tauri-apps/api/event").then(async ({ listen }) => {
       const un = await listen<number>(BAND_CLIENTS_EVENT, (e) => setClients(e.payload));
-      if (cancelled) un();
-      else unlisten = un;
+      const unLeaders = await listen<number>(BAND_LEADERS_EVENT, (e) => setLeaders(e.payload));
+      unlisten = () => {
+        un();
+        unLeaders();
+      };
+      if (cancelled) unlisten();
     });
     return () => {
       cancelled = true;
@@ -221,13 +239,30 @@ export function useBandServer(): BandHostApi {
     getPin: async () => (await bandInfo())?.pin ?? (await bandStart()).pin,
   });
 
-  return useMemo(() => ({ info, clients, start, error, online }), [info, clients, start, error, online]);
+  return useMemo(
+    () => ({ info, clients, leaders, start, error, online }),
+    [info, clients, leaders, start, error, online],
+  );
 }
 
 export function useBandHost(opts: BandHostOptions): BandHostApi {
-  const { ctx, itemIdx, slideIdx, blankMode, jumpTo, addSong, toggleBlank, setKey } = opts;
+  const { ctx, itemIdx, slideIdx, blankMode, jumpTo, addSong, toggleBlank, setKey, jumpHold } = opts;
   const server = useBandServer();
   const { info } = server;
+
+  // Jumps wait only while a leader's screen on this computer's band server
+  // is unlocked, and only if it's running: no server, no leader, no wait.
+  const leadersOn = info !== null ? server.leaders : 0;
+  const setHoldLeaders = jumpHold?.setLeaders;
+  useEffect(() => {
+    setHoldLeaders?.(leadersOn);
+  }, [setHoldLeaders, leadersOn]);
+  const holdNotice = jumpHold?.notice ?? null;
+  useEffect(() => {
+    if (info !== null) void bandPublish("jump_hold", holdNotice).catch(() => undefined);
+  }, [info, holdNotice]);
+  const jumpHoldRef = useRef(jumpHold);
+  jumpHoldRef.current = jumpHold;
   const [charts, setCharts] = useState<Record<string, ChordChart | null>>({});
   const [transposes, setTransposes] = useState<Record<string, number>>({});
 
@@ -359,6 +394,10 @@ export function useBandHost(opts: BandHostOptions): BandHostApi {
   }, [ctx, pendingJumpItemId]);
   applyCommandRef.current = (payload: unknown) => {
     if (!isBandCommand(payload)) return;
+    if (payload.kind === "jump_answer") {
+      jumpHoldRef.current?.answer(payload.id, payload.go);
+      return;
+    }
     const action = resolveBandCommand(payload, ctxRef.current);
     if (action?.type === "jump") {
       jumpToRef.current(action.itemIdx, action.slideIdx);

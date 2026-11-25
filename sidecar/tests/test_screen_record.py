@@ -26,6 +26,7 @@ from auto_presenter.protocol import (
 )
 from auto_presenter.server_state import (
     AI_MOVE_ECHO_S,
+    AI_MOVE_ECHO_SONG_S,
     _state,
     check_ai_move_landed,
     deliver_decision,
@@ -112,6 +113,24 @@ def test_a_move_the_app_never_shows_puts_the_record_back(session):
     item, slide, _sent = _state.ai_move_pending
     _state.ai_move_pending = (item, slide, time.monotonic() - AI_MOVE_ECHO_S - 0.1)
     check_ai_move_landed()  # the app never reported it: declined
+    assert engine._displayed == (0, 1) and _state.ai_move_pending is None
+
+
+def test_a_move_to_another_song_waits_longer_for_the_leader(session):
+    """With nobody at the laptop, the app holds a jump to another song for the
+    band leader's OK (up to 3 s): not declined at the usual 1.5 s."""
+    engine, _director, _shown = session
+    _state.last_slide = (0, 1)
+    engine.note_displayed(1, 1)
+    assert deliver_decision(
+        MatcherDecision(item_idx=1, slide_idx=1, t_seconds=11.0, confidence=1.0)
+    )
+    item, slide, _sent = _state.ai_move_pending
+    _state.ai_move_pending = (item, slide, time.monotonic() - AI_MOVE_ECHO_S - 0.1)
+    check_ai_move_landed()  # the leader may still be deciding
+    assert engine._displayed == (1, 1) and _state.ai_move_pending is not None
+    _state.ai_move_pending = (item, slide, time.monotonic() - AI_MOVE_ECHO_SONG_S - 0.1)
+    check_ai_move_landed()  # the leader said stop, or the app declined it
     assert engine._displayed == (0, 1) and _state.ai_move_pending is None
 
 

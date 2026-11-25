@@ -36,10 +36,21 @@ import websockets  # noqa: E402
 
 from auto_presenter.protocol import ParticleFilterTunables  # noqa: E402
 
-DEFAULT_DATA = REPO.parent / "auto-presenter-research" / "public_worship" / "speech"
+#: the research folder sits beside the checkout; a worktree is nested inside it
+DEFAULT_DATA = next(
+    (p / "auto-presenter-research" for p in REPO.parents if (p / "auto-presenter-research").is_dir()),
+    REPO.parent / "auto-presenter-research",
+) / "public_worship" / "speech"
 #: Too frequent to keep, and not evidence of a trigger.
 SKIP_KINDS = {"audio_level", "belief_state", "pipeline_health", "music_state", "chord_state"}
 TRIGGER_SOURCES = {"ai", "voice"}
+
+
+def add_song_library(db: Path, src: Path) -> None:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from run_follower_eval import add_song_library as add
+
+    add(db, src.expanduser().resolve())
 
 
 def as_wav(src: Path, cache: Path) -> Path:
@@ -88,7 +99,10 @@ async def play(wav: Path, items: list[dict], model: str, backend: str, port: int
                     continue
                 kinds[kind] = kinds.get(kind, 0) + 1
                 log.write(json.dumps({"t_audio": round(t_audio, 2), **msg}) + "\n")
-                if kind == "slide_change" and msg.get("source") in TRIGGER_SOURCES:
+                if kind == "import_library_song":
+                    # a library song put into the setlist by itself: a false trigger too
+                    triggers.append((round(t_audio, 1), "import", msg.get("song_id"), msg.get("slide_idx")))
+                elif kind == "slide_change" and msg.get("source") in TRIGGER_SOURCES:
                     triggers.append((round(t_audio, 1), msg["source"], msg["item_idx"], msg["slide_idx"]))
                 elif kind == "singing_state" and msg.get("blanking"):
                     blanks += 1
@@ -108,6 +122,9 @@ async def run_file(wav: Path, items, args, log_path: Path) -> dict:
         tmp = Path(td)
         # an empty library: no lead sheets, no learned rows, nothing from the real app
         db = tmp / "library.db"
+        if args.song_library is not None:
+            # songs only, so the off-setlist watcher can import (and so be caught doing it)
+            add_song_library(db, args.song_library)
         (tmp / "recordings").mkdir()
         proc = subprocess.Popen(
             [sys.executable, "-m", "auto_presenter", "--port", str(args.port), "--db-path", str(db), "--dev-tools"],
@@ -139,6 +156,8 @@ def main() -> int:
     ap.add_argument("--backend", default="mlx")
     ap.add_argument("--port", type=int, default=8794)
     ap.add_argument("--out", type=Path, default=Path("speech_negatives.json"))
+    ap.add_argument("--song-library", type=Path,
+                    help="a library.db whose songs the engine may import (default: none, so off-setlist import never runs)")
     ap.add_argument("--tunable", action="append", default=[], metavar="KEY=VALUE",
                     help="override a ParticleFilterTunables field (JSON value)")
     args = ap.parse_args()

@@ -62,7 +62,7 @@ describe("AIStatusPill when live AI can't run", () => {
     });
     render(<AIStatusPill />);
     const pill = screen.getByText("AI unavailable on this computer");
-    expect(pill.closest("[title]")?.getAttribute("title")).toMatch(/cloud option/);
+    expect(pill.closest("[title]")?.getAttribute("title")).toMatch(/Presenting by hand/);
     // nothing to switch on
     expect(screen.queryByTestId("ai-toggle")).toBeNull();
   });
