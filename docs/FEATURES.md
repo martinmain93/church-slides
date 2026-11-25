@@ -70,6 +70,12 @@ history.
   networks that keep devices apart.
 - **Share a setlist or a whole library** with another computer on the same
   network.
+- **The web app** (preview, `app.churchslides.app`): an organization's songs
+  with chords in the order they're sung, song editing (words, order,
+  credits) and service planning (dates, drag to reorder, readings and text
+  slides) from any device, synced with every slides computer. Services have
+  a date on the desktop too.
+  ([WEB_AND_MOBILE](roadmap/WEB_AND_MOBILE.md))
 
 ## Behind the scenes
 

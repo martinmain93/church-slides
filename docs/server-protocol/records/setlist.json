@@ -3,6 +3,7 @@
   "id": "setlist_01HSAMPLESUNDAY0000000",
   "fields": {
     "name": "Sunday 22 Nov",
+    "service_date": "2026-11-22",
     "created_at": 1731600000000,
     "last_used_at": 1731700000000,
     "items": [

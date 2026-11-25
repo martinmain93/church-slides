@@ -10,6 +10,9 @@ refuses to release a version that has no entry here.
 
 ## Unreleased
 
+- New (preview): **Church Slides on the web.** Sign in at app.churchslides.app from a phone or any computer to see your organization's songs with their chords, edit words and credits, and plan services (songs, keys, readings, text slides). Changes show up on the slides computer, and theirs show up there. Presenting and chord editing stay in the app.
+- New: **services have a date.** A new service is dated for the coming Sunday and named after it, never with the same name as another; change either one in the setlist's header.
+
 ## 0.2.3 — 18 November 2026
 
 - Changed: **adding songs to a setlist no longer shuffles the list.** A song you add stays where it is, with a tick, so the next click lands on the song you meant. Click it again to add a reprise.

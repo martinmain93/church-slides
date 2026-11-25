@@ -21,6 +21,9 @@ use crate::db::{Db, SongRow};
 pub struct SetlistRow {
     pub id: String,
     pub name: String,
+    /// The day the service is for, `YYYY-MM-DD` (migration 014), or None.
+    #[serde(default)]
+    pub service_date: Option<String>,
     pub created_at: i64,
     pub last_used_at: Option<i64>,
     /// Item names in setlist order — song titles, and a passage's reference
@@ -94,7 +97,7 @@ pub fn list_setlists(db: &Arc<Db>) -> Result<Vec<SetlistRow>> {
     // A setlist not yet presented sorts by when it was made, so a new one is
     // at the top of Home rather than under every service ever run.
     let mut stmt = conn.prepare(
-        "SELECT id, name, created_at, last_used_at \
+        "SELECT id, name, created_at, last_used_at, service_date \
          FROM setlists \
          ORDER BY COALESCE(last_used_at, created_at) DESC, name COLLATE NOCASE",
     )?;
@@ -137,7 +140,7 @@ pub fn get_setlist(db: &Arc<Db>, id: &str) -> Result<Option<SetlistDetail>> {
     let conn = db.conn().lock().unwrap();
 
     let setlist = match conn
-        .prepare("SELECT id, name, created_at, last_used_at FROM setlists WHERE id = ?1")?
+        .prepare("SELECT id, name, created_at, last_used_at, service_date FROM setlists WHERE id = ?1")?
         .query_row(params![id], map_setlist_row)
     {
         Ok(s) => s,
@@ -192,7 +195,8 @@ pub fn get_setlist(db: &Arc<Db>, id: &str) -> Result<Option<SetlistDetail>> {
     Ok(Some(SetlistDetail { setlist, items }))
 }
 
-pub fn create_setlist(db: &Arc<Db>, name: &str) -> Result<String> {
+pub fn create_setlist(db: &Arc<Db>, name: &str, service_date: Option<&str>) -> Result<String> {
+    let service_date = checked_date(service_date)?;
     let id = format!(
         "setlist_{}",
         ulid::Ulid::new().to_string().to_lowercase()
@@ -200,10 +204,32 @@ pub fn create_setlist(db: &Arc<Db>, name: &str) -> Result<String> {
     let now = unix_ms();
     let conn = db.conn().lock().unwrap();
     conn.execute(
-        "INSERT INTO setlists (id, name, created_at) VALUES (?1, ?2, ?3)",
-        params![id, name, now],
+        "INSERT INTO setlists (id, name, created_at, service_date) VALUES (?1, ?2, ?3, ?4)",
+        params![id, name, now, service_date],
     )?;
     Ok(id)
+}
+
+/// A service date as stored: `YYYY-MM-DD`, or None. Anything else is refused.
+fn checked_date(date: Option<&str>) -> Result<Option<&str>> {
+    match date {
+        None | Some("") => Ok(None),
+        Some(d) if d.len() == 10 && d.bytes().enumerate().all(|(i, b)| if i == 4 || i == 7 { b == b'-' } else { b.is_ascii_digit() }) => Ok(Some(d)),
+        Some(d) => Err(anyhow!("not a date: {d}")),
+    }
+}
+
+pub fn update_setlist_date(db: &Arc<Db>, id: &str, service_date: Option<&str>) -> Result<()> {
+    let service_date = checked_date(service_date)?;
+    let conn = db.conn().lock().unwrap();
+    let n = conn.execute(
+        "UPDATE setlists SET service_date = ?2 WHERE id = ?1",
+        params![id, service_date],
+    )?;
+    if n == 0 {
+        return Err(anyhow!("no setlist with id {id}"));
+    }
+    Ok(())
 }
 
 pub fn update_setlist_name(db: &Arc<Db>, id: &str, name: &str) -> Result<()> {
@@ -350,15 +376,16 @@ pub fn set_setlist_item_content(
 
 /// "Start from last service": a new setlist holding a copy of another's
 /// items — songs, readings and every per-service edit — in the same order.
-pub fn duplicate_setlist(db: &Arc<Db>, source_id: &str, name: &str) -> Result<String> {
+pub fn duplicate_setlist(db: &Arc<Db>, source_id: &str, name: &str, service_date: Option<&str>) -> Result<String> {
+    let service_date = checked_date(service_date)?;
     let mut conn = db.conn().lock().unwrap();
     let tx = conn.transaction()?;
     tx.query_row("SELECT 1 FROM setlists WHERE id = ?1", params![source_id], |_| Ok(()))
         .map_err(|_| anyhow!("no setlist with id {source_id}"))?;
     let id = format!("setlist_{}", ulid::Ulid::new().to_string().to_lowercase());
     tx.execute(
-        "INSERT INTO setlists (id, name, created_at) VALUES (?1, ?2, ?3)",
-        params![id, name, unix_ms()],
+        "INSERT INTO setlists (id, name, created_at, service_date) VALUES (?1, ?2, ?3, ?4)",
+        params![id, name, unix_ms(), service_date],
     )?;
     type CopiedItem = (String, Option<String>, i64, Option<String>, Option<String>, Option<String>, Option<String>);
     let items: Vec<CopiedItem> = tx
@@ -608,6 +635,7 @@ fn map_setlist_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<SetlistRow> {
         name: row.get(1)?,
         created_at: row.get(2)?,
         last_used_at: row.get(3)?,
+        service_date: row.get(4)?,
         song_titles: Vec::new(),
         song_count: 0,
     })
@@ -648,9 +676,23 @@ mod tests {
     }
 
     #[test]
+    fn a_service_keeps_its_date_and_refuses_a_malformed_one() {
+        let (_d, db) = fresh();
+        let id = create_setlist(&db, "Sunday 29 Nov", Some("2026-11-29")).unwrap();
+        assert_eq!(get_setlist(&db, &id).unwrap().unwrap().setlist.service_date.as_deref(), Some("2026-11-29"));
+        update_setlist_date(&db, &id, Some("2026-12-06")).unwrap();
+        let copy = duplicate_setlist(&db, &id, "Sunday 13 Dec", Some("2026-12-13")).unwrap();
+        assert_eq!(list_setlists(&db).unwrap().iter().find(|s| s.id == id).unwrap().service_date.as_deref(), Some("2026-12-06"));
+        assert_eq!(get_setlist(&db, &copy).unwrap().unwrap().setlist.service_date.as_deref(), Some("2026-12-13"));
+        assert!(update_setlist_date(&db, &id, Some("6 Dec")).is_err());
+        update_setlist_date(&db, &id, None).unwrap();
+        assert_eq!(get_setlist(&db, &id).unwrap().unwrap().setlist.service_date, None);
+    }
+
+    #[test]
     fn create_then_list() {
         let (_d, db) = fresh();
-        let id = create_setlist(&db, "Sunday morning").unwrap();
+        let id = create_setlist(&db, "Sunday morning", None).unwrap();
         let all = list_setlists(&db).unwrap();
         assert_eq!(all.len(), 1);
         assert_eq!(all[0].id, id);
@@ -661,7 +703,7 @@ mod tests {
     fn new_setlist_lists_above_one_presented_before_it_was_made() {
         let (_d, db) = fresh();
         let week = 7 * 24 * 3600 * 1000;
-        let old = create_setlist(&db, "Last week").unwrap();
+        let old = create_setlist(&db, "Last week", None).unwrap();
         {
             let conn = db.conn().lock().unwrap();
             conn.execute(
@@ -670,7 +712,7 @@ mod tests {
             )
             .unwrap();
         }
-        let new = create_setlist(&db, "This Sunday").unwrap();
+        let new = create_setlist(&db, "This Sunday", None).unwrap();
         let all = list_setlists(&db).unwrap();
         assert_eq!(all[0].id, new);
         assert_eq!(all[1].id, old);
@@ -681,8 +723,8 @@ mod tests {
         let (_d, db) = fresh();
         let song_a = make_song(&db, "Alpha");
         let song_b = make_song(&db, "Bravo");
-        let full = create_setlist(&db, "Full").unwrap();
-        let empty = create_setlist(&db, "Empty").unwrap();
+        let full = create_setlist(&db, "Full", None).unwrap();
+        let empty = create_setlist(&db, "Empty", None).unwrap();
         let a = add_setlist_item(&db, &full, &song_a).unwrap();
         let b = add_setlist_item(&db, &full, &song_b).unwrap();
         reorder_setlist(&db, &full, &[b, a]).unwrap();
@@ -700,7 +742,7 @@ mod tests {
         let song_b = make_song(&db, "Bravo");
         let song_c = make_song(&db, "Charlie");
 
-        let setlist_id = create_setlist(&db, "Test").unwrap();
+        let setlist_id = create_setlist(&db, "Test", None).unwrap();
         let item_a = add_setlist_item(&db, &setlist_id, &song_a).unwrap();
         let item_b = add_setlist_item(&db, &setlist_id, &song_b).unwrap();
         let item_c = add_setlist_item(&db, &setlist_id, &song_c).unwrap();
@@ -717,7 +759,7 @@ mod tests {
     fn add_item_uses_incrementing_position() {
         let (_d, db) = fresh();
         let song = make_song(&db, "Song");
-        let setlist_id = create_setlist(&db, "Test").unwrap();
+        let setlist_id = create_setlist(&db, "Test", None).unwrap();
 
         for i in 0..5 {
             add_setlist_item(&db, &setlist_id, &song).unwrap();
@@ -735,7 +777,7 @@ mod tests {
         let song_a = make_song(&db, "Alpha");
         let song_b = make_song(&db, "Bravo");
         let song_c = make_song(&db, "Charlie");
-        let setlist_id = create_setlist(&db, "Test").unwrap();
+        let setlist_id = create_setlist(&db, "Test", None).unwrap();
         let a = add_setlist_item(&db, &setlist_id, &song_a).unwrap();
         let b = add_setlist_item(&db, &setlist_id, &song_b).unwrap();
         let c = add_setlist_item(&db, &setlist_id, &song_c).unwrap();
@@ -755,8 +797,8 @@ mod tests {
     fn reorder_rejects_foreign_items() {
         let (_d, db) = fresh();
         let song = make_song(&db, "Song");
-        let sl1 = create_setlist(&db, "One").unwrap();
-        let sl2 = create_setlist(&db, "Two").unwrap();
+        let sl1 = create_setlist(&db, "One", None).unwrap();
+        let sl2 = create_setlist(&db, "Two", None).unwrap();
         let item_in_sl1 = add_setlist_item(&db, &sl1, &song).unwrap();
 
         // Try to reorder sl2 with an item from sl1.
@@ -768,7 +810,7 @@ mod tests {
     fn delete_setlist_cascades_items() {
         let (_d, db) = fresh();
         let song = make_song(&db, "Song");
-        let setlist_id = create_setlist(&db, "Test").unwrap();
+        let setlist_id = create_setlist(&db, "Test", None).unwrap();
         add_setlist_item(&db, &setlist_id, &song).unwrap();
         add_setlist_item(&db, &setlist_id, &song).unwrap();
 
@@ -789,7 +831,7 @@ mod tests {
     fn remove_item_keeps_others() {
         let (_d, db) = fresh();
         let song = make_song(&db, "Song");
-        let setlist_id = create_setlist(&db, "Test").unwrap();
+        let setlist_id = create_setlist(&db, "Test", None).unwrap();
         let a = add_setlist_item(&db, &setlist_id, &song).unwrap();
         let b = add_setlist_item(&db, &setlist_id, &song).unwrap();
         let c = add_setlist_item(&db, &setlist_id, &song).unwrap();
@@ -805,14 +847,14 @@ mod tests {
     fn an_item_keeps_its_own_look_and_a_copy_keeps_it_too() {
         let (_d, db) = fresh();
         let song = make_song(&db, "Song");
-        let setlist_id = create_setlist(&db, "Test").unwrap();
+        let setlist_id = create_setlist(&db, "Test", None).unwrap();
         let item = add_setlist_item(&db, &setlist_id, &song).unwrap();
         let detail = get_setlist(&db, &setlist_id).unwrap().unwrap();
         assert_eq!(detail.items[0].item.look, None);
 
         let look = r#"{"theme":"light","font":"georgia","size":"l","weight":"regular"}"#;
         set_setlist_item_look(&db, &setlist_id, &item, Some(look)).unwrap();
-        let copy = duplicate_setlist(&db, &setlist_id, "Copy").unwrap();
+        let copy = duplicate_setlist(&db, &setlist_id, "Copy", None).unwrap();
         let copied = get_setlist(&db, &copy).unwrap().unwrap();
         assert_eq!(copied.items[0].item.look.as_deref(), Some(look));
 
@@ -827,10 +869,10 @@ mod tests {
     fn an_item_keeps_its_own_key_and_a_copy_keeps_it_too() {
         let (_d, db) = fresh();
         let song = make_song(&db, "Song");
-        let setlist_id = create_setlist(&db, "Test").unwrap();
+        let setlist_id = create_setlist(&db, "Test", None).unwrap();
         let item = add_setlist_item(&db, &setlist_id, &song).unwrap();
         set_setlist_item_key(&db, &setlist_id, &item, Some("Bb")).unwrap();
-        let copy = duplicate_setlist(&db, &setlist_id, "Copy").unwrap();
+        let copy = duplicate_setlist(&db, &setlist_id, "Copy", None).unwrap();
         assert_eq!(get_setlist(&db, &copy).unwrap().unwrap().items[0].item.song_key.as_deref(), Some("Bb"));
 
         set_setlist_item_key(&db, &setlist_id, &item, None).unwrap();
@@ -847,7 +889,7 @@ mod tests {
     fn set_and_clear_slides_override() {
         let (_d, db) = fresh();
         let song = make_song(&db, "Song");
-        let setlist_id = create_setlist(&db, "Test").unwrap();
+        let setlist_id = create_setlist(&db, "Test", None).unwrap();
         let item = add_setlist_item(&db, &setlist_id, &song).unwrap();
 
         // Default: no override.
@@ -870,8 +912,8 @@ mod tests {
     fn set_slides_override_rejects_foreign_item() {
         let (_d, db) = fresh();
         let song = make_song(&db, "Song");
-        let sl1 = create_setlist(&db, "One").unwrap();
-        let sl2 = create_setlist(&db, "Two").unwrap();
+        let sl1 = create_setlist(&db, "One", None).unwrap();
+        let sl2 = create_setlist(&db, "Two", None).unwrap();
         let item = add_setlist_item(&db, &sl1, &song).unwrap();
         let err = set_setlist_item_slides(&db, &sl2, &item, Some("[]")).unwrap_err();
         assert!(err.to_string().contains("no item"));
@@ -881,7 +923,7 @@ mod tests {
     fn service_item_lands_after_the_selected_item() {
         let (_d, db) = fresh();
         let song = make_song(&db, "Song");
-        let sl = create_setlist(&db, "Test").unwrap();
+        let sl = create_setlist(&db, "Test", None).unwrap();
         let a = add_setlist_item(&db, &sl, &song).unwrap();
         let b = add_setlist_item(&db, &sl, &song).unwrap();
         let reading = add_service_item(
@@ -906,7 +948,7 @@ mod tests {
     #[test]
     fn service_items_refuse_bad_kinds_and_content() {
         let (_d, db) = fresh();
-        let sl = create_setlist(&db, "Test").unwrap();
+        let sl = create_setlist(&db, "Test", None).unwrap();
         assert!(add_service_item(&db, &sl, "song", "{}", None, None).is_err());
         assert!(add_service_item(&db, &sl, "video", "{}", None, None).is_err());
         assert!(add_service_item(&db, &sl, "text", "not json", None, None).is_err());
@@ -916,7 +958,7 @@ mod tests {
     fn content_updates_only_service_items() {
         let (_d, db) = fresh();
         let song = make_song(&db, "Song");
-        let sl = create_setlist(&db, "Test").unwrap();
+        let sl = create_setlist(&db, "Test", None).unwrap();
         let s = add_setlist_item(&db, &sl, &song).unwrap();
         let t = add_service_item(&db, &sl, "text", r#"{"title":"A"}"#, None, None).unwrap();
         set_setlist_item_content(&db, &sl, &t, r#"{"title":"B"}"#).unwrap();
@@ -929,7 +971,7 @@ mod tests {
     fn list_names_readings_alongside_songs() {
         let (_d, db) = fresh();
         let song = make_song(&db, "Alpha");
-        let sl = create_setlist(&db, "Sunday").unwrap();
+        let sl = create_setlist(&db, "Sunday", None).unwrap();
         add_setlist_item(&db, &sl, &song).unwrap();
         add_service_item(&db, &sl, "scripture", r#"{"reference":"Psalm 23"}"#, None, None).unwrap();
         add_service_item(&db, &sl, "text", r#"{"title":"Announcements"}"#, None, None).unwrap();
@@ -942,12 +984,12 @@ mod tests {
     fn duplicate_copies_items_and_edits_in_order() {
         let (_d, db) = fresh();
         let song = make_song(&db, "Alpha");
-        let sl = create_setlist(&db, "Last week").unwrap();
+        let sl = create_setlist(&db, "Last week", None).unwrap();
         let a = add_setlist_item(&db, &sl, &song).unwrap();
         set_setlist_item_slides(&db, &sl, &a, Some("[]")).unwrap();
         add_service_item(&db, &sl, "text", r#"{"title":"Creed"}"#, Some("[1]"), None).unwrap();
 
-        let copy = duplicate_setlist(&db, &sl, "This week").unwrap();
+        let copy = duplicate_setlist(&db, &sl, "This week", None).unwrap();
         let src = get_setlist(&db, &sl).unwrap().unwrap();
         let dst = get_setlist(&db, &copy).unwrap().unwrap();
         assert_eq!(dst.setlist.name, "This week");
@@ -978,9 +1020,9 @@ mod tests {
     #[test]
     fn mark_used_bumps_recency_sort() {
         let (_d, db) = fresh();
-        let older = create_setlist(&db, "Older").unwrap();
+        let older = create_setlist(&db, "Older", None).unwrap();
         std::thread::sleep(std::time::Duration::from_millis(5));
-        let newer = create_setlist(&db, "Newer").unwrap();
+        let newer = create_setlist(&db, "Newer", None).unwrap();
 
         // By default newer (most recently created) sorts first.
         let by_default = list_setlists(&db).unwrap();
@@ -1005,9 +1047,9 @@ mod tests {
         let song_b = make_song(&db, "Bravo");
         let song_c = make_song(&db, "Charlie");
 
-        let sl1 = create_setlist(&db, "Sunday").unwrap();
-        let sl2 = create_setlist(&db, "Wednesday").unwrap();
-        let sl3 = create_setlist(&db, "Special").unwrap();
+        let sl1 = create_setlist(&db, "Sunday", None).unwrap();
+        let sl2 = create_setlist(&db, "Wednesday", None).unwrap();
+        let sl3 = create_setlist(&db, "Special", None).unwrap();
 
         // Alpha appears in 3 setlists; Bravo in 1; Charlie in 0.
         add_setlist_item(&db, &sl1, &song_a).unwrap();

@@ -36,16 +36,19 @@ import {
   getSetlist,
   listChartKeys,
   listReadings,
+  listSetlists,
   listSongsSorted,
   removeSetlistItem,
   reorderSetlist,
   setSetlistItemKey,
+  updateSetlistDate,
   updateSetlistName,
   type SetlistDetail,
   type ReadingRow,
   type SetlistItemWithSong,
   type SongRow,
 } from "@/lib/tauri";
+import { nameForDate } from "@/lib/setlistName";
 import {
   itemCountLabel,
   itemKind,
@@ -310,6 +313,23 @@ export function SetlistBuilder({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [name]);
+
+  /** A new date; a name still made from the old date follows it. */
+  async function changeDate(date: string | null) {
+    if (!detail) return;
+    try {
+      await updateSetlistDate(setlistId, date);
+      const others = (await listSetlists()).filter((s) => s.id !== setlistId).map((s) => s.name);
+      const next = date ? nameForDate(name.trim(), detail.service_date, date, others) : name;
+      setDetail({ ...detail, service_date: date });
+      if (next !== name) {
+        setName(next);
+        await updateSetlistName(setlistId, next);
+      }
+    } catch (err) {
+      toast.error(`Couldn't change the date: ${err instanceof Error ? err.message : err}`);
+    }
+  }
 
   async function persistName() {
     if (!detail || !nameDirty.current) return;
@@ -581,6 +601,14 @@ export function SetlistBuilder({
             onBlur={persistName}
             placeholder="Untitled setlist"
             className="h-9 max-w-md text-base font-semibold"
+          />
+          <Input
+            type="date"
+            value={detail.service_date ?? ""}
+            onChange={(e) => void changeDate(e.target.value || null)}
+            aria-label="Service date"
+            title="The day this service is for"
+            className="h-9 w-auto shrink-0 text-sm"
           />
           <span className="shrink-0 whitespace-nowrap text-xs text-muted-foreground">
             {itemCountLabel(detail.items)}

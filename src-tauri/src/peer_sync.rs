@@ -1199,7 +1199,7 @@ mod tests {
             }],
         )
         .unwrap();
-        let set = setlists::create_setlist(&db, "Sunday").unwrap();
+        let set = setlists::create_setlist(&db, "Sunday", None).unwrap();
         setlists::add_setlist_item(&db, &set, &a).unwrap();
         let item_b = setlists::add_setlist_item(&db, &set, &b).unwrap();
         setlists::add_setlist_item(&db, &set, &a).unwrap();
@@ -1303,7 +1303,7 @@ mod tests {
     fn scripture_and_text_items_travel_with_their_content() {
         let (_d, sdb) = db();
         let a = song(&sdb, "Oceans", "[v1]\nYou call me out upon the waters");
-        let set = setlists::create_setlist(&sdb, "Sunday").unwrap();
+        let set = setlists::create_setlist(&sdb, "Sunday", None).unwrap();
         setlists::add_setlist_item(&sdb, &set, &a).unwrap();
         let scripture = r#"{"reference":"John 3:16","verses":[{"ref":"John 3:16","text":"For God so loved"}]}"#;
         setlists::add_service_item(&sdb, &set, "scripture", scripture, None, None).unwrap();

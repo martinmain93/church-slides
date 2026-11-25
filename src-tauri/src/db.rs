@@ -27,6 +27,7 @@ const MIGRATIONS: &[(i32, &str)] = &[
     (11, include_str!("../migrations/011_setlist_item_look.sql")),
     (12, include_str!("../migrations/012_setlist_item_key.sql")),
     (13, include_str!("../migrations/013_library_look.sql")),
+    (14, include_str!("../migrations/014_setlist_service_date.sql")),
 ];
 
 /// Thread-safe handle to the SQLite database.

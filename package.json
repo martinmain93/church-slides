@@ -17,6 +17,8 @@
     "sidecar:build": "uv run --project sidecar python scripts/build_sidecar.py",
     "tauri:build:no-ai": "tauri build",
     "build:relay": "node scripts/build_relay.mjs",
+    "web:dev": "vite --config web/vite.web.config.ts",
+    "web:build": "vite build --config web/vite.web.config.ts",
     "relay:dev": "node scripts/build_relay.mjs && wrangler dev --config relay/wrangler.toml"
   },
   "dependencies": {

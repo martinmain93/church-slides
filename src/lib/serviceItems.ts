@@ -19,74 +19,37 @@
 
 import { loadDisplayLook, SIZE_SCALE, type DisplaySize } from "@/lib/displayLook";
 import { tokenize } from "@/lib/parseSong";
-import { parseSlidesOverride, resolveSlideSequence, serializeSlidesOverride, type OverrideSlide } from "@/lib/slideSequence";
+import { parseSlidesOverride } from "@/lib/slideSequence";
+import {
+  bodyFromSlides,
+  isSongItem,
+  itemKind,
+  itemTitle,
+  scriptureContent,
+  textSlides,
+  type ItemKind,
+  type ScriptureContent,
+} from "@/lib/serviceItemContent";
 import type { SetlistDetail, SetlistItemWithSong, SongRow } from "@/lib/tauri";
 import type { ScripturePassage, ScriptureVerse } from "@/types/generated";
 
-export type ItemKind = "song" | "scripture" | "text";
-
-export interface ScriptureContent {
-  /** Canonical, as the Bible returned it ("John 3:16–17"). */
-  reference: string;
-  /** Translation id ("web"); missing = the service's default when filled. */
-  translation?: string;
-  /** Short name shown with the reference ("WEB"). */
-  abbreviation?: string;
-  /** The verses, copied when the item was added. Missing until filled — an
-   * item added by an assistant over MCP has only its reference. */
-  verses?: ScriptureVerse[];
-  /** Text pasted by the church in place of `verses` (a licensed translation). */
-  own_text?: string;
-  /** The copyright line that goes with `own_text`. */
-  credit?: string;
-}
-
-export interface TextContent {
-  title: string;
-}
-
-const TEXT_SECTION = { type: "other" as const, number: 1 };
-
-export function itemKind(item: Pick<SetlistItemWithSong, "kind">): ItemKind {
-  return item.kind === "scripture" || item.kind === "text" ? item.kind : "song";
-}
-
-export function isSongItem(item: Pick<SetlistItemWithSong, "kind">): boolean {
-  return itemKind(item) === "song";
-}
-
-function parseJson<T>(raw: string | null | undefined): T | null {
-  if (!raw) return null;
-  try {
-    const v = JSON.parse(raw) as unknown;
-    return v && typeof v === "object" ? (v as T) : null;
-  } catch {
-    return null;
-  }
-}
-
-export function scriptureContent(item: Pick<SetlistItemWithSong, "kind" | "content">): ScriptureContent | null {
-  if (itemKind(item) !== "scripture") return null;
-  const c = parseJson<ScriptureContent>(item.content);
-  return c && typeof c.reference === "string" ? c : null;
-}
-
-export function textContent(item: Pick<SetlistItemWithSong, "kind" | "content">): TextContent | null {
-  if (itemKind(item) !== "text") return null;
-  const c = parseJson<TextContent>(item.content);
-  return { title: typeof c?.title === "string" && c.title.trim() ? c.title : "Text" };
-}
+export {
+  bodyFromSlides,
+  isSongItem,
+  itemKind,
+  readingBody,
+  readingSlides,
+  scriptureContent,
+  textContent,
+  textSlides,
+  type ItemKind,
+  type ScriptureContent,
+  type TextContent,
+} from "@/lib/serviceItemContent";
 
 /** What the running order calls an item. */
 export function itemLabel(item: SetlistItemWithSong): string {
-  switch (itemKind(item)) {
-    case "scripture":
-      return scriptureContent(item)?.reference ?? "Scripture";
-    case "text":
-      return textContent(item)!.title;
-    default:
-      return item.song?.title ?? "Missing song";
-  }
+  return itemTitle(item, item.song);
 }
 
 /** "5 songs", or "4 songs · 2 passages · 1 text" once there is more than songs. */
@@ -114,23 +77,6 @@ export function scriptureFromPassage(p: ScripturePassage): ScriptureContent {
     ...(p.abbreviation ? { abbreviation: p.abbreviation } : {}),
     verses: p.verses,
   };
-}
-
-/** A new text item's slides: what was typed, as its first slide. */
-export function textSlides(lines: string[]): string {
-  const slides: OverrideSlide[] = lines.map((lyrics) => ({ section: TEXT_SECTION, lyrics }));
-  return serializeSlidesOverride(slides.length > 0 ? slides : [{ section: TEXT_SECTION, lyrics: "" }]);
-}
-
-/** A saved reading's body as a text item's slides. */
-export function readingSlides(body: string): string {
-  return textSlides(resolveSlideSequence(body, null).map((s) => s.lyrics));
-}
-
-/** A text item's slides as a reading's body: the song format without
- * section tags, one blank line between slides. */
-export function readingBody(slides: string[]): string {
-  return bodyFromSlides(slides.map((s) => s.trim()).filter(Boolean));
 }
 
 // --- Cutting a passage into slides -------------------------------------------
@@ -335,20 +281,6 @@ export function aiMayLeave(kinds: readonly ItemKind[], showing: number, target: 
 }
 
 // --- Presenting items as songs -----------------------------------------------
-
-/** Body text in the song format: one slide per block. A line that would read
- * as a section tag ("[...]") gets a zero-width space in front — the parser
- * trims whitespace but not that — so it stays text. */
-function bodyFromSlides(slides: string[]): string {
-  return slides
-    .map((s) =>
-      s
-        .split("\n")
-        .map((line) => (/^\s*\[[^\]]+\]\s*$/.test(line) ? `​${line}` : line))
-        .join("\n"),
-    )
-    .join("\n\n");
-}
 
 /** The song-shaped stand-in a scripture or text item is presented as. */
 export function itemSong(item: SetlistItemWithSong, budget: number): SongRow {

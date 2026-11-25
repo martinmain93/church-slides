@@ -97,6 +97,7 @@ export function isWholeLibraryFile(text: string): boolean {
 function looksBinary(text: string): boolean {
   const sample = text.slice(0, 4096);
   if (sample.includes("\u0000")) return true;
+  // eslint-disable-next-line no-control-regex -- looking for control characters is the point
   const controls = sample.match(/[\u0001-\u0008\u000e-\u001f]/g)?.length ?? 0;
   return controls > Math.max(2, sample.length / 100);
 }

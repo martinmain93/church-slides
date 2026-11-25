@@ -219,6 +219,6 @@ describe("App", () => {
     // Global sidebar is collapsed inside the unified setlist workspace
     expect(screen.queryByRole("button", { name: /^library$/i })).toBeNull();
     // Named for the coming Sunday, so the home list can tell setlists apart.
-    expect(tauri.createSetlist).toHaveBeenCalledWith(expect.stringMatching(/^Sunday \d+ \w+$/));
+    expect(tauri.createSetlist).toHaveBeenCalledWith(expect.stringMatching(/^Sunday \d+ \w+$/), expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/));
   });
 });

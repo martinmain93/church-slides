@@ -26,7 +26,7 @@ export const KNOWN_FIELDS: Record<RecordType, readonly string[]> = {
     "title", "body_text", "ccli", "author", "copyright", "default_tempo_wps", "slide_order", "created_at", "updated_at",
     "chart", "scriptures", "references",
   ],
-  setlist: ["name", "created_at", "last_used_at", "items", "refs"],
+  setlist: ["name", "service_date", "created_at", "last_used_at", "items", "refs"],
   reading: ["title", "body_text", "created_at", "updated_at"],
   service: ["setlist_id", "started_at", "songs"],
   look: ["display", "scripture", "updated_at"],
@@ -105,19 +105,41 @@ export function setlistFromRecord(id: string, f: Fields): { setlist: SetlistRow;
     }))
     .sort((a, b) => a.position - b.position || a.id.localeCompare(b.id));
   return {
-    setlist: { id, name: str(f.name) ?? "", created_at: num(f.created_at) ?? 0, last_used_at: num(f.last_used_at) },
+    setlist: {
+      id,
+      name: str(f.name) ?? "",
+      service_date: serviceDate(f.service_date),
+      created_at: num(f.created_at) ?? 0,
+      last_used_at: num(f.last_used_at),
+    },
     items,
   };
 }
 
-export function setlistToFields(setlist: Omit<SetlistRow, "id">, items: readonly SetlistItemRow[]): Fields {
+/** A service's date as stored: `YYYY-MM-DD`, or null when it has none or
+ * it's malformed. */
+export function serviceDate(v: unknown): string | null {
+  return typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null;
+}
+
+/** A setlist's fields. `kept` is the record as it was: an item keeps any
+ * fields this client doesn't know (from a newer app). */
+export function setlistToFields(setlist: Omit<SetlistRow, "id">, items: readonly SetlistItemRow[], kept: Fields = {}): Fields {
   const ordered = [...items].sort((a, b) => a.position - b.position || a.id.localeCompare(b.id));
   const songs = [...new Set(ordered.map((i) => i.song_id).filter((s): s is string => !!s))].sort();
+  const keptItems = new Map(
+    (Array.isArray(kept.items) ? (kept.items as Record<string, unknown>[]) : [])
+      .filter((i) => i && typeof i.id === "string")
+      .map((i) => [i.id as string, i]),
+  );
+  const unknown = (id: string): Fields =>
+    Object.fromEntries(Object.entries(keptItems.get(id) ?? {}).filter(([k]) => !(ITEM_FIELDS as readonly string[]).includes(k)));
   return compact({
     name: setlist.name,
+    service_date: setlist.service_date ?? null,
     created_at: setlist.created_at,
     last_used_at: setlist.last_used_at,
-    items: ordered.map((i) => compact(Object.fromEntries(ITEM_FIELDS.map((k) => [k, i[k]])))),
+    items: ordered.map((i) => compact({ ...unknown(i.id), ...Object.fromEntries(ITEM_FIELDS.map((k) => [k, i[k]])) })),
     refs: songs.map((s) => `song:${s}`).sort(),
   });
 }
@@ -147,10 +169,22 @@ export function changedFields(type: RecordType, now: Fields, before: Fields): Fi
   for (const k of KNOWN_FIELDS[type]) {
     const a = now[k];
     const b = before[k];
-    if (JSON.stringify(a) !== JSON.stringify(b)) out[k] = a === undefined ? null : a;
+    if (!sameValue(a, b)) out[k] = a === undefined ? null : a;
   }
   return out;
 }
+
+/** JSON with object keys sorted, so two clients' copies of the same value
+ * compare equal whatever order their keys came in. */
+export function canonical(v: unknown): string {
+  return JSON.stringify(v, (_k, x: unknown) =>
+    x && typeof x === "object" && !Array.isArray(x)
+      ? Object.fromEntries(Object.entries(x as Record<string, unknown>).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
+      : x,
+  );
+}
+
+export const sameValue = (a: unknown, b: unknown): boolean => canonical(a) === canonical(b);
 
 /** A record after a push's `set` (null removes a field). */
 export function applySet(base: Fields, set: Fields): Fields {
