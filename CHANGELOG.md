@@ -10,6 +10,9 @@ refuses to release a version that has no entry here.
 
 ## Unreleased
 
+- New: **split a slide in two.** The scissors on a slide (in a song or a service) cuts it at the line break nearest the middle, or mid-line for a single long line.
+- Fixed: clicking a slide whose words run past the edge now shows all of them.
+
 ## 0.3.0 — 23 November 2026
 
 - Changed: **the AI hears the band better and sooner** on Macs with Apple silicon. It uses a newer speech engine: on our test services the wrong slide was up a little less often, and 179 of 225 slide changes landed on time, up from 169. Its speech model is a bigger one-time download, about 2.2 GB.

@@ -15,13 +15,14 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Copy, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
+import { Copy, MoreHorizontal, Pencil, Plus, Scissors, Trash2 } from "lucide-react";
 
 import { inkStyle, stageThumbnailStyle } from "@/components/presentation/StageSurface";
-import { Textarea } from "@/components/ui/textarea";
+import { Textarea, growToFit } from "@/components/ui/textarea";
 import { SIZE_SCALE, type DisplayLook } from "@/lib/displayLook";
 import { sectionLabelClass, type SectionType } from "@/lib/parseSong";
 import { isTypingTarget } from "@/lib/slideKeys";
+import { canSplit } from "@/lib/slideSplit";
 
 const ACTION =
   "flex size-6 items-center justify-center rounded-md border border-white/15 bg-zinc-900/90 text-zinc-100 shadow-sm outline-none transition-colors duration-150 focus-visible:ring-1 focus-visible:ring-white/40";
@@ -51,7 +52,11 @@ interface Props {
   /** Add an empty slide straight after this one and start typing in it. */
   onInsertAfter: () => void;
   onDuplicate: () => void;
+  /** Cut the slide in two near its middle; without it there's no split button. */
+  onSplit?: () => void;
   onDelete: () => void;
+  /** The selected card grows to show every word (prep, not the live grid). */
+  growWhenSelected?: boolean;
   /** `data-*` attributes and the test id, which differ between the views. */
   data: Record<string, string | undefined>;
   /** "Delete" before the service, "Remove" during it. */
@@ -77,12 +82,15 @@ export function SetlistSlideCard({
   onChangeLyrics,
   onInsertAfter,
   onDuplicate,
+  onSplit,
   onDelete,
+  growWhenSelected = false,
   data,
   deleteLabel = "Delete",
   deleteOnKey = false,
 }: Props) {
   const [menu, setMenu] = useState(false);
+  const expanded = growWhenSelected && (selected || editing);
   // The whole card is the drag handle — except while typing in it, where a
   // drag selects text.
   const { listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -147,10 +155,12 @@ export function SetlistSlideCard({
     >
       <div
         style={stageThumbnailStyle(look)}
-        className={`relative aspect-video w-full overflow-hidden rounded-md border shadow-xs transition-[border-color,box-shadow] duration-250 ease-out ${
+        data-expanded={expanded ? "true" : undefined}
+        className={`relative ${expanded ? "grid" : "aspect-video"} w-full overflow-hidden rounded-md border shadow-xs transition-[border-color,box-shadow] duration-250 ease-out ${
           selected ? "border-primary ring-2 ring-primary" : idleClassName
         }`}
       >
+        {expanded && <div aria-hidden className="col-start-1 row-start-1 aspect-video w-full" />}
         {sectionLabel && (
           <span
             className={`pointer-events-none absolute left-2.5 top-2 z-30 truncate rounded bg-black/65 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider ${sectionLabelClass(sectionType)}`}
@@ -160,11 +170,17 @@ export function SetlistSlideCard({
         )}
 
         {editing ? (
-          <div className="absolute inset-0 flex items-center justify-center p-3 pt-7">
+          <div
+            className={`${expanded ? "relative col-start-1 row-start-1 pb-7" : "absolute inset-0 pb-3"} flex items-center justify-center px-3 pt-7`}
+          >
             <Textarea
               autoFocus
+              ref={expanded ? growToFit : undefined}
               defaultValue={lyrics}
-              onChange={onChangeLyrics ? (e) => onChangeLyrics(e.target.value) : undefined}
+              onChange={(e) => {
+                onChangeLyrics?.(e.target.value);
+                if (expanded) growToFit(e.target);
+              }}
               onBlur={(e) => onStopEdit(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Escape") {
@@ -173,7 +189,7 @@ export function SetlistSlideCard({
                   e.currentTarget.blur();
                 }
               }}
-              className="h-full w-full resize-none rounded-sm border-none bg-transparent p-0 text-center text-xs leading-snug focus-visible:ring-0"
+              className={`${expanded ? "min-h-0" : "h-full"} w-full resize-none rounded-sm border-none bg-transparent p-0 text-center text-xs leading-snug focus-visible:ring-0`}
               style={inkStyle(look)}
             />
           </div>
@@ -186,10 +202,10 @@ export function SetlistSlideCard({
             }}
             onDoubleClick={onStartEdit}
             aria-label={selectLabel}
-            className="absolute inset-0 flex cursor-pointer items-center justify-center overflow-hidden px-4 py-5 text-center"
+            className={`${expanded ? "relative col-start-1 row-start-1 py-8" : "absolute inset-0 py-5"} flex cursor-pointer items-center justify-center overflow-hidden px-4 text-center`}
           >
             <div
-              className="max-h-full overflow-hidden whitespace-pre-wrap text-center leading-snug"
+              className={`${expanded ? "" : "max-h-full "}overflow-hidden whitespace-pre-wrap text-center leading-snug`}
               style={{
                 ...inkStyle(look),
                 fontSize: `${Math.round(12 * SIZE_SCALE[look.size])}px`,
@@ -205,6 +221,11 @@ export function SetlistSlideCard({
             <ActionButton label="Edit slide text" className="hover:border-sky-400 hover:bg-sky-500 hover:text-white" onClick={onStartEdit}>
               <Pencil className="size-3.5" />
             </ActionButton>
+            {onSplit && canSplit(lyrics) && (
+              <ActionButton label="Split slide in two" className="hover:border-amber-400 hover:bg-amber-500 hover:text-zinc-950" onClick={onSplit}>
+                <Scissors className="size-3.5" />
+              </ActionButton>
+            )}
             <ActionButton label="More slide actions" className="hover:border-white/40 hover:bg-zinc-700" onClick={() => setMenu(true)}>
               <MoreHorizontal className="size-3.5" />
             </ActionButton>

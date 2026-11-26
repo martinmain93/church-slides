@@ -31,6 +31,7 @@ import { useDisplayLook } from "@/lib/displayLook";
 import { Textarea } from "@/components/ui/textarea";
 import { ChordPickerPopover } from "@/components/library/ChordPickerPopover";
 import { AiChangeGlow, ProjectorSlideCard } from "@/components/library/ProjectorSlideCard";
+import { splitAt } from "@/lib/slideSplit";
 
 export type SetWordChordHandler = (
   slideLyrics: string,
@@ -680,6 +681,19 @@ export function SongPreview({
     setSelectedSlideIdx(idx + 1);
   }
 
+  function handleSplitSlide(idx: number) {
+    if (!onChangeBody) return;
+    const currentList: OverrideSlide[] = slides.map((s) => ({
+      section: s.section,
+      lyrics: s.lyrics,
+    }));
+    const nextList = splitAt(currentList, idx);
+    if (nextList === currentList) return;
+    if (editingSlideIdx === idx) setEditingSlideIdx(null);
+    commitSlidesMutation(nextList);
+    setSelectedSlideIdx(idx);
+  }
+
   function handleDeleteSlide(idx: number) {
     if (!onChangeBody) return;
     const currentList: OverrideSlide[] = slides.map((s) => ({
@@ -828,6 +842,7 @@ export function SongPreview({
                     }}
                     onChangeSection={(sec) => handleUpdateSlideSection(i, sec)}
                     onDuplicate={() => handleDuplicateSlide(i)}
+                    onSplit={() => handleSplitSlide(i)}
                     onDelete={() => handleDeleteSlide(i)}
                   />
                   {pulsing && aiPulse && <AiChangeGlow key={aiPulse.token} />}
