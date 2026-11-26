@@ -313,7 +313,10 @@ def run_wrapper(label: str, backend, clip: Clip, t0: float, out: Path, window: f
             yield AudioFrame(samples[i : i + n], t_start, (i + len(samples[i : i + n])) / SR)
 
     kw = {"window_seconds": window} if window else {}
-    wrapper = SlidingWindowWrapper(backend, emission_observer=observe, **kw)
+    if callable(getattr(backend, "streamer", None)):  # streams its own words (Qwen, remote)
+        wrapper = backend.streamer(emission_observer=observe)
+    else:
+        wrapper = SlidingWindowWrapper(backend, emission_observer=observe, **kw)
     with out.open("w") as log:
         log.write(json.dumps({"meta": {"label": label, "model": backend.name()}}) + "\n")
         try:
@@ -412,6 +415,15 @@ async def run_clip(clip: Clip, providers: list[str], keys: dict, variants: list[
             model, window, *flags = rest.split(":")
             be = deepinfra_backend(keys["DEEPINFRA_API_KEY"], model, carry_prompt="p" in flags)
             threads.append(threading.Thread(target=run_wrapper, args=(label, be, clip, t0, outdir / f"{label}.jsonl", float(window))))
+    if "remote" in providers:
+        # REMOTE_SPEECH_URL + REMOTE_SPEECH_TOKEN: the streaming Qwen engine on a
+        # server (research/spikes/qwen_gpu), asr.remote_backend.
+        from auto_presenter.asr.remote_backend import RemoteStreamingBackend
+
+        token = os.environ["REMOTE_SPEECH_TOKEN"]
+        be = RemoteStreamingBackend(os.environ["REMOTE_SPEECH_URL"], lambda: token)
+        label = os.environ.get("REMOTE_LABEL", "remote")
+        threads.append(threading.Thread(target=run_wrapper, args=(label, be, clip, t0, outdir / f"{label}.jsonl")))
     if "mlx" in providers:
         from auto_presenter.asr.mlx_backend import MLXWhisperBackend
 
