@@ -54,7 +54,7 @@ interface SignedIn {
 
 type State = { kind: "loading" } | { kind: "signing-out" } | { kind: "signed-out"; error?: string } | SignedIn;
 
-const centred = "web-app flex min-h-dvh flex-col items-center justify-center gap-4 p-6 text-center";
+const centred = "web-app flex min-h-dvh flex-col items-center justify-center gap-4 py-6 text-center [--web-pad-x:1.5rem]";
 
 /** `persist` is for tests: the library kept in memory instead of IndexedDB. */
 export function WebApp({ persist }: { persist?: (name: string) => Promise<Persist> } = {}) {

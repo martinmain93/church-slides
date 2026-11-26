@@ -12,7 +12,9 @@
 }
 
 /* Room for the notch and rounded corners when added to a home screen. */
+/* The larger of the notch and a screen's own side padding (`--web-pad-x`):
+   a plain env() here would wipe out a page's p-6 on every phone. */
 .web-app {
-  padding-left: env(safe-area-inset-left);
-  padding-right: env(safe-area-inset-right);
+  padding-left: max(env(safe-area-inset-left), var(--web-pad-x, 0px));
+  padding-right: max(env(safe-area-inset-right), var(--web-pad-x, 0px));
 }

@@ -21,7 +21,7 @@ import { KEY_CHOICES } from "@/lib/chords/chord";
 import { itemTitle, readingBody, readingSlides, scriptureContent, textContent, textSlides } from "@/lib/serviceItemContent";
 import { parseSlidesOverride, resolveSlideSequence, serializeSlidesOverride } from "@/lib/slideSequence";
 import { unknownOrderTags } from "@/web/pages/SongEditor";
-import { copiedService, nameForDate, shortServiceDate } from "@/lib/setlistName";
+import { copiedService, nameForDate, rowDate, shortServiceDate } from "@/lib/setlistName";
 import { checkReference } from "@/core/bibleBooks";
 import { useServiceDateField } from "@/lib/useServiceDateField";
 import { go, href } from "@/web/route";
@@ -173,9 +173,10 @@ export function ServicePage({
           Copied. This is the new service for {shortServiceDate(service.service_date)}.
         </p>
       )}
-      {!canEdit && service.service_date && (
+      {!canEdit && rowDate(service) && (
+        // Only when the name doesn't already say it.
         <p className="px-4 pt-3 text-sm text-muted-foreground" data-testid="service-day">
-          {shortServiceDate(service.service_date)}
+          {rowDate(service)}
         </p>
       )}
       {canEdit && <ServiceDetails key={service.id} service={service} otherNames={otherNames} focusName={created} onError={setError} />}
@@ -763,7 +764,7 @@ function AddSheet({ serviceId, inService, onClose }: { serviceId: string; inServ
   return (
     <Sheet title="Add to service" onClose={onClose}>
       {/* One height for every tab, so switching doesn't make the sheet jump. */}
-      <div className="min-h-[55dvh] space-y-4">
+      <div className="min-h-[calc(85dvh-6rem)] space-y-4">
         {/* Tabs, search and the "Added" note stay in view while the list scrolls. */}
         <div className="sticky -top-4 z-10 -mx-4 -mt-4 space-y-3 bg-card px-4 pb-1 pt-4">
           <div className="flex gap-1 rounded-lg border border-border p-1" role="tablist">
