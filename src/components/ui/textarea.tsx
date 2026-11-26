@@ -19,3 +19,13 @@ const Textarea = React.forwardRef<
 Textarea.displayName = "Textarea";
 
 export { Textarea };
+
+/**
+ * Grow a textarea to fit its words (soft wraps included), so nothing hides
+ * behind a scrollbar. Use as `ref` and call again on input.
+ */
+export function growToFit(el: HTMLTextAreaElement | null) {
+  if (!el) return;
+  el.style.height = "auto";
+  el.style.height = `${el.scrollHeight}px`;
+}

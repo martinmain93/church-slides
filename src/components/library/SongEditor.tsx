@@ -1435,6 +1435,7 @@ export function SongEditor({ songId, onClose, backLabel = "Library" }: Props) {
               body={body}
               slideOrder={slideOrder}
               chart={showChords ? chart : null}
+              hasChords={!!chart && chartHasChords(chart)}
               chartKey={chart?.key ?? null}
               preferFlats={preferFlats}
               displayMode={displayMode}

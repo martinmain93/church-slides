@@ -58,6 +58,7 @@ import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/lib/confirm";
 import { useToast } from "@/lib/toast";
 import { SetlistSlideCard } from "@/components/setlists/SetlistSlideCard";
+import { splitAt } from "@/lib/slideSplit";
 
 const PERSIST_DEBOUNCE_MS = 600;
 
@@ -227,6 +228,22 @@ export function SetlistSongSlides({
     const copy: EditableSlide = { ...slides[idx]!, uid: nextUid() };
     mutate([...slides.slice(0, idx + 1), copy, ...slides.slice(idx + 1)]);
     selectIndex(idx + 1);
+  }
+
+  /** Cut the slide in two near its middle; the first half stays selected. */
+  function handleSplit(uid: string) {
+    const idx = slides.findIndex((s) => s.uid === uid);
+    if (idx < 0) return;
+    const next = splitAt(slides, idx, (slide, lyrics) => ({
+      uid: nextUid(),
+      section: { ...slide.section },
+      lyrics,
+    }));
+    if (next === slides) return;
+    if (editingUid === uid) setEditingUid(null);
+    mutate(next);
+    setLocalSelectedIdx(idx);
+    onSelectSlide?.(idx);
   }
 
   /** A blank slide in the same section straight after `uid`, selected and open for typing. */
@@ -589,8 +606,10 @@ export function SetlistSongSlides({
                 onChangeLyrics={(lyrics) => handleEdit(slide.uid, lyrics)}
                 onInsertAfter={() => handleInsertAfter(slide.uid)}
                 onDuplicate={() => handleDuplicate(slide.uid)}
+                onSplit={() => handleSplit(slide.uid)}
                 onDelete={() => handleDelete(slide.uid)}
                 deleteOnKey
+                growWhenSelected
                 data={{
                   "data-testid": "setlist-slide-card",
                   "data-slide-uid": slide.uid,

@@ -12,7 +12,8 @@ import { sectionLabel, sectionLabelClass, type ParsedSection, type SectionType }
 import type { SongSuggestion } from "@/lib/chords/suggestions";
 import { inkStyle, stageThumbnailStyle } from "@/components/presentation/StageSurface";
 import { SIZE_SCALE, type DisplayLook } from "@/lib/displayLook";
-import { Textarea } from "@/components/ui/textarea";
+import { Textarea, growToFit } from "@/components/ui/textarea";
+import { canSplit } from "@/lib/slideSplit";
 
 const SECTION_CHOICES: { type: SectionType; label: string }[] = [
   { type: "verse", label: "Verse" },
@@ -50,6 +51,8 @@ export function ProjectorSlideCard({
   onStopEdit,
   onChangeSection,
   onDuplicate,
+  onSplit,
+  splitMidLine = true,
   onDelete,
 }: {
   slide: { id: string; section: ParsedSection; lyrics: string };
@@ -67,6 +70,10 @@ export function ProjectorSlideCard({
   onStopEdit: () => void;
   onChangeSection: (next: ParsedSection) => void;
   onDuplicate: () => void;
+  /** Cut the slide in two near its middle (see `smartSplit`). */
+  onSplit?: () => void;
+  /** Whether a split may cut one long line (not in a song with chords). */
+  splitMidLine?: boolean;
   onDelete: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -97,6 +104,9 @@ export function ProjectorSlideCard({
 
   const fontSizePx = Math.round(15 * SIZE_SCALE[look.size]);
   const lineCount = Math.max(1, editingDraft.split("\n").length);
+  // The open card grows to show every word; the others stay a 16:9 picture.
+  const expanded = selected || editing;
+  const contentPos = expanded ? "relative col-start-1 row-start-1 py-9" : "absolute inset-0 py-5";
 
   return (
     <div
@@ -104,12 +114,16 @@ export function ProjectorSlideCard({
       style={style}
       data-testid="preview-slide"
       data-selected={selected ? "true" : undefined}
-      className={`group relative aspect-video w-full overflow-hidden rounded-md border shadow-xs transition-[border-color,box-shadow] duration-250 ease-out ${
+      data-expanded={expanded ? "true" : undefined}
+      className={`group relative w-full overflow-hidden rounded-md border shadow-xs transition-[border-color,box-shadow] duration-250 ease-out ${
+        expanded ? "grid" : "aspect-video"
+      } ${
         selected || editing
           ? "border-primary ring-2 ring-primary"
           : "border-border hover:border-primary/50 hover:ring-1 hover:ring-primary/50"
       }`}
     >
+      {expanded && <div aria-hidden className="col-start-1 row-start-1 aspect-video w-full" />}
       {/* Top-left section badge (clickable when editable to change section type/number) */}
       <div ref={badgeRef} className="absolute left-2.5 top-2 z-30">
         {editable ? (
@@ -208,6 +222,20 @@ export function ProjectorSlideCard({
           >
             <Copy className="size-3.5 shrink-0" />
           </button>
+          {onSplit && !editing && canSplit(slide.lyrics, { midLine: splitMidLine }) && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onSplit();
+              }}
+              aria-label="Split slide in two"
+              title="Split slide in two"
+              className="flex h-7 w-7 items-center justify-center rounded-md border border-white/15 bg-zinc-900/90 p-1.5 text-zinc-100 shadow-sm outline-none transition-all duration-150 hover:scale-105 hover:border-amber-400 hover:bg-amber-500 hover:text-zinc-950 focus-visible:ring-1 focus-visible:ring-white/40"
+            >
+              <Scissors className="size-3.5 shrink-0" />
+            </button>
+          )}
           <button
             type="button"
             onClick={(e) => {
@@ -226,14 +254,18 @@ export function ProjectorSlideCard({
       {editing ? (
         <div
           onClick={() => onSelect()}
-          className="absolute inset-0 flex items-center justify-center overflow-hidden px-4 py-5 text-center"
+          className={`${contentPos} flex items-center justify-center overflow-hidden px-4 text-center`}
         >
           <Textarea
             autoFocus
+            ref={growToFit}
             rows={lineCount}
             value={editingDraft}
             placeholder="New slide lyrics…"
-            onChange={(e) => onChangeDraft(e.target.value)}
+            onChange={(e) => {
+              onChangeDraft(e.target.value);
+              growToFit(e.target);
+            }}
             onBlur={onStopEdit}
             onKeyDown={(e) => {
               if (e.key === "Escape") {
@@ -243,7 +275,7 @@ export function ProjectorSlideCard({
                 onStopEdit();
               }
             }}
-            className="max-h-full min-h-0 w-full resize-none overflow-y-auto rounded-sm border-none bg-transparent p-0 text-center leading-snug shadow-none outline-none ring-offset-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+            className="min-h-0 w-full resize-none overflow-y-auto rounded-sm border-none bg-transparent p-0 text-center leading-snug shadow-none outline-none ring-offset-0 focus-visible:ring-0 focus-visible:ring-offset-0"
             style={{
               ...inkStyle(look),
               fontSize: `${fontSizePx}px`,
@@ -262,10 +294,10 @@ export function ProjectorSlideCard({
             }
           }}
           aria-label="Select slide"
-          className="absolute inset-0 flex cursor-pointer items-center justify-center overflow-hidden px-4 py-5 text-center"
+          className={`${contentPos} flex cursor-pointer items-center justify-center overflow-hidden px-4 text-center`}
         >
           <div
-            className="max-h-full overflow-hidden whitespace-pre-wrap text-center leading-snug"
+            className={`${expanded ? "" : "max-h-full "}overflow-hidden whitespace-pre-wrap text-center leading-snug`}
             style={{
               ...inkStyle(look),
               fontSize: `${fontSizePx}px`,

@@ -9,7 +9,11 @@ import { insertAfter } from "@/lib/presentation/slideEditing";
 
 afterEach(cleanup);
 
-function renderCard(handlers: { onInsertAfter?: () => void; onDuplicate?: () => void; onDelete?: () => void } = {}) {
+function renderCard(
+  handlers: { onInsertAfter?: () => void; onDuplicate?: () => void; onDelete?: () => void; onSplit?: () => void } = {},
+  lyrics = "Amazing grace",
+  selected = false,
+) {
   render(
     <DndContext>
       <SortableContext items={["s1"]}>
@@ -18,9 +22,9 @@ function renderCard(handlers: { onInsertAfter?: () => void; onDuplicate?: () => 
           look={DEFAULT_LOOK}
           sectionLabel="verse 1"
           sectionType="verse"
-          lyrics="Amazing grace"
+          lyrics={lyrics}
           emptyText="(blank)"
-          selected={false}
+          selected={selected}
           editing={false}
           selectLabel="Select slide"
           onSelect={vi.fn()}
@@ -29,6 +33,8 @@ function renderCard(handlers: { onInsertAfter?: () => void; onDuplicate?: () => 
           onInsertAfter={handlers.onInsertAfter ?? vi.fn()}
           onDuplicate={handlers.onDuplicate ?? vi.fn()}
           onDelete={handlers.onDelete ?? vi.fn()}
+          onSplit={handlers.onSplit}
+          growWhenSelected
           data={{ "data-testid": "card" }}
         />
       </SortableContext>
@@ -51,6 +57,30 @@ describe("a setlist slide card", () => {
     fireEvent.click(screen.getByRole("menuitem", { name: "Insert slide" }));
     expect(onInsertAfter).toHaveBeenCalledOnce();
     expect(screen.queryByRole("menu")).toBeNull();
+  });
+});
+
+describe("splitting a setlist slide", () => {
+  it("shows a split button that splits the slide", () => {
+    const onSplit = vi.fn();
+    renderCard({ onSplit }, "Amazing grace how sweet the sound\nThat saved a wretch like me");
+    fireEvent.click(screen.getByRole("button", { name: "Split slide in two" }));
+    expect(onSplit).toHaveBeenCalledOnce();
+  });
+
+  it("hides it for a slide of one word", () => {
+    renderCard({ onSplit: vi.fn() }, "Hallelujah");
+    expect(screen.queryByRole("button", { name: "Split slide in two" })).toBeNull();
+  });
+});
+
+describe("the selected setlist slide", () => {
+  it("grows to show every word, while the others stay 16:9", () => {
+    renderCard({}, "Amazing grace", true);
+    expect(document.querySelector("[data-expanded]")).not.toBeNull();
+    cleanup();
+    renderCard({}, "Amazing grace", false);
+    expect(document.querySelector("[data-expanded]")).toBeNull();
   });
 });
 
