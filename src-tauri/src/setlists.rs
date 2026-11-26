@@ -211,7 +211,7 @@ pub fn create_setlist(db: &Arc<Db>, name: &str, service_date: Option<&str>) -> R
 }
 
 /// A service date as stored: `YYYY-MM-DD`, or None. Anything else is refused.
-fn checked_date(date: Option<&str>) -> Result<Option<&str>> {
+pub(crate) fn checked_date(date: Option<&str>) -> Result<Option<&str>> {
     match date {
         None | Some("") => Ok(None),
         Some(d) if d.len() == 10 && d.bytes().enumerate().all(|(i, b)| if i == 4 || i == 7 { b == b'-' } else { b.is_ascii_digit() }) => Ok(Some(d)),

@@ -49,6 +49,7 @@ import {
   type SongRow,
 } from "@/lib/tauri";
 import { nameForDate } from "@/lib/setlistName";
+import { useServiceDateField } from "@/lib/useServiceDateField";
 import {
   itemCountLabel,
   itemKind,
@@ -315,21 +316,27 @@ export function SetlistBuilder({
   }, [name]);
 
   /** A new date; a name still made from the old date follows it. */
-  async function changeDate(date: string | null) {
-    if (!detail) return;
+  const nameNow = useRef(name);
+  nameNow.current = name;
+  async function changeDate(date: string | null, previous: string | null) {
     try {
       await updateSetlistDate(setlistId, date);
+      setDetail((d) => (d ? { ...d, service_date: date } : d));
+      if (!date) return;
+      const current = nameNow.current;
       const others = (await listSetlists()).filter((s) => s.id !== setlistId).map((s) => s.name);
-      const next = date ? nameForDate(name.trim(), detail.service_date, date, others) : name;
-      setDetail({ ...detail, service_date: date });
-      if (next !== name) {
+      const next = nameForDate(current.trim(), previous, date, others);
+      if (next !== current) {
+        nameNow.current = next;
         setName(next);
         await updateSetlistName(setlistId, next);
       }
     } catch (err) {
       toast.error(`Couldn't change the date: ${err instanceof Error ? err.message : err}`);
+      throw err;
     }
   }
+  const dateField = useServiceDateField(detail?.service_date, changeDate);
 
   async function persistName() {
     if (!detail || !nameDirty.current) return;
@@ -604,8 +611,7 @@ export function SetlistBuilder({
           />
           <Input
             type="date"
-            value={detail.service_date ?? ""}
-            onChange={(e) => void changeDate(e.target.value || null)}
+            {...dateField}
             aria-label="Service date"
             title="The day this service is for"
             className="h-9 w-auto shrink-0 text-sm"

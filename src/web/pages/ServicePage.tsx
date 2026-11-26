@@ -21,6 +21,7 @@ import { KEY_CHOICES } from "@/lib/chords/chord";
 import { itemTitle, readingBody, readingSlides, scriptureContent, textContent, textSlides } from "@/lib/serviceItemContent";
 import { parseSlidesOverride } from "@/lib/slideSequence";
 import { nameForDate, newService } from "@/lib/setlistName";
+import { useServiceDateField } from "@/lib/useServiceDateField";
 import { go, href } from "@/web/route";
 import { matchesSearch } from "@/web/pages/SongsPage";
 import { writtenKeyOf } from "@/web/pages/SongPage";
@@ -243,20 +244,23 @@ function ServiceDetails({
     }
   };
 
-  const saveDate = async (date: string) => {
+  const nameNow = useRef(name);
+  nameNow.current = name;
+  const dateField = useServiceDateField(service.service_date, async (date, previous) => {
     try {
-      await lib.setServiceDate(service.id, date || null);
-      if (date) {
-        const renamed = nameForDate(service.name, service.service_date, date, otherNames);
-        if (renamed !== service.name) {
-          setName(renamed);
-          await lib.renameSetlist(service.id, renamed);
-        }
+      await lib.setServiceDate(service.id, date);
+      if (!date) return;
+      const renamed = nameForDate(nameNow.current, previous, date, otherNames);
+      if (renamed !== nameNow.current) {
+        nameNow.current = renamed;
+        setName(renamed);
+        await lib.renameSetlist(service.id, renamed);
       }
     } catch (err) {
       onError(errorText(err));
+      throw err;
     }
-  };
+  });
 
   return (
     <div className="flex gap-3 px-4 py-4">
@@ -281,7 +285,7 @@ function ServiceDetails({
       </Field>
       <div className="w-40 shrink-0">
         <Field label="Date">
-          <input type="date" className={fieldClass} value={service.service_date ?? ""} onChange={(e) => void saveDate(e.target.value)} data-testid="service-date" />
+          <input type="date" className={fieldClass} {...dateField} data-testid="service-date" />
         </Field>
       </div>
     </div>

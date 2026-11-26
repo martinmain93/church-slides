@@ -85,7 +85,11 @@ export function useLeaveGuard(when: boolean, ask: (to: Route) => void): void {
       return false;
     };
     guard = mine;
-    const unload = (e: BeforeUnloadEvent) => e.preventDefault();
+    const unload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      // Older Safari and Chrome ask only when this is set.
+      e.returnValue = "";
+    };
     window.addEventListener("beforeunload", unload);
     return () => {
       if (guard === mine) guard = null;

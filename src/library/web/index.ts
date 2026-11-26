@@ -18,6 +18,7 @@ import {
   type Fields,
 } from "@/core/records";
 import { itemTitle, readingSlides, textSlides } from "@/lib/serviceItemContent";
+import { isoDate } from "@/lib/setlistName";
 import type { LibrarySource, ServiceItemKind } from "@/library/source";
 import type { RecordStore } from "@/library/web/store";
 
@@ -311,7 +312,8 @@ function songInput(input: NewSongInput, created: number, updated: number): Omit<
 
 /** Newest service first: by its date, else when it was last used or made. */
 function newestFirst(a: SetlistRow, b: SetlistRow): number {
-  const day = (s: SetlistRow) => s.service_date ?? new Date(s.last_used_at ?? s.created_at).toISOString().slice(0, 10);
+  // Both in the planner's own time zone, as service dates are.
+  const day = (s: SetlistRow) => s.service_date ?? isoDate(new Date(s.last_used_at ?? s.created_at));
   return (
     day(b).localeCompare(day(a)) ||
     (b.last_used_at ?? b.created_at) - (a.last_used_at ?? a.created_at) ||

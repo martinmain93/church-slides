@@ -42,6 +42,8 @@ interface Pending {
   verifier: string;
   /** The server's issuer name, to check the answer came from it (RFC 9207). */
   issuer?: string;
+  /** The server says it always sends `iss`: an answer without it is refused. */
+  issRequired?: boolean;
 }
 
 export interface Membership {
@@ -74,6 +76,8 @@ const redirectUri = (c: BrowserClient) => `${window.location.origin}${c.redirect
 
 interface ServerMeta {
   issuer?: string;
+  /** The server names itself in the sign-in answer (RFC 9207). */
+  authorization_response_iss_parameter_supported?: boolean;
   client_id_metadata_document_supported?: boolean;
   registration_endpoint?: string;
   revocation_endpoint?: string;
@@ -181,6 +185,7 @@ export async function startSignIn(client: BrowserClient, server = serverFor(clie
     state: randomToken(),
     verifier: randomToken(),
     issuer: meta.issuer,
+    issRequired: meta.authorization_response_iss_parameter_supported === true,
   };
   writeJson(sessionStorage, pendingKey(client), pending);
   const url = new URL(`${server}/authorize`);
@@ -229,7 +234,9 @@ export async function finishSignIn<S extends BrowserSession>(
   if (!pending || params.get("state") !== pending.state) throw new Error("This sign-in expired. Sign in again.");
   // The answer must come from the server this sign-in started at.
   const iss = params.get("iss");
-  if (iss && pending.issuer && iss !== pending.issuer) throw new Error("This sign-in came from the wrong place. Sign in again.");
+  if ((iss && pending.issuer && iss !== pending.issuer) || (!iss && pending.issRequired)) {
+    throw new Error("This sign-in came from the wrong place. Sign in again.");
+  }
   const res = await fetch(`${pending.server}/oauth/token`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
