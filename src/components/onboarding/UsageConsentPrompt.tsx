@@ -90,7 +90,7 @@ export function UsageConsentPrompt({
           Help improve Church Slides?
         </h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          Your songs, setlists and audio stay on this computer either way. Choose
+          Your songs, services and audio stay on this computer either way. Choose
           what you&rsquo;re happy to send to the developer:
         </p>
         <div className="mt-4 space-y-3">

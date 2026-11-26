@@ -17,6 +17,8 @@ import {
 import {
   createSong,
   deleteSong,
+  getSetlist,
+  listSetlists,
   deleteSongChart,
   getSong,
   getSongCharts,
@@ -37,6 +39,7 @@ import { parseSong, sectionLabel, sectionLabelClass, type ParsedSection } from "
 import { formatSlideOrder, parseSlideOrder } from "@/lib/slideSequence";
 import { useConfirm } from "@/lib/confirm";
 import { useToast } from "@/lib/toast";
+import { deleteSongMessage } from "@/lib/deleteSongText";
 import {
   alignSlides,
   chartHasChords,
@@ -333,10 +336,15 @@ export function SongEditor({ songId, onClose, backLabel = "Library" }: Props) {
       onClose(null);
       return;
     }
+    const songId = idRef.current;
+    const usedBy: string[] = [];
+    for (const sl of await listSetlists().catch(() => [])) {
+      const detail = await getSetlist(sl.id).catch(() => null);
+      if (detail?.items.some((i) => i.song_id === songId)) usedBy.push(sl.name);
+    }
     const ok = await confirm({
       title: `Delete "${title || "this song"}"?`,
-      message:
-        "This can't be undone. If the song is in any setlists, it will be removed from them too.",
+      message: deleteSongMessage(usedBy),
       confirmLabel: "Delete",
       variant: "destructive",
     });
@@ -1264,7 +1272,7 @@ export function SongEditor({ songId, onClose, backLabel = "Library" }: Props) {
               size="sm"
               data-testid="undo-suggestion-btn"
               onClick={handleRestoreUndoSnapshot}
-              title="Undo last accepted suggestion"
+              title="Undo the last change (a split or an accepted suggestion)"
               className="h-8 gap-1 text-xs text-muted-foreground hover:text-foreground"
             >
               <Undo2 className="size-3.5" />
@@ -1436,6 +1444,7 @@ export function SongEditor({ songId, onClose, backLabel = "Library" }: Props) {
               slideOrder={slideOrder}
               chart={showChords ? chart : null}
               hasChords={!!chart && chartHasChords(chart)}
+              onBeforeSplit={() => setUndoSnapshot(captureUndoSnapshot())}
               chartKey={chart?.key ?? null}
               preferFlats={preferFlats}
               displayMode={displayMode}

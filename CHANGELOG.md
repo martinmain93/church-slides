@@ -10,10 +10,13 @@ refuses to release a version that has no entry here.
 
 ## Unreleased
 
-- New (preview): **Church Slides on the web.** Sign in at app.churchslides.app from a phone or any computer to see your organization's songs with their chords, edit words and credits, and plan services (songs, keys, readings, text slides). Changes show up on the slides computer, and theirs show up there. Presenting and chord editing stay in the app.
-- New: **services have a date.** A new service is dated for the coming Sunday and named after it, never with the same name as another; change either one in the setlist's header.
-- New: **split a slide in two.** The scissors on a slide (in a song or a service) cuts it at the line break nearest the middle, or mid-line for a single long line.
-- Fixed: clicking a slide whose words run past the edge now shows all of them.
+- New (preview, coming soon): **Church Slides on the web.** From a phone or any computer, see your organization's songs with their chords, edit words, order and credits, and plan services (songs, keys, Bible passages, text slides). Changes show up on the slides computer, and theirs show up there. Presenting and chord editing stay in the app.
+- New: **services have a date.** A new service is for the first Sunday that doesn't have one yet, and is named after it; a copy is for the week after. Home lists services coming up first, then past ones.
+- New: **split a slide in two.** The scissors on a long slide (in a song or a service) cut it at the end of a sentence nearest the middle. Undo puts it back.
+- New: **slide cards show the screen as the room sees it.** A slide too long for the screen says so on its card, with the scissors ready.
+- Changed: the app says **service** everywhere (not "setlist"), and **Bible passage** for scripture, the same as on the web.
+- Changed: deleting a song says which services have it, then takes it out of them.
+- New: signed in to an organization whose plan includes AI, spoken requests work with no Groq key of your own.
 
 ## 0.3.0 — 23 November 2026
 

@@ -63,24 +63,25 @@ describe("a setlist slide card", () => {
 describe("splitting a setlist slide", () => {
   it("shows a split button that splits the slide", () => {
     const onSplit = vi.fn();
-    renderCard({ onSplit }, "Amazing grace how sweet the sound\nThat saved a wretch like me");
+    renderCard({ onSplit }, "Amazing grace how sweet the sound\nThat saved a wretch like me\nI once was lost but now am found");
     fireEvent.click(screen.getByRole("button", { name: "Split slide in two" }));
     expect(onSplit).toHaveBeenCalledOnce();
   });
 
-  it("hides it for a slide of one word", () => {
+  it("hides it for a slide of one word, or an ordinary two-line one", () => {
     renderCard({ onSplit: vi.fn() }, "Hallelujah");
+    expect(screen.queryByRole("button", { name: "Split slide in two" })).toBeNull();
+    cleanup();
+    renderCard({ onSplit: vi.fn() }, "Amazing grace\nHow sweet the sound");
     expect(screen.queryByRole("button", { name: "Split slide in two" })).toBeNull();
   });
 });
 
-describe("the selected setlist slide", () => {
-  it("grows to show every word, while the others stay 16:9", () => {
+describe("a setlist slide's picture", () => {
+  it("stays a 16:9 picture of the screen when selected: only typing grows it", () => {
     renderCard({}, "Amazing grace", true);
-    expect(document.querySelector("[data-expanded]")).not.toBeNull();
-    cleanup();
-    renderCard({}, "Amazing grace", false);
     expect(document.querySelector("[data-expanded]")).toBeNull();
+    expect(screen.getByTestId("mini-slide-words")).toHaveTextContent("Amazing grace");
   });
 });
 

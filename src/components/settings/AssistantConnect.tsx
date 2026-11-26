@@ -71,7 +71,7 @@ export function AssistantConnect() {
   return (
     <div className="space-y-4">
       <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        Build setlists, add songs from lyrics, and tidy slide order.
+        Build services, add songs from lyrics, and tidy slide order.
         <InfoTip>
           It works on this computer&apos;s library directly, and open screens here update as it
           goes. The whole library is backed up before each batch of changes it makes.
@@ -85,7 +85,7 @@ export function AssistantConnect() {
             {STATUS[state]}
             {justConnected && state === "connected" && (
               <> Quit and reopen Claude to finish, then ask it something like
-              “make a setlist for Sunday with three upbeat songs we haven’t
+              “make a service for Sunday with three upbeat songs we haven’t
               sung this month”.</>
             )}
           </div>

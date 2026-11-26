@@ -68,6 +68,8 @@ interface Props {
   chart?: ChordChart | null;
   /** The song has chords, shown or not: a split then keeps to line breaks. */
   hasChords?: boolean;
+  /** Called just before a slide is split, so the editor can offer Undo. */
+  onBeforeSplit?: () => void;
   /** Key used for the quick diatonic chord palette and Nashville numbers. */
   chartKey?: string | null;
   /** Whether chords should be spelled with flats (true) or sharps (false). */
@@ -224,6 +226,7 @@ export function SongPreview({
   slideOrder,
   chart,
   hasChords = false,
+  onBeforeSplit,
   chartKey,
   preferFlats,
   displayMode = "letters",
@@ -692,6 +695,7 @@ export function SongPreview({
     }));
     const nextList = splitAt(currentList, idx, undefined, { midLine: !hasChords });
     if (nextList === currentList) return;
+    onBeforeSplit?.();
     if (editingSlideIdx === idx) setEditingSlideIdx(null);
     commitSlidesMutation(nextList);
     setSelectedSlideIdx(idx);

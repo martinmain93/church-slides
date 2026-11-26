@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useConfirm } from "@/lib/confirm";
 import { useToast } from "@/lib/toast";
+import { groupServices, lastService, rowDate } from "@/lib/setlistName";
 
 const RECENT_LIMIT = 6;
 
@@ -51,9 +52,8 @@ export function HomeScreen({
   // A setlist got from another computer: this screen's own write, which the
   // library watcher doesn't echo.
   const [synced, setSynced] = useState(0);
-  // The most recent setlist with anything in it: the weekly order of worship
-  // to start the next one from.
-  const lastService = setlists?.find((s) => (s.song_titles?.length ?? 0) > 0) ?? null;
+  // The latest service held (by its date), with something in it: not a draft for next month.
+  const lastHeld = setlists ? lastService(setlists.filter((s) => (s.song_titles?.length ?? 0) > 0)) : null;
   // Song files dropped anywhere on Home go into the library.
   const { dropProps, ui: importUi } = useSongFileImport({
     onImported: (message) => {
@@ -85,23 +85,28 @@ export function HomeScreen({
     ? setlists?.find((s) => s.id === lastSession.setlistId)
     : null;
 
-  const filteredSetlists = useMemo(() => {
+  // As the web app lists them: coming services first (soonest at the top),
+  // then past ones, latest first. Past ones are cut to a few until asked.
+  const groups = useMemo(() => {
     if (!setlists) return null;
     const q = searchQuery.trim().toLowerCase();
-    if (!q) return showAll ? setlists : setlists.slice(0, RECENT_LIMIT);
-    return setlists.filter((sl) => {
-      const nameMatch = (sl.name || "").toLowerCase().includes(q);
-      const songMatch = (sl.song_titles ?? []).some((t) => t.toLowerCase().includes(q));
-      return nameMatch || songMatch;
-    });
+    const shown = q
+      ? setlists.filter((sl) => {
+          const nameMatch = (sl.name || "").toLowerCase().includes(q);
+          const songMatch = (sl.song_titles ?? []).some((t) => t.toLowerCase().includes(q));
+          return nameMatch || songMatch;
+        })
+      : setlists;
+    const { upcoming, past } = groupServices(shown);
+    return { upcoming, past: q || showAll ? past : past.slice(0, RECENT_LIMIT), hiddenPast: past.length };
   }, [setlists, searchQuery, showAll]);
 
   async function handleDeleteSetlist(sl: SetlistRow) {
     const titles = sl.song_titles ?? [];
     if (titles.length > 0) {
       const ok = await confirm({
-        title: `Delete "${sl.name || "this setlist"}"?`,
-        message: "This can't be undone. (The songs themselves stay in your library.)",
+        title: `Delete "${sl.name || "this service"}"?`,
+        message: "It goes from every device. Its songs stay in the library.",
         confirmLabel: "Delete",
         variant: "destructive",
       });
@@ -144,7 +149,7 @@ export function HomeScreen({
           />
         )}
         <Section
-          title="Recent setlists"
+          title="Services"
           action={
             <div className="flex items-center gap-2">
               {/* Always there while this computer has no setlists — that's
@@ -157,12 +162,12 @@ export function HomeScreen({
                   align="right"
                 />
               )}
-              {lastService && (
+              {lastHeld && (
                 <Button
-                  onClick={() => onCopySetlist(lastService.id)}
+                  onClick={() => onCopySetlist(lastHeld.id)}
                   size="sm"
                   variant="ghost"
-                  title={`A new setlist with everything in "${lastService.name}" — songs, readings and edits — to change from there`}
+                  title={`A new service for the week after, with everything in "${lastHeld.name}"`}
                 >
                   <Copy className="size-4" />
                   Copy last service
@@ -170,7 +175,7 @@ export function HomeScreen({
               )}
               <Button onClick={onCreateSetlist} size="sm">
                 <Plus className="size-4" />
-                New setlist
+                New service
               </Button>
             </div>
           }
@@ -187,19 +192,30 @@ export function HomeScreen({
                   <Input
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search setlists by name or song…"
-                    aria-label="Search setlists"
+                    placeholder="Search services by name or song…"
+                    aria-label="Search services"
                     className="h-9 pl-9"
                   />
                 </div>
               )}
-              {filteredSetlists && filteredSetlists.length === 0 ? (
+              {groups && groups.upcoming.length + groups.past.length === 0 ? (
                 <div className="rounded-lg border border-border bg-card px-4 py-6 text-center text-xs text-muted-foreground">
-                  No setlists match &ldquo;{searchQuery}&rdquo;.
+                  No services match &ldquo;{searchQuery}&rdquo;.
                 </div>
               ) : (
-                <ul className="divide-y divide-border rounded-lg border border-border bg-card">
-                  {(filteredSetlists ?? []).map((sl) => {
+                groups &&
+                ([
+                  ["Coming up", groups.upcoming],
+                  ["Past", groups.past],
+                ] as const).map(([label, list]) =>
+                  list.length === 0 ? null : (
+                    <div key={label} className="space-y-1.5">
+                      {groups.upcoming.length > 0 && groups.past.length > 0 && (
+                        <div className="px-1 text-xs text-muted-foreground">{label}</div>
+                      )}
+                      <ul className="divide-y divide-border rounded-lg border border-border bg-card">
+                        {list.map((sl) => {
+
                     const titles = sl.song_titles ?? [];
                     return (
                       <li key={sl.id} className="group flex items-center gap-2 pr-3">
@@ -210,11 +226,13 @@ export function HomeScreen({
                         >
                           <div className="min-w-0 flex-1">
                             <div className="flex items-baseline gap-2">
-                              <span className="truncate font-medium">{sl.name || "Untitled"}</span>
+                              <span className="truncate font-medium">{sl.name || "Untitled service"}</span>
                               <span className="shrink-0 text-xs text-muted-foreground">
-                                {sl.last_used_at
-                                  ? `used ${formatRelative(sl.last_used_at)}`
-                                  : `created ${formatRelative(sl.created_at)}`}
+                                {sl.service_date
+                                  ? rowDate(sl)
+                                  : sl.last_used_at
+                                    ? `used ${formatRelative(sl.last_used_at)}`
+                                    : `created ${formatRelative(sl.created_at)}`}
                               </span>
                             </div>
                             <div className="truncate text-xs text-muted-foreground">
@@ -227,8 +245,8 @@ export function HomeScreen({
                         <button
                           type="button"
                           onClick={() => void handleDeleteSetlist(sl)}
-                          title={`Delete ${sl.name || "setlist"}`}
-                          aria-label={`Delete ${sl.name || "setlist"}`}
+                          title={`Delete ${sl.name || "service"}`}
+                          aria-label={`Delete ${sl.name || "service"}`}
                           className="rounded p-1.5 text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive focus-visible:opacity-100 group-hover:opacity-100"
                         >
                           <Trash2 className="size-3.5" />
@@ -247,17 +265,20 @@ export function HomeScreen({
                         )}
                       </li>
                     );
-                  })}
-                </ul>
+                        })}
+                      </ul>
+                    </div>
+                  ),
+                )
               )}
-              {searchQuery.trim() === "" && setlists.length > RECENT_LIMIT && (
+              {searchQuery.trim() === "" && groups && groups.hiddenPast > RECENT_LIMIT && (
                 <button
                   type="button"
                   onClick={() => setShowAll((v) => !v)}
                   className="flex w-full items-center justify-center gap-1 rounded-md py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent/40 hover:text-foreground"
                 >
                   <ChevronDown className={`size-3.5 transition-transform ${showAll ? "rotate-180" : ""}`} />
-                  {showAll ? "Show fewer" : `Show all ${setlists.length} setlists`}
+                  {showAll ? "Show fewer" : `Show all ${groups.hiddenPast} past services`}
                 </button>
               )}
             </div>
@@ -316,11 +337,11 @@ function EmptySetlists({ onCreate }: { onCreate: () => void }) {
   return (
     <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-border bg-card/50 px-6 py-10 text-center">
       <div className="text-sm text-muted-foreground">
-        No setlists yet. Build one from your library.
+        No services yet. Build one from your library.
       </div>
       <Button onClick={onCreate} size="sm">
         <Plus className="size-4" />
-        New setlist
+        New service
       </Button>
     </div>
   );

@@ -75,7 +75,7 @@ describe("setlist builder", () => {
     renderBuilder(false);
     await screen.findByDisplayValue("Sunday 22 Nov");
     fireEvent.click(screen.getAllByRole("button", { name: /songs/i })[0]!);
-    expect(await screen.findByLabelText("In the setlist")).toBeInTheDocument();
+    expect(await screen.findByLabelText("In the service")).toBeInTheDocument();
     expect(screen.getAllByText("Alpha Song").length).toBeGreaterThan(0);
   });
 });

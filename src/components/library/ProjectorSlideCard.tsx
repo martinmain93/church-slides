@@ -10,10 +10,12 @@ import { Copy, GripVertical, Pencil, Scissors, Sparkles, Trash2 } from "lucide-r
 
 import { sectionLabel, sectionLabelClass, type ParsedSection, type SectionType } from "@/lib/parseSong";
 import type { SongSuggestion } from "@/lib/chords/suggestions";
-import { inkStyle, stageThumbnailStyle } from "@/components/presentation/StageSurface";
-import { SIZE_SCALE, type DisplayLook } from "@/lib/displayLook";
+import { stageThumbnailStyle } from "@/components/presentation/StageSurface";
+import { type DisplayLook } from "@/lib/displayLook";
 import { Textarea, growToFit } from "@/components/ui/textarea";
-import { canSplit } from "@/lib/slideSplit";
+import { cn } from "@/lib/utils";
+import { canSplit, isCrowded, offerSplit } from "@/lib/slideSplit";
+import { MiniSlide, useMiniStage } from "@/components/presentation/MiniSlide";
 
 const SECTION_CHOICES: { type: SectionType; label: string }[] = [
   { type: "verse", label: "Verse" },
@@ -102,10 +104,13 @@ export function ProjectorSlideCard({
     opacity: isDragging ? 0.6 : 1,
   };
 
-  const fontSizePx = Math.round(15 * SIZE_SCALE[look.size]);
   const lineCount = Math.max(1, editingDraft.split("\n").length);
+  const mini = useMiniStage(look);
+  const [overflows, setOverflows] = useState(false);
   // The open card grows to show every word; the others stay a 16:9 picture.
-  const expanded = selected || editing;
+  // A true-scale 16:9 picture of the screen; only the box being typed in
+  // grows, so nothing typed is ever hidden.
+  const expanded = editing;
   const contentPos = expanded ? "relative col-start-1 row-start-1 py-9" : "absolute inset-0 py-5";
 
   return (
@@ -185,68 +190,47 @@ export function ProjectorSlideCard({
         )}
       </div>
 
-      {/* Top-right 4 action buttons */}
+      {/* Slide actions, in the same order as a service's slide cards: Edit,
+          Split, then the rest. Shown on hover, and always on the open card
+          (a touch screen has no hover). */}
       {editable && (
-        <div className="absolute right-2 top-2 z-30 flex items-center gap-1.5 opacity-0 transition-opacity duration-200 ease-out group-hover:opacity-100 focus-within:opacity-100">
+        <div
+          className={`absolute right-2 top-2 z-30 flex items-center gap-1 transition-opacity duration-200 ease-out group-hover:opacity-100 focus-within:opacity-100 ${
+            selected || editing ? "opacity-100" : "opacity-0"
+          }`}
+        >
+          <CardAction label="Edit slide text" onClick={onStartEdit}>
+            <Pencil className="size-3.5 shrink-0" />
+          </CardAction>
+          {onSplit &&
+            (offerSplit(editing ? editingDraft : slide.lyrics, { midLine: splitMidLine }) ||
+              (overflows && canSplit(slide.lyrics, { midLine: splitMidLine }))) && (
+            <CardAction
+              label="Split slide in two"
+              onClick={onSplit}
+              // A crowded slide asks for it.
+              tone={overflows || isCrowded(editing ? editingDraft : slide.lyrics) ? "suggest" : "plain"}
+              // Clicking it while typing: the text box's blur mustn't eat the click.
+              onMouseDown={(e) => e.preventDefault()}
+            >
+              <Scissors className="size-3.5 shrink-0" />
+            </CardAction>
+          )}
+          <CardAction label="Duplicate slide" onClick={onDuplicate}>
+            <Copy className="size-3.5 shrink-0" />
+          </CardAction>
+          <CardAction label="Delete slide" onClick={onDelete} tone="danger">
+            <Trash2 className="size-3.5 shrink-0" />
+          </CardAction>
           <button
             {...attributes}
             {...listeners}
             onClick={(e) => e.stopPropagation()}
             aria-label="Drag to reorder slide"
             title="Drag to reorder slide"
-            className="flex h-7 w-7 cursor-grab items-center justify-center rounded-md border border-white/15 bg-zinc-900/90 p-1.5 text-zinc-100 shadow-sm outline-none transition-all duration-150 hover:scale-105 hover:border-amber-400 hover:bg-amber-500 hover:text-zinc-950 focus-visible:ring-1 focus-visible:ring-white/40 active:cursor-grabbing"
+            className={cn(CARD_ACTION, "cursor-grab hover:border-white/40 hover:bg-zinc-700 active:cursor-grabbing")}
           >
             <GripVertical className="size-3.5 shrink-0" />
-          </button>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onStartEdit();
-            }}
-            aria-label="Edit slide text"
-            title="Edit slide text"
-            className="flex h-7 w-7 items-center justify-center rounded-md border border-white/15 bg-zinc-900/90 p-1.5 text-zinc-100 shadow-sm outline-none transition-all duration-150 hover:scale-105 hover:border-sky-400 hover:bg-sky-500 hover:text-white focus-visible:ring-1 focus-visible:ring-white/40"
-          >
-            <Pencil className="size-3.5 shrink-0" />
-          </button>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onDuplicate();
-            }}
-            aria-label="Duplicate slide"
-            title="Duplicate slide"
-            className="flex h-7 w-7 items-center justify-center rounded-md border border-white/15 bg-zinc-900/90 p-1.5 text-zinc-100 shadow-sm outline-none transition-all duration-150 hover:scale-105 hover:border-emerald-400 hover:bg-emerald-500 hover:text-white focus-visible:ring-1 focus-visible:ring-white/40"
-          >
-            <Copy className="size-3.5 shrink-0" />
-          </button>
-          {onSplit && !editing && canSplit(slide.lyrics, { midLine: splitMidLine }) && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onSplit();
-              }}
-              aria-label="Split slide in two"
-              title="Split slide in two"
-              className="flex h-7 w-7 items-center justify-center rounded-md border border-white/15 bg-zinc-900/90 p-1.5 text-zinc-100 shadow-sm outline-none transition-all duration-150 hover:scale-105 hover:border-amber-400 hover:bg-amber-500 hover:text-zinc-950 focus-visible:ring-1 focus-visible:ring-white/40"
-            >
-              <Scissors className="size-3.5 shrink-0" />
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete();
-            }}
-            aria-label="Delete slide"
-            title="Delete slide"
-            className="flex h-7 w-7 items-center justify-center rounded-md border border-white/15 bg-zinc-900/90 p-1.5 text-zinc-100 shadow-sm outline-none transition-all duration-150 hover:scale-105 hover:border-destructive hover:bg-destructive hover:text-destructive-foreground focus-visible:ring-1 focus-visible:ring-white/40"
-          >
-            <Trash2 className="size-3.5 shrink-0" />
           </button>
         </div>
       )}
@@ -256,6 +240,7 @@ export function ProjectorSlideCard({
           onClick={() => onSelect()}
           className={`${contentPos} flex items-center justify-center overflow-hidden px-4 text-center`}
         >
+          <div ref={mini.ref} style={mini.container} className="w-full">
           <Textarea
             autoFocus
             ref={growToFit}
@@ -275,12 +260,10 @@ export function ProjectorSlideCard({
                 onStopEdit();
               }
             }}
-            className="min-h-0 w-full resize-none overflow-y-auto rounded-sm border-none bg-transparent p-0 text-center leading-snug shadow-none outline-none ring-offset-0 focus-visible:ring-0 focus-visible:ring-offset-0"
-            style={{
-              ...inkStyle(look),
-              fontSize: `${fontSizePx}px`,
-            }}
+            className="min-h-0 w-full resize-none overflow-y-auto rounded-sm font-bold leading-tight border-none bg-transparent p-0 text-center leading-snug shadow-none outline-none ring-offset-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+            style={{ ...mini.text, maxWidth: undefined }}
           />
+          </div>
         </div>
       ) : (
         <button
@@ -294,46 +277,9 @@ export function ProjectorSlideCard({
             }
           }}
           aria-label="Select slide"
-          className={`${contentPos} flex cursor-pointer items-center justify-center overflow-hidden px-4 text-center`}
+          className="absolute inset-0 cursor-pointer overflow-hidden text-center"
         >
-          <div
-            className={`${expanded ? "" : "max-h-full "}overflow-hidden whitespace-pre-wrap text-center leading-snug`}
-            style={{
-              ...inkStyle(look),
-              fontSize: `${fontSizePx}px`,
-            }}
-          >
-            {slide.lyrics ? (
-              (() => {
-                const splitSug = slideSuggestions.find((s) => s.category === "slide-split");
-                if (!splitSug || splitSug.splitAfterLineIdx === undefined) {
-                  return slide.lyrics;
-                }
-                const lines = slide.lyrics.split("\n");
-                return lines.map((line, li) => (
-                  <div key={li}>
-                    <div>{line}</div>
-                    {li === splitSug.splitAfterLineIdx && (
-                      <div
-                        data-testid="ghost-slide-split-line"
-                        className="my-1 flex items-center justify-center gap-1.5"
-                      >
-                        <span className="h-px flex-1 border-t border-dashed border-amber-400/70" />
-                        <span className="rounded bg-amber-500/25 px-1.5 py-0.5 font-sans text-[9px] font-semibold uppercase tracking-wider text-amber-200">
-                          Split here
-                        </span>
-                        <span className="h-px flex-1 border-t border-dashed border-amber-400/70" />
-                      </div>
-                    )}
-                  </div>
-                ));
-              })()
-            ) : (
-              <span className="font-sans text-xs font-normal italic opacity-50">
-                Empty slide — click to edit
-              </span>
-            )}
-          </div>
+          <MiniSlide lyrics={slide.lyrics} look={look} empty="Empty slide — click to edit" onOverflow={setOverflows} />
         </button>
       )}
 
@@ -360,11 +306,7 @@ export function ProjectorSlideCard({
                     : "border-amber-400/50 bg-zinc-900/90 text-amber-300 hover:border-amber-400 hover:bg-amber-950/90"
                 }`}
               >
-                {primary.category === "slide-split" ? (
-                  <Scissors className="size-3 shrink-0 text-amber-400" />
-                ) : (
-                  <Sparkles className="size-3 shrink-0 text-amber-400" />
-                )}
+                <Sparkles className="size-3 shrink-0 text-amber-400" />
                 <span className="truncate">{primary.label}</span>
                 {isPrimaryActive && (
                   <kbd className="shrink-0 rounded border border-amber-400/40 bg-amber-900/80 px-1 font-mono text-[9px] text-amber-100">
@@ -377,5 +319,46 @@ export function ProjectorSlideCard({
         </div>
       )}
     </div>
+  );
+}
+
+const CARD_ACTION =
+  "flex size-7 items-center justify-center rounded-md border border-white/15 bg-zinc-900/90 text-zinc-100 shadow-sm outline-none transition-colors duration-150 focus-visible:ring-1 focus-visible:ring-white/40";
+
+const TONE = {
+  plain: "hover:border-white/40 hover:bg-zinc-700",
+  suggest: "border-amber-400/70 text-amber-300 hover:border-amber-400 hover:bg-amber-500 hover:text-zinc-950",
+  danger: "hover:border-destructive hover:bg-destructive hover:text-destructive-foreground",
+};
+
+/** One of a slide card's corner buttons. Neutral, except Delete (red) and a
+ * split the slide is asking for (amber). */
+export function CardAction({
+  label,
+  onClick,
+  onMouseDown,
+  tone = "plain",
+  children,
+}: {
+  label: string;
+  onClick: () => void;
+  onMouseDown?: (e: React.MouseEvent) => void;
+  tone?: keyof typeof TONE;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      onMouseDown={onMouseDown}
+      aria-label={label}
+      title={label}
+      className={cn(CARD_ACTION, TONE[tone])}
+    >
+      {children}
+    </button>
   );
 }

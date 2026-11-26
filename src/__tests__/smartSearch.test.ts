@@ -83,6 +83,12 @@ describe("smartSearch", () => {
     expect(r.parsed.parts.map((p) => p.label)).toEqual(["Easter"]);
   });
 
+  it("a title typed out finds that song, even with a filter word in it", async () => {
+    const lib = [...LIB, song("oldhymn", "Morning Hymn", "Awake my soul and with the sun")];
+    const r = await smartSearch("Morning Hymn", deps({ listSongs: async () => lib, searchSongs: async (q) => lib.filter((s) => s.title.toLowerCase().includes(q.toLowerCase())) }));
+    expect(r.songs[0]?.id).toBe("oldhymn");
+  });
+
   it("filters hymns in a key, ranked by the topic", async () => {
     const r = await smartSearch(
       "Hymns in the key of E about the blood of Jesus",

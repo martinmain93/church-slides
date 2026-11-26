@@ -36,7 +36,7 @@ import { loadAudioInputPrefs } from "@/lib/audioInputPrefs";
 import { getAiEngineStatus, listSongs, type LibrarySyncStatus } from "@/lib/tauri";
 import { fillMissingVerses } from "@/lib/scripture/prepared";
 import { monitorCount } from "@/lib/presentation/projection";
-import { newService } from "@/lib/setlistName";
+import { copiedService, newService, shortServiceDate } from "@/lib/setlistName";
 import { ConfirmProvider } from "@/lib/confirm";
 import { ToastProvider, useToast } from "@/lib/toast";
 import {
@@ -214,9 +214,12 @@ function Inner() {
 
   async function onCopySetlist(sourceId: string) {
     try {
-      const { name, date } = newService((await listSetlists()).map((s) => s.name));
+      const all = await listSetlists();
+      const source = all.find((s) => s.id === sourceId);
+      const { name, date } = source ? copiedService(source, all) : newService(all);
       const id = await duplicateSetlist(sourceId, name, date);
       setView({ kind: "setlist", id });
+      toast.success(`Copied. This is the new service for ${shortServiceDate(date)}.`);
     } catch (err) {
       toast.error(`Copy failed: ${err instanceof Error ? err.message : err}`);
     }
@@ -224,7 +227,7 @@ function Inner() {
 
   async function onCreateSetlist() {
     try {
-      const { name, date } = newService((await listSetlists()).map((s) => s.name));
+      const { name, date } = newService(await listSetlists());
       const id = await createSetlist(name, date);
       setView({ kind: "setlist", id, justCreated: true });
     } catch (err) {
@@ -240,7 +243,7 @@ function Inner() {
     try {
       let detail = await getSetlist(setlistId);
       if (!detail) {
-        toast.error("Setlist not found.");
+        toast.error("This service was deleted.");
         return;
       }
       // A passage an assistant added has only its reference until a Bible
@@ -356,7 +359,7 @@ function Inner() {
             {view.kind === "editor" && (
               <SongEditor
                 songId={view.songId}
-                backLabel={view.fromSetlist ? "setlist" : "Library"}
+                backLabel={view.fromSetlist ? "service" : "Library"}
                 onClose={() => {
                   setView(view.fromSetlist ? { kind: "setlist", id: view.fromSetlist } : { kind: "library" });
                   bumpReload();

@@ -27,8 +27,9 @@ export interface WebLibrary extends LibrarySource {
   readonly store: RecordStore;
 }
 
+// "Psalm 9" before "Psalm 24": numbers in titles sort as numbers.
 const byTitle = (a: { title: string }, b: { title: string }) =>
-  a.title.localeCompare(b.title, undefined, { sensitivity: "base" });
+  a.title.localeCompare(b.title, undefined, { sensitivity: "base", numeric: true });
 
 export function webLibrary(
   store: RecordStore,
@@ -76,12 +77,6 @@ export function webLibrary(
     if (!s) throw new Error("That service is gone.");
     await saveSetlist(s.setlist, edit([...s.items]));
   };
-
-  const songUsedBy = (songId: string): string[] =>
-    store
-      .all("setlist")
-      .filter(([, f]) => Array.isArray(f.refs) && (f.refs as string[]).includes(`song:${songId}`))
-      .map(([, f]) => String(f.name ?? ""));
 
   return {
     store,
@@ -134,8 +129,11 @@ export function webLibrary(
     },
 
     async deleteSong(id) {
-      const users = songUsedBy(id);
-      if (users.length) throw new Error(`A service still uses this song (${users[0]}).`);
+      // As on the desktop: it comes out of every service that has it.
+      for (const [setlistId, f] of store.all("setlist")) {
+        if (!Array.isArray(f.refs) || !(f.refs as string[]).includes(`song:${id}`)) continue;
+        await editItems(setlistId, (items) => items.filter((i) => i.song_id !== id));
+      }
       await store.write("song", id, null);
       notify();
     },

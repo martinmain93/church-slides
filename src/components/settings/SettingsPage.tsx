@@ -35,7 +35,7 @@ import {
 } from "@/lib/recordingClient";
 import { Input } from "@/components/ui/input";
 import { AiRequirements } from "@/components/settings/AiRequirements";
-import { GroqKeyField } from "@/components/settings/AISettings";
+import { GroqKeyField, useOrgAllowance } from "@/components/settings/AISettings";
 import { InstructionModelPicker } from "@/components/debug/InstructionModelPicker";
 import { DisplayLookControls } from "@/components/presentation/DisplayLookDialog";
 import { AssistantConnect } from "@/components/settings/AssistantConnect";
@@ -152,7 +152,8 @@ export function SettingsPage({
                             While the AI is on, the worship leader can say &ldquo;go to the
                             chorus&rdquo; or &ldquo;let&rsquo;s sing Way Maker&rdquo; and the
                             slides follow. It uses Groq&rsquo;s online model, so it needs the
-                            internet during the service and a free Groq key.
+                            internet during the service, and either a free Groq key or an
+                            organization whose plan includes AI.
                           </InfoTip>
                         </div>
                         <SpokenRequestsToggle
@@ -894,16 +895,20 @@ function SpokenRequestsToggle({
     if (!models.seen) void refreshInstructionModels().catch(() => undefined);
   }, [models.seen]);
   const active = models.models.find((m) => m.id === models.activeModelId);
+  // The engine counts an organization's AI as a key: nothing to enter.
   const keyed = active?.model_kind === "hosted" && active.has_api_key === true;
+  const allowanceOf = useOrgAllowance();
   const on = value ?? keyed;
   return (
     <Field
       label="Act on spoken requests"
       hint={
         value === null
-          ? keyed
-            ? "On, because a Groq key is saved."
-            : "Turns on by itself once a Groq key is saved below."
+          ? allowanceOf
+            ? `On: ${allowanceOf}’s plan covers it.`
+            : keyed
+              ? "On, because a Groq key is saved."
+              : "Turns on by itself once a Groq key is saved below."
           : "“Go to the chorus”, “let’s sing Way Maker”, said out loud during a service."
       }
     >

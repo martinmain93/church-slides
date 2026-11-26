@@ -3,7 +3,7 @@
 
 import { Component, useCallback, useEffect, useId, useRef, useState, type ErrorInfo, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { ChevronLeft, X } from "lucide-react";
+import { ChevronLeft, Info, X } from "lucide-react";
 
 import { useLibrary } from "@/library/context";
 import type { LibrarySource } from "@/library/source";
@@ -116,7 +116,7 @@ export function DangerButton({ className, ...props }: React.ButtonHTMLAttributes
     <button
       type="button"
       className={cn(
-        "flex h-11 w-full items-center justify-center gap-1.5 rounded-md border border-red-400/40 px-4 text-sm font-medium text-red-400 hover:bg-red-400/10 disabled:opacity-50",
+        "flex h-11 w-full items-center justify-center gap-1.5 rounded-md border border-red-400/40 px-4 text-sm font-medium text-red-600 hover:bg-red-400/10 dark:text-red-400 disabled:opacity-50",
         className,
       )}
       {...props}
@@ -130,26 +130,49 @@ export const fieldClass =
 export function Field({
   label,
   hint,
+  info,
   error,
   children,
 }: {
   label: string;
+  /** One line under the field. */
   hint?: ReactNode;
-  /** Shown under the field in red, in place of the hint. */
+  /** The detail behind an (i) beside the hint, shown on a tap. */
+  info?: ReactNode;
+  /** Shown under the field in red, above the hint (which still explains). */
   error?: string | null;
   children: ReactNode;
 }) {
+  const [open, setOpen] = useState(false);
   return (
     <label className="block space-y-1.5">
       <span className="block text-sm font-medium">{label}</span>
       {children}
-      {error ? (
-        <span className="block text-sm text-red-400" role="alert">
+      {error && (
+        <span className="block text-sm text-red-600 dark:text-red-400" role="alert">
           {error}
         </span>
-      ) : (
-        hint && <span className="block text-xs leading-relaxed text-muted-foreground">{hint}</span>
       )}
+      {(hint || info) && (
+        <span className="flex items-start gap-1.5 text-xs leading-relaxed text-muted-foreground">
+          <span className="min-w-0 flex-1">{hint}</span>
+          {info && (
+            <button
+              type="button"
+              className="-my-2.5 -mr-2.5 flex size-10 shrink-0 items-center justify-center text-muted-foreground hover:text-foreground"
+              aria-label={`More about ${label}`}
+              aria-expanded={open}
+              onClick={(e) => {
+                e.preventDefault();
+                setOpen((o) => !o);
+              }}
+            >
+              <Info className="size-4" />
+            </button>
+          )}
+        </span>
+      )}
+      {info && open && <span className="block rounded-md bg-muted px-3 py-2 text-xs leading-relaxed text-muted-foreground">{info}</span>}
     </label>
   );
 }

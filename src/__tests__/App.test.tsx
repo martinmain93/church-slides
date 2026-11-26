@@ -197,7 +197,7 @@ describe("App", () => {
     );
   });
 
-  it("Home -> New setlist opens a setlist builder", async () => {
+  it("Home -> New service opens the service builder", async () => {
     vi.spyOn(tauri, "createSetlist").mockResolvedValue("setlist_new");
     vi.spyOn(tauri, "getSetlist").mockResolvedValue({
       id: "setlist_new",
@@ -208,9 +208,9 @@ describe("App", () => {
     });
     render(<App />);
     await screen.findByRole("heading", { name: "Home" });
-    // Two "New setlist" buttons render when the list is empty: the section
+    // Two "New service" buttons render when the list is empty: the section
     // action and the empty-state CTA. Either should work; click the first.
-    const buttons = await screen.findAllByRole("button", { name: /new setlist/i });
+    const buttons = await screen.findAllByRole("button", { name: /new service/i });
     fireEvent.click(buttons[0]!);
     await waitFor(() => {
       expect(screen.getByDisplayValue("New setlist")).toBeInTheDocument();
