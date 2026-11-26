@@ -16,14 +16,18 @@ export interface Persist {
   close?(): void;
 }
 
+/** A copy that shares nothing with `v` (values here are plain JSON; not
+ * `structuredClone`, which Safari 14 lacks). */
+const copy = (v: unknown): unknown => (v === undefined ? v : JSON.parse(JSON.stringify(v)));
+
 export function memoryPersist(): Persist {
   const map = new Map<string, unknown>();
   return {
-    load: async () => [...map.entries()].map(([k, v]) => [k, structuredClone(v)]),
+    load: async () => [...map.entries()].map(([k, v]) => [k, copy(v)]),
     put: async (entries) => {
       for (const [k, v] of entries) {
         if (v === null) map.delete(k);
-        else map.set(k, structuredClone(v));
+        else map.set(k, copy(v));
       }
     },
     clear: async () => map.clear(),
