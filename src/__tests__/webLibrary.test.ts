@@ -510,8 +510,8 @@ describe("services' dates and names", () => {
 
 describe("the web app's pieces", () => {
   it("a song link keeps its key and service, and a malformed one doesn't crash", () => {
-    const link = href({ page: "song", id: "song_1", key: "A", from: "setlist_9" });
-    expect(parseRoute(link)).toEqual({ page: "song", id: "song_1", key: "A", from: "setlist_9" });
+    const link = href({ page: "song", id: "song_1", key: "A", from: "setlist_9", item: "item_3" });
+    expect(parseRoute(link)).toEqual({ page: "song", id: "song_1", key: "A", from: "setlist_9", item: "item_3" });
     expect(parseRoute("#/songs/%E0")).toMatchObject({ page: "song", id: "%E0" });
     expect(parseRoute(href({ page: "service", id: "s", created: true }))).toEqual({ page: "service", id: "s", created: true, copied: false });
   });

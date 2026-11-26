@@ -25,7 +25,9 @@ export function ServicesPage({ canEdit }: { canEdit: boolean }) {
     }
   };
 
-  const groups = services ? groupServices(services) : null;
+  // The band sees services with something in them; empty drafts are the planners' business.
+  const visible = services && !canEdit ? services.filter((s) => (s.song_titles?.length ?? 0) > 0) : services;
+  const groups = visible ? groupServices(visible) : null;
 
   return (
     <>
@@ -44,7 +46,7 @@ export function ServicesPage({ canEdit }: { canEdit: boolean }) {
         <Empty>No services yet. {canEdit ? "Plan one here and it's ready on the slides computer." : ""}</Empty>
       ) : (
         <>
-          <ServiceList title="Upcoming" services={groups.upcoming} />
+          <ServiceList title="Coming up" services={groups.upcoming} />
           <ServiceList title="Past" services={groups.past} past />
         </>
       )}

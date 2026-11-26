@@ -20,7 +20,7 @@ import { ServicesPage } from "@/web/pages/ServicesPage";
 import { SongEditor } from "@/web/pages/SongEditor";
 import { SongPage } from "@/web/pages/SongPage";
 import { SongsPage } from "@/web/pages/SongsPage";
-import { Empty, PageBoundary, PageHeader, PrimaryButton, QuietButton, useTitle } from "@/web/ui";
+import { ConfirmSheet, Empty, PageBoundary, PageHeader, PrimaryButton, QuietButton, useTitle } from "@/web/ui";
 import { cn } from "@/lib/utils";
 import { roleLabel } from "@/core/roles";
 
@@ -108,7 +108,7 @@ export function WebApp({ persist }: { persist?: (name: string) => Promise<Persis
       <div className={centred} data-testid="web-signed-out">
         <img src="/logo.svg" alt="" className="size-14" />
         <h1 className="text-2xl font-semibold">Church Slides</h1>
-        <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
+        <p className="w-full max-w-sm text-sm leading-relaxed text-muted-foreground">
           Plan services and keep your team&apos;s songs up to date from any device. They&apos;re ready on the slides computer on Sunday.
         </p>
         <PrimaryButton className="min-w-40" onClick={() => void startWebSignIn()} data-testid="web-sign-in">
@@ -130,6 +130,7 @@ export function WebApp({ persist }: { persist?: (name: string) => Promise<Persis
           remember(m.orgId);
           setState({ ...state, org: m });
         }}
+        onCheckAgain={() => void load(state.session)}
         onSignOut={() => void signOut(state)}
       />
     );
@@ -142,15 +143,16 @@ export function WebApp({ persist }: { persist?: (name: string) => Promise<Persis
       userId={state.userId}
       org={org}
       persist={persist}
-      account={
+      account={(waiting) => (
         <AccountPage
           email={email}
           org={org}
           memberships={memberships}
+          waiting={waiting}
           onSwitch={() => setState({ ...state, org: null })}
           onSignOut={() => void signOut(state)}
         />
-      }
+      )}
       onRemoved={() => void load(state.session)}
     />
   );
@@ -161,12 +163,15 @@ function OrgPicker({
   memberships,
   current,
   onPick,
+  onCheckAgain,
   onSignOut,
 }: {
   email: string | null;
   memberships: Membership[];
   current: string | null;
   onPick: (m: Membership) => void;
+  /** Read the memberships again (just accepted an invite). */
+  onCheckAgain: () => void;
   onSignOut: () => void;
 }) {
   const back = memberships.find((m) => m.orgId === current);
@@ -175,10 +180,13 @@ function OrgPicker({
       {memberships.length === 0 ? (
         <>
           <h1 className="text-xl font-semibold">You&apos;re not in an organization yet</h1>
-          <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
-            Songs and services live in an organization. Ask whoever runs your slides to invite you{email ? ` (${email})` : ""}, or
-            create one in the Church Slides app under Settings → Account.
+          <p className="w-full max-w-sm text-sm leading-relaxed text-muted-foreground">
+            Ask whoever runs your slides to invite you{email ? ` (${email})` : ""}, then open the link they send. Or create one in the
+            Church Slides app under Settings → Account.
           </p>
+          <PrimaryButton className="min-w-40" onClick={onCheckAgain}>
+            Check again
+          </PrimaryButton>
         </>
       ) : (
         <>
@@ -218,7 +226,8 @@ function OrgLibrary({
   userId: string;
   org: Membership;
   persist?: (name: string) => Promise<Persist>;
-  account: ReactNode;
+  /** The Account page, told how many changes haven't gone up yet. */
+  account: (waiting: number) => ReactNode;
   onRemoved: () => void;
 }) {
   const [opened, setOpened] = useState<{ lib: WebLibrary; sync: LibrarySync } | null>(null);
@@ -287,7 +296,7 @@ function OrgLibrary({
         <div className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col pb-[calc(3.5rem+env(safe-area-inset-bottom))] lg:max-w-3xl lg:pb-0">
           <SyncNotice status={status} onRetry={() => void opened.sync.syncNow()} />
           <main className="flex-1">
-            <PageBoundary resetKey={href(route)}>{page(route, perms, account)}</PageBoundary>
+            <PageBoundary resetKey={href(route)}>{page(route, perms, account(status.waiting))}</PageBoundary>
           </main>
         </div>
       </div>
@@ -306,6 +315,8 @@ function page(route: Route, perms: { editSongs: boolean; editServices: boolean }
           playKey={route.key}
           canEdit={perms.editSongs}
           back={route.from ? href({ page: "service", id: route.from }) : href({ page: "songs" })}
+          from={route.from ?? null}
+          itemId={route.item ?? null}
         />
       );
     case "edit-song":
@@ -323,7 +334,12 @@ function page(route: Route, perms: { editSongs: boolean; editServices: boolean }
 function SyncNotice({ status, onRetry }: { status: SyncStatus; onRetry: () => void }) {
   let text: string | null = null;
   if (status.state === "offline") {
-    text = status.waiting > 0 ? `Offline. ${status.waiting} change${status.waiting === 1 ? "" : "s"} waiting to go up.` : "Offline. Showing the library as it was.";
+    // The device can be online while the server isn't reachable: say which.
+    const where = typeof navigator !== "undefined" && navigator.onLine === false ? "Offline." : "Can't reach Church Slides.";
+    text =
+      status.waiting > 0
+        ? `${where} ${status.waiting} change${status.waiting === 1 ? "" : "s"} kept here, waiting to go up.`
+        : `${where} Showing the library as it was.`;
   } else if (status.state === "signed_out") text = "You've been signed out. Reload to sign in again.";
   else if (status.state === "error" || status.message) text = status.message ?? "Couldn't sync.";
   if (!text) return null;
@@ -400,16 +416,20 @@ function AccountPage({
   email,
   org,
   memberships,
+  waiting,
   onSwitch,
   onSignOut,
 }: {
   email: string | null;
   org: Membership;
   memberships: Membership[];
+  /** Changes made here that haven't gone up: signing out would lose them. */
+  waiting: number;
   onSwitch: () => void;
   onSignOut: () => void;
 }) {
   const perms = rolePermissions(org.role);
+  const [asking, setAsking] = useState(false);
   useTitle("Account");
   return (
     <>
@@ -436,10 +456,16 @@ function AccountPage({
         <p className="text-sm leading-relaxed text-muted-foreground">
           Presenting, importing and chord editing are in the Church Slides app on the slides computer. Everything you change here shows up there.
         </p>
-        <QuietButton className="w-full" onClick={onSignOut} data-testid="web-sign-out">
+        <QuietButton className="w-full" onClick={() => (waiting > 0 ? setAsking(true) : onSignOut())} data-testid="web-sign-out">
           Sign out
         </QuietButton>
       </div>
+      {asking && (
+        <ConfirmSheet title="Sign out anyway?" action="Sign out" onClose={() => setAsking(false)} onAction={onSignOut}>
+          {waiting === 1 ? "1 change" : `${waiting} changes`} made here {waiting === 1 ? "hasn't" : "haven't"} reached Church Slides yet, and would be lost. Connect
+          first to keep {waiting === 1 ? "it" : "them"}.
+        </ConfirmSheet>
+      )}
     </>
   );
 }

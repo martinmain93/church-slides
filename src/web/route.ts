@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from "react";
 
 export type Route =
   | { page: "songs" }
-  | { page: "song"; id: string; key: string | null; from?: string | null }
+  | { page: "song"; id: string; key: string | null; from?: string | null; item?: string | null }
   | { page: "edit-song"; id: string | null }
   | { page: "services" }
   | { page: "service"; id: string; created?: boolean; copied?: boolean }
@@ -21,7 +21,7 @@ export function parseRoute(hash: string): Route {
     case "songs":
       if (parts[1] === "new") return { page: "edit-song", id: null };
       if (parts[1] && parts[2] === "edit") return { page: "edit-song", id: parts[1] };
-      if (parts[1]) return { page: "song", id: parts[1], key: q.get("key"), from: q.get("from") };
+      if (parts[1]) return { page: "song", id: parts[1], key: q.get("key"), from: q.get("from"), item: q.get("item") };
       return { page: "songs" };
     case "services":
       return parts[1]
@@ -42,6 +42,7 @@ export function href(route: Route): string {
       const q = new URLSearchParams();
       if (route.key) q.set("key", route.key);
       if (route.from) q.set("from", route.from);
+      if (route.from && route.item) q.set("item", route.item);
       const query = q.toString(); // not `.size`: Safari before 17 lacks it
       return `#/songs/${encodeURIComponent(route.id)}${query ? `?${query}` : ""}`;
     }

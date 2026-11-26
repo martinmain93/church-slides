@@ -6,6 +6,8 @@ export function KeyBadge({ songKey, className = "" }: { songKey: string; classNa
   return (
     <span
       title={`Key of ${songKey}`}
+      role="img"
+      aria-label={`Key of ${songKey}`}
       data-testid="key-badge"
       className={cn(
         "inline-flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold tracking-tight text-white",
