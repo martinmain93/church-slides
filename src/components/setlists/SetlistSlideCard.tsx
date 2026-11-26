@@ -22,7 +22,7 @@ import { Textarea, growToFit } from "@/components/ui/textarea";
 import { SIZE_SCALE, type DisplayLook } from "@/lib/displayLook";
 import { sectionLabelClass, type SectionType } from "@/lib/parseSong";
 import { isTypingTarget } from "@/lib/slideKeys";
-import { canSplit } from "@/lib/slideSplit";
+import { isCrowded, offerSplit } from "@/lib/slideSplit";
 
 const ACTION =
   "flex size-6 items-center justify-center rounded-md border border-white/15 bg-zinc-900/90 text-zinc-100 shadow-sm outline-none transition-colors duration-150 focus-visible:ring-1 focus-visible:ring-white/40";
@@ -54,6 +54,8 @@ interface Props {
   onDuplicate: () => void;
   /** Cut the slide in two near its middle; without it there's no split button. */
   onSplit?: () => void;
+  /** Whether a split may cut one long line (not in a song with chords). */
+  splitMidLine?: boolean;
   onDelete: () => void;
   /** The selected card grows to show every word (prep, not the live grid). */
   growWhenSelected?: boolean;
@@ -83,6 +85,7 @@ export function SetlistSlideCard({
   onInsertAfter,
   onDuplicate,
   onSplit,
+  splitMidLine = true,
   onDelete,
   growWhenSelected = false,
   data,
@@ -217,12 +220,24 @@ export function SetlistSlideCard({
         )}
 
         {!editing && (
-          <div className="absolute right-1.5 top-1.5 z-30 flex items-center gap-1 opacity-0 transition-opacity duration-200 ease-out focus-within:opacity-100 group-hover:opacity-100">
-            <ActionButton label="Edit slide text" className="hover:border-sky-400 hover:bg-sky-500 hover:text-white" onClick={onStartEdit}>
+          <div
+            className={`absolute right-1.5 top-1.5 z-30 flex items-center gap-1 transition-opacity duration-200 ease-out focus-within:opacity-100 group-hover:opacity-100 ${
+              selected ? "opacity-100" : "opacity-0"
+            }`}
+          >
+            <ActionButton label="Edit slide text" className="hover:border-white/40 hover:bg-zinc-700" onClick={onStartEdit}>
               <Pencil className="size-3.5" />
             </ActionButton>
-            {onSplit && canSplit(lyrics) && (
-              <ActionButton label="Split slide in two" className="hover:border-amber-400 hover:bg-amber-500 hover:text-zinc-950" onClick={onSplit}>
+            {onSplit && offerSplit(lyrics, { midLine: splitMidLine }) && (
+              <ActionButton
+                label="Split slide in two"
+                className={
+                  isCrowded(lyrics)
+                    ? "border-amber-400/70 text-amber-300 hover:border-amber-400 hover:bg-amber-500 hover:text-zinc-950"
+                    : "hover:border-white/40 hover:bg-zinc-700"
+                }
+                onClick={onSplit}
+              >
                 <Scissors className="size-3.5" />
               </ActionButton>
             )}

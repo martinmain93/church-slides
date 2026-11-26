@@ -28,7 +28,6 @@ import {
 import { findLineWord, parseLineId } from "@/lib/chords/lineWords";
 import { parseSong, sectionLabel, type ParsedSection } from "@/lib/parseSong";
 import { formatSlideOrder, parseSlideOrder, slidesToBody, type OverrideSlide } from "@/lib/slideSequence";
-import { splitLineIndex } from "@/lib/slideSplit";
 import type { ChordPlacementInfo } from "@/types/generated";
 
 export type SuggestionCategory =
@@ -525,37 +524,6 @@ function computeChordSpellcheckSuggestions(
 }
 
 /**
- * 3. Slide Split Suggestions (16:9 Projector Readability):
- *    Finds slides with >= 4 lines and proposes splitting them where the split button
- *    would (`splitLineIndex`: the line break nearest the middle by words, preferring
- *    a breath after punctuation).
- */
-function computeSlideSplitSuggestions(
-  slides: { section: ParsedSection; lyrics: string }[],
-): SongSuggestion[] {
-  const out: SongSuggestion[] = [];
-
-  slides.forEach((slide, slideIdx) => {
-    const lines = slide.lyrics.split("\n").map((l) => l.trimEnd());
-    if (lines.length < 4) return;
-
-    const bestSplitIdx = splitLineIndex(lines);
-    if (bestSplitIdx === null) return;
-
-    out.push({
-      id: `slide-split-${slideIdx}-${bestSplitIdx}`,
-      category: "slide-split",
-      label: `Split ${sectionLabel(slide.section)} (${lines.length} lines → ${bestSplitIdx + 1} + ${lines.length - (bestSplitIdx + 1)})`,
-      reason: `${lines.length}-line slide is crowded on 16:9 projectors; split at breath mark after line ${bestSplitIdx + 1}`,
-      slideIdx,
-      splitAfterLineIdx: bestSplitIdx,
-    });
-  });
-
-  return out;
-}
-
-/**
  * 4. Lyric Cleanup & Cross-Section Lyric Ripple Suggestions:
  *    - Detects leftover PDF/notation syllable hyphens inside words (e.g. `"Wor-thy"`, `"sur-ren-der"`, `"Ho-ly"`).
  *    - Detects excessive trailing punctuation on slide lines (`"Praise the Lord,,,"` or trailing commas on final lines).
@@ -830,10 +798,6 @@ export function computeSongSuggestions(params: {
       });
     }
 
-    if (lastEdit.kind === "slide-split") {
-      return computeSlideSplitSuggestions(slides);
-    }
-
     if (lastEdit.kind === "lyric") {
       return computeLyricCleanupSuggestions(slides, lastEdit);
     }
@@ -863,7 +827,6 @@ export function computeSongSuggestions(params: {
     );
   }
 
-  all.push(...computeSlideSplitSuggestions(slides));
   all.push(...computeLyricCleanupSuggestions(slides, lastEdit));
 
   const arr = computeArrangementSuggestion(body, slideOrder);

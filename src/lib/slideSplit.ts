@@ -113,6 +113,21 @@ export function canSplit(lyrics: string, opts: SplitOptions = {}): boolean {
   return smartSplit(lyrics, opts) !== null;
 }
 
+/** A slide that's hard to read at once: four or more lines, or a lot of
+ * words. Its split button stands out. */
+export function isCrowded(lyrics: string): boolean {
+  const lines = trimLines(lyrics).filter((l) => l.trim());
+  return lines.length >= 4 || lines.join(" ").length > 140;
+}
+
+/** Whether to offer a split at all: not on an ordinary two-line slide
+ * (hide it until it's useful), only on three or more lines, or a long one. */
+export function offerSplit(lyrics: string, opts: SplitOptions = {}): boolean {
+  const lines = trimLines(lyrics).filter((l) => l.trim());
+  const long = lines.join(" ").length > 70;
+  return (lines.length >= 3 || long) && canSplit(lyrics, opts);
+}
+
 /** Replace slide `idx` with its two halves, both in its section. */
 export function splitAt<S extends { lyrics: string; section: object }>(
   slides: S[],

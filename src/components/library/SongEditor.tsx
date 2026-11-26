@@ -1264,7 +1264,7 @@ export function SongEditor({ songId, onClose, backLabel = "Library" }: Props) {
               size="sm"
               data-testid="undo-suggestion-btn"
               onClick={handleRestoreUndoSnapshot}
-              title="Undo last accepted suggestion"
+              title="Undo the last change (a split or an accepted suggestion)"
               className="h-8 gap-1 text-xs text-muted-foreground hover:text-foreground"
             >
               <Undo2 className="size-3.5" />
@@ -1436,6 +1436,7 @@ export function SongEditor({ songId, onClose, backLabel = "Library" }: Props) {
               slideOrder={slideOrder}
               chart={showChords ? chart : null}
               hasChords={!!chart && chartHasChords(chart)}
+              onBeforeSplit={() => setUndoSnapshot(captureUndoSnapshot())}
               chartKey={chart?.key ?? null}
               preferFlats={preferFlats}
               displayMode={displayMode}

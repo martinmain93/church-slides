@@ -770,6 +770,7 @@ export function SetlistBuilder({
                 item={it}
                 number={idx + 1}
                 chartKey={it.song_id ? (chartKeys[it.song_id] ?? null) : null}
+                hasChords={!!it.song_id && it.song_id in chartKeys}
                 onKeyChange={(key) => void handleKeyChange(it, key)}
                 selectedSlideIdx={
                   selectedSlide?.itemId === it.id ? selectedSlide.slideIdx : null
