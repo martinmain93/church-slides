@@ -6,7 +6,7 @@ Status: **agreed 2026-11-18. Groundwork built 2026-11-18:** record formats
 the data-source interface (`src/library/`) with the desktop version, and the
 lint rule for the layers. The desktop's views don't use the interface yet;
 they move over as the web app needs their pieces. **Web app v1 built
-2026-11-24** (see "As built"); not yet deployed.
+2026-11-24** (see "As built"); live at `app.churchslides.app` since 2026-11-26.
 
 Church Slides runs today as a desktop app. A web app at
 `app.churchslides.app` comes next, so a team can plan services from a phone
@@ -155,10 +155,20 @@ once a church relies on it, formats only change with a migration.
   `a_service_planned_on_the_web`). Not yet tried: real Google sign-in,
   deploying, the CSP on signed-in pages in a production build.
 
+### Deploying
+
+Live at `app.churchslides.app` since 2026-11-26: a Cloudflare Worker with
+static assets (`web/wrangler.jsonc`), beside the account server at
+`api.churchslides.app`, which accepts the web app's client metadata
+document (`web/public/oauth/web-app-client.json`). `web/public/_headers`
+sets the security policy and caching. To deploy, from `main`:
+
+```sh
+pnpm web:build && pnpm web:deploy
+```
+
 ### Not yet
 
-- Deploying `app.churchslides.app` (Cloudflare static site); the server
-  must accept the web app's client metadata document in production.
 - The team page (members, invites) and the chord editor.
 - Several tabs share one library without coordinating (each keeps its own
   copy in memory); one tab syncing for all is the fix.
