@@ -43,7 +43,12 @@ export function ServicesPage({ canEdit }: { canEdit: boolean }) {
       />
       {(error ?? loadError) && <ErrorLine>{error ?? loadError}</ErrorLine>}
       {!groups ? null : groups.upcoming.length + groups.past.length === 0 ? (
-        <Empty>No services yet. {canEdit ? "Plan one here and it's ready on the slides computer." : ""}</Empty>
+        <Empty>
+          No services yet.{" "}
+          {canEdit
+            ? "Plan one here and it's ready on the slides computer. The slides computer's own services come with its songs (Settings → Account there, “Use this computer’s songs”)."
+            : ""}
+        </Empty>
       ) : (
         <>
           <ServiceList title="Coming up" services={groups.upcoming} />
