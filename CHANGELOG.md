@@ -10,6 +10,8 @@ refuses to release a version that has no entry here.
 
 ## Unreleased
 
+- New (preview): **Church Slides on the web.** Sign in at app.churchslides.app from a phone or any computer to see your organization's songs with their chords, edit words and credits, and plan services (songs, keys, readings, text slides). Changes show up on the slides computer, and theirs show up there. Presenting and chord editing stay in the app.
+- New: **services have a date.** A new service is dated for the coming Sunday and named after it, never with the same name as another; change either one in the setlist's header.
 - New: **split a slide in two.** The scissors on a slide (in a song or a service) cuts it at the line break nearest the middle, or mid-line for a single long line.
 - Fixed: clicking a slide whose words run past the edge now shows all of them.
 

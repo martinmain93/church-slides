@@ -71,7 +71,7 @@ async fn two_computers_through_a_local_server() {
     // A builds a library; B downloads it.
     let grace = a.db.create_song(song("Amazing Grace", "[Verse 1]\nAmazing grace")).unwrap();
     let other = a.db.create_song(song("Other", "x")).unwrap();
-    let list = setlists::create_setlist(&a.db, "Sunday").unwrap();
+    let list = setlists::create_setlist(&a.db, "Sunday", None).unwrap();
     setlists::add_setlist_item(&a.db, &list, &grace).unwrap();
     assert_eq!(a.sync(&org).await, None);
     b.sync(&org).await;
@@ -184,4 +184,66 @@ async fn another_computer_edits() {
     s.body_text = format!("{}\n\n[Chorus]\nEdited on another computer", s.body_text);
     c.db.update_song(&song_id, song(&s.title, &s.body_text)).unwrap();
     c.sync(&org).await;
+}
+
+/// A service planned in the web app (`src/web`) arrives on a computer as it
+/// was made, and the computer's change goes back. Plan one in the web app on
+/// the local server first, then:
+/// `SYNC_E2E_ORG_NAME=<organization> SYNC_E2E_SETLIST_NAME=<service> CHURCH_SLIDES_SERVER=… cargo test --lib library_sync::e2e::a_service_planned_on_the_web -- --ignored --nocapture`
+#[tokio::test]
+#[ignore = "needs a service planned in the web app on a local server: see the doc comment"]
+async fn a_service_planned_on_the_web() {
+    let (Ok(org_name), Ok(list_name)) = (std::env::var("SYNC_E2E_ORG_NAME"), std::env::var("SYNC_E2E_SETLIST_NAME")) else {
+        panic!("set SYNC_E2E_ORG_NAME and SYNC_E2E_SETLIST_NAME");
+    };
+    let first = tempfile::tempdir().unwrap();
+    account::sign_in(first.path(), None, |url| {
+        let url = url.to_string();
+        tokio::spawn(async move {
+            let _ = reqwest::Client::new().get(url).send().await;
+        });
+        Ok(())
+    })
+    .await
+    .unwrap();
+    let me = account::api(first.path(), "GET", "/me", None).await.unwrap();
+    let org = me["memberships"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|m| m["orgName"] == org_name.as_str())
+        .and_then(|m| m["orgId"].as_str())
+        .unwrap_or_else(|| panic!("not in {org_name}: {me}"))
+        .to_string();
+
+    let c = Computer::new(&org, Some(first.path()));
+    assert_eq!(c.sync(&org).await, None);
+    let list = setlists::list_setlists(&c.db).unwrap().into_iter().find(|s| s.name == list_name).expect("the service came down");
+    let detail = setlists::get_setlist(&c.db, &list.id).unwrap().unwrap();
+    println!("date {:?}", detail.setlist.service_date);
+    if let Ok(date) = std::env::var("SYNC_E2E_SETLIST_DATE") {
+        assert_eq!(detail.setlist.service_date.as_deref(), Some(date.as_str()));
+    }
+    for i in &detail.items {
+        println!(
+            "{} {:<9} key={:<4} song={:<20} content={:?} slides={:?}",
+            i.item.position,
+            i.item.kind,
+            i.item.song_key.as_deref().unwrap_or("-"),
+            i.song.as_ref().map(|s| s.title.as_str()).unwrap_or("-"),
+            i.item.content,
+            i.item.slides_override
+        );
+    }
+    let positions: Vec<i64> = detail.items.iter().map(|i| i.item.position).collect();
+    assert_eq!(positions, (0..detail.items.len() as i64).collect::<Vec<_>>());
+    let song = detail.items.iter().find(|i| i.item.kind == "song").expect("a song item");
+    let song_id = song.song.as_ref().expect("its library song came down").id.clone();
+    let charts = crate::charts::get_charts(&c.db, &[song_id.clone()]).unwrap();
+    println!("chart for {song_id}: key {:?}", charts.get(&song_id).map(|c| c.original_key.clone()));
+
+    // The computer adds the song again (a reprise); the web app should show it.
+    setlists::add_setlist_item(&c.db, &list.id, &song_id).unwrap();
+    assert_eq!(c.sync(&org).await, None);
+    assert_eq!(super::local::waiting(&c.db.conn().lock().unwrap()).unwrap(), 0);
 }

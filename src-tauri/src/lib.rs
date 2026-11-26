@@ -517,6 +517,7 @@ pub fn run() {
             commands::get_setlist,
             commands::create_setlist,
             commands::update_setlist_name,
+            commands::update_setlist_date,
             commands::delete_setlist,
             commands::add_setlist_item,
             commands::add_service_item,

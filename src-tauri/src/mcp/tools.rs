@@ -455,7 +455,7 @@ impl Library {
         let song_ids: Vec<String> = songs.iter().map(|(id, _)| id.clone()).collect();
         check_songs_exist(&self.db, &song_ids)?;
         self.snapshot()?;
-        let id = setlists::create_setlist(&self.db, &name)?;
+        let id = setlists::create_setlist(&self.db, &name, opt_str(args, "service_date")?.as_deref())?;
         set_setlist_songs(&self.db, &id, &song_ids)?;
         self.apply_keys(&id, &songs)?;
         let mut out = self.setlist_view(&id)?;
@@ -948,6 +948,7 @@ pub fn specs() -> Value {
                 "type": "object",
                 "properties": {
                     "name": { "type": "string", "description": "e.g. \"Sunday 5 Oct — Morning\"" },
+                    "service_date": { "type": "string", "description": "The day it's for, YYYY-MM-DD (optional)" },
                     "songs": {
                         "type": "array",
                         "description": "Songs in running order, each with an optional key for this service (\"original\" = the chart's own key; leave key out to keep the song's current one)",

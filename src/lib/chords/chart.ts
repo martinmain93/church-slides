@@ -56,13 +56,50 @@ export function chartHasChords(chart: ChordChart): boolean {
 /** Parse a stored chart, or null for absent/malformed JSON. */
 export function parseStoredChart(json: string | null | undefined): ChordChart | null {
   if (!json) return null;
+  let c: unknown;
   try {
-    const c = JSON.parse(json) as ChordChart;
-    if (!c || !Array.isArray(c.sections)) return null;
-    return c;
+    c = JSON.parse(json);
   } catch {
     return null;
   }
+  return chartFrom(c);
+}
+
+/** A chart from parsed JSON, keeping only what has the right shape: a chart
+ * synced from another device (or a newer app) can't break a page. */
+function chartFrom(raw: unknown): ChordChart | null {
+  if (!raw || typeof raw !== "object" || !Array.isArray((raw as ChordChart).sections)) return null;
+  const c = raw as Record<string, unknown>;
+  const str = (v: unknown) => (typeof v === "string" ? v : null);
+  const line = (l: unknown): ChartLine | null => {
+    if (!l || typeof l !== "object") return null;
+    const { text, chords } = l as Record<string, unknown>;
+    return {
+      text: typeof text === "string" ? text : "",
+      chords: (Array.isArray(chords) ? chords : []).filter(
+        (p): p is PlacedChord => !!p && typeof (p as PlacedChord).pos === "number" && typeof (p as PlacedChord).chord === "string",
+      ),
+    };
+  };
+  const sections = (c.sections as unknown[]).flatMap((s): ChartSection[] => {
+    if (!s || typeof s !== "object") return [];
+    const { label, stanzas } = s as Record<string, unknown>;
+    return [
+      {
+        label: str(label) ?? "",
+        stanzas: (Array.isArray(stanzas) ? stanzas : [])
+          .filter(Array.isArray)
+          .map((st: unknown[]) => st.map(line).filter((l): l is ChartLine => !!l)),
+      },
+    ];
+  });
+  return {
+    version: typeof c.version === "number" ? c.version : CHART_VERSION,
+    key: str(c.key),
+    tempo: typeof c.tempo === "number" ? c.tempo : null,
+    time: str(c.time),
+    sections,
+  };
 }
 
 // --- Alignment: find a slide's chords in the chart ---------------------------

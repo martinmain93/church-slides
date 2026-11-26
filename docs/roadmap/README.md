@@ -55,6 +55,10 @@ what it does today.
   suggest one that fits.
 - **Suggestions that learn the leader's habits**: rank "Fits next" by what
   this leader actually picks. This never touches the engine.
+- **More inputs** (order TBD): a talkback channel for the music director
+  that goes straight to commands; a talk button on the leader or band page;
+  audio from a phone or iPad near the stage as the music input.
+  [INPUTS](INPUTS.md)
 
 ### Library and setup
 

@@ -12,6 +12,7 @@ export default tseslint.config(
       "build/**",
       "site/**",
       "relay/**",
+      "web/dist/**",
       "stats/**",
       "src-tauri/**",
       "sidecar/**",
@@ -62,6 +63,24 @@ export default tseslint.config(
         {
           patterns: [
             { group: ["@tauri-apps/*", "@/lib/tauri", "@/lib/invoke"], message: "Platform code goes in its own implementation (desktop.ts)." },
+          ],
+        },
+      ],
+    },
+  },
+  // The web app and its library run in a browser: nothing from Tauri, and
+  // nothing from the desktop's library either.
+  {
+    files: ["src/web/**/*.{ts,tsx}", "src/library/web/**/*.{ts,tsx}", "src/lib/account/**/*.ts", "web/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@tauri-apps/*", "@/lib/tauri", "@/lib/invoke", "@/library/desktop", "@/lib/displayLook", "@/lib/serviceItems"],
+              message: "The web app runs in a browser: no Tauri, directly or through desktop modules.",
+            },
           ],
         },
       ],

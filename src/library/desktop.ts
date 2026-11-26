@@ -21,13 +21,15 @@ export const desktopLibrary: LibrarySource = {
   listSongs: tauri.listSongs,
   getSong: tauri.getSong,
   createSong: tauri.createSong,
-  updateSong: tauri.updateSong,
+  updateSong: (id, input) => tauri.updateSong(id, input),
   deleteSong: tauri.deleteSong,
+  getChart: async (songId) => (await tauri.getSongCharts([songId]))[songId] ?? null,
 
   listSetlists: tauri.listSetlists,
   getSetlist: tauri.getSetlist,
   createSetlist: tauri.createSetlist,
   renameSetlist: tauri.updateSetlistName,
+  setServiceDate: tauri.updateSetlistDate,
   deleteSetlist: tauri.deleteSetlist,
   copySetlist: tauri.duplicateSetlist,
 
@@ -37,6 +39,10 @@ export const desktopLibrary: LibrarySource = {
   reorderItems: tauri.reorderSetlist,
   setItemKey: tauri.setSetlistItemKey,
   setItemSlides: tauri.setSetlistItemSlides,
+  setItemContent: async (setlistId, itemId, content, slidesOverride) => {
+    await tauri.setSetlistItemContent(setlistId, itemId, content);
+    if (slidesOverride !== undefined) await tauri.setSetlistItemSlides(setlistId, itemId, slidesOverride);
+  },
 
   listReadings: tauri.listReadings,
   saveReading: tauri.saveReading,

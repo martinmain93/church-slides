@@ -1,0 +1,10 @@
+{
+  "client_id": "https://app.churchslides.app/oauth/web-app-client.json",
+  "client_name": "Church Slides on the web",
+  "client_uri": "https://churchslides.app",
+  "application_type": "web",
+  "redirect_uris": ["https://app.churchslides.app/"],
+  "grant_types": ["authorization_code", "refresh_token"],
+  "response_types": ["code"],
+  "token_endpoint_auth_method": "none"
+}

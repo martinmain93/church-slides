@@ -36,7 +36,7 @@ import { loadAudioInputPrefs } from "@/lib/audioInputPrefs";
 import { getAiEngineStatus, listSongs, type LibrarySyncStatus } from "@/lib/tauri";
 import { fillMissingVerses } from "@/lib/scripture/prepared";
 import { monitorCount } from "@/lib/presentation/projection";
-import { defaultSetlistName } from "@/lib/setlistName";
+import { newService } from "@/lib/setlistName";
 import { ConfirmProvider } from "@/lib/confirm";
 import { ToastProvider, useToast } from "@/lib/toast";
 import {
@@ -44,6 +44,7 @@ import {
   duplicateSetlist,
   getSetlist,
   getSettings,
+  listSetlists,
   type SetlistDetail,
 } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
@@ -213,7 +214,8 @@ function Inner() {
 
   async function onCopySetlist(sourceId: string) {
     try {
-      const id = await duplicateSetlist(sourceId, defaultSetlistName());
+      const { name, date } = newService((await listSetlists()).map((s) => s.name));
+      const id = await duplicateSetlist(sourceId, name, date);
       setView({ kind: "setlist", id });
     } catch (err) {
       toast.error(`Copy failed: ${err instanceof Error ? err.message : err}`);
@@ -222,7 +224,8 @@ function Inner() {
 
   async function onCreateSetlist() {
     try {
-      const id = await createSetlist(defaultSetlistName());
+      const { name, date } = newService((await listSetlists()).map((s) => s.name));
+      const id = await createSetlist(name, date);
       setView({ kind: "setlist", id, justCreated: true });
     } catch (err) {
       toast.error(`Create failed: ${err instanceof Error ? err.message : err}`);
