@@ -91,9 +91,13 @@ Per recording, Modal against the baseline: 0.312/0.325, 0.227/0.204,
 0.485/0.513, 0.270/0.233, 0.264/0.297, 0.320/0.300, 0.191/0.193, 0.472/0.434,
 0.090/0.154. No audio was dropped, and the server failed no steps.
 
-- **A tie on accuracy, not a win.** The streaming bench's better words
-  (WER 0.390 vs 0.466, final words 1.4 s sooner) don't reach the slides on
-  their own. The follower and its timing were tuned on Whisper.
+- **A tie on accuracy, not a win, because the next-line check is missing.**
+  The server already runs the Mac's Qwen tuning (2026-11-21,
+  `QWEN3_ASR_IMPROVEMENTS.md`): attention word times and the 0.5 flush
+  filter are `QwenStreamingBackend` defaults. What the processor path lacks
+  is the next-line check, which needs Qwen's audio tower on a GPU. On the
+  Mac, turning it off took Qwen from about 0.24–0.27 to 0.299 (quick set).
+  The baseline here has no check either.
 - **What it does buy:** the best hosted result so far (DeepInfra was 0.320
   at best). It switches slides about 0.5 s earlier. It also uses about a
   third less of the computer's processor, which matters on the slow
@@ -131,12 +135,13 @@ raise this.
 
 ## Not yet done
 
-- **Tuning the follower on Qwen's words.** The gate is a tie with Whisper's
-  tuning. Qwen's sooner, cleaner words are the lever.
+- **The Qwen next-line check on the server:** its phone model reads Qwen's
+  audio tower, which only the server has. Send its phones back and use
+  `next_line.qwen_tuning()` while the server answers; with Whisper as the
+  fallback, run without a check, as the processor path does today.
 - **A health check on the server:** restart the container when steps keep
   failing (the kernel fault above).
 - **Batching steps** across streams on one GPU.
-- **The next-line check on the server.**
 - **Waking in the app:** under 10 s, so the GPU is woken when the AI starts,
   with no warm-up message. Whisper covers the first seconds, and any wait
   for capacity (already built).
