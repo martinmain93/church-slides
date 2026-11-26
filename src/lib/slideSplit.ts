@@ -13,7 +13,16 @@
  *     in the middle half of the line, the one nearest the middle.
  *  3. Otherwise: break at the space nearest the middle.
  *  4. A single word (or nothing) can't be split.
+ *
+ * Rules 2 and 3 cut inside a line. A song with chords has them placed on its
+ * lines, and a cut line's chords don't follow it into the second half, so
+ * there the split keeps to line breaks (`midLine: false`).
  */
+
+export interface SplitOptions {
+  /** Allow cutting one long line in two (rules 2 and 3). Default true. */
+  midLine?: boolean;
+}
 
 /** How much a break after punctuation is preferred, as a share of the slide's length. */
 const BREATH_BONUS = 0.08;
@@ -73,7 +82,7 @@ function splitLineOffset(line: string): number | null {
 }
 
 /** The slide's words as two slides, or null when it can't be split. */
-export function smartSplit(lyrics: string): [string, string] | null {
+export function smartSplit(lyrics: string, opts: SplitOptions = {}): [string, string] | null {
   const lines = trimLines(lyrics);
   const lineIdx = splitLineIndex(lines);
   if (lineIdx !== null) {
@@ -82,6 +91,7 @@ export function smartSplit(lyrics: string): [string, string] | null {
       trimLines(lines.slice(lineIdx + 1).join("\n")).join("\n"),
     ];
   }
+  if (opts.midLine === false) return null;
   const line = lines.find((l) => l.trim())?.trim();
   if (!line) return null;
   const at = splitLineOffset(line);
@@ -91,8 +101,8 @@ export function smartSplit(lyrics: string): [string, string] | null {
   return first && second ? [first, second] : null;
 }
 
-export function canSplit(lyrics: string): boolean {
-  return smartSplit(lyrics) !== null;
+export function canSplit(lyrics: string, opts: SplitOptions = {}): boolean {
+  return smartSplit(lyrics, opts) !== null;
 }
 
 /** Replace slide `idx` with its two halves, both in its section. */
@@ -100,10 +110,11 @@ export function splitAt<S extends { lyrics: string; section: object }>(
   slides: S[],
   idx: number,
   copy: (slide: S, lyrics: string) => S = (slide, lyrics) => ({ ...slide, section: { ...slide.section }, lyrics }),
+  opts: SplitOptions = {},
 ): S[] {
   const target = slides[idx];
   if (!target) return slides;
-  const halves = smartSplit(target.lyrics);
+  const halves = smartSplit(target.lyrics, opts);
   if (!halves) return slides;
   return [...slides.slice(0, idx), copy(target, halves[0]), copy(target, halves[1]), ...slides.slice(idx + 1)];
 }

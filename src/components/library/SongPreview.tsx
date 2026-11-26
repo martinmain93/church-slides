@@ -66,6 +66,8 @@ interface Props {
   slideOrder?: string | null;
   /** When set, draw its chords above the lyrics (the band's view). */
   chart?: ChordChart | null;
+  /** The song has chords, shown or not: a split then keeps to line breaks. */
+  hasChords?: boolean;
   /** Key used for the quick diatonic chord palette and Nashville numbers. */
   chartKey?: string | null;
   /** Whether chords should be spelled with flats (true) or sharps (false). */
@@ -221,6 +223,7 @@ export function SongPreview({
   body,
   slideOrder,
   chart,
+  hasChords = false,
   chartKey,
   preferFlats,
   displayMode = "letters",
@@ -682,12 +685,12 @@ export function SongPreview({
   }
 
   function handleSplitSlide(idx: number) {
-    if (!onChangeBody) return;
+    if (!onChangeBody || slides[idx]?.lyrics === NEW_SLIDE_STAND_IN) return;
     const currentList: OverrideSlide[] = slides.map((s) => ({
       section: s.section,
       lyrics: s.lyrics,
     }));
-    const nextList = splitAt(currentList, idx);
+    const nextList = splitAt(currentList, idx, undefined, { midLine: !hasChords });
     if (nextList === currentList) return;
     if (editingSlideIdx === idx) setEditingSlideIdx(null);
     commitSlidesMutation(nextList);
@@ -843,6 +846,7 @@ export function SongPreview({
                     onChangeSection={(sec) => handleUpdateSlideSection(i, sec)}
                     onDuplicate={() => handleDuplicateSlide(i)}
                     onSplit={() => handleSplitSlide(i)}
+                    splitMidLine={!hasChords}
                     onDelete={() => handleDeleteSlide(i)}
                   />
                   {pulsing && aiPulse && <AiChangeGlow key={aiPulse.token} />}

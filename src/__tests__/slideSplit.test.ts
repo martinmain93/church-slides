@@ -52,6 +52,11 @@ describe("smartSplit", () => {
     expect(smartSplit("\nfirst line\nsecond line\n\n")).toEqual(["first line", "second line"]);
   });
 
+  it("can keep to line breaks (a song with chords)", () => {
+    expect(smartSplit("one two three four five six", { midLine: false })).toBeNull();
+    expect(smartSplit("one two\nthree four", { midLine: false })).toEqual(["one two", "three four"]);
+  });
+
   it("won't split one word or nothing", () => {
     expect(smartSplit("Hallelujah")).toBeNull();
     expect(smartSplit("   ")).toBeNull();

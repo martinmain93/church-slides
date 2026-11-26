@@ -52,6 +52,7 @@ export function ProjectorSlideCard({
   onChangeSection,
   onDuplicate,
   onSplit,
+  splitMidLine = true,
   onDelete,
 }: {
   slide: { id: string; section: ParsedSection; lyrics: string };
@@ -71,6 +72,8 @@ export function ProjectorSlideCard({
   onDuplicate: () => void;
   /** Cut the slide in two near its middle (see `smartSplit`). */
   onSplit?: () => void;
+  /** Whether a split may cut one long line (not in a song with chords). */
+  splitMidLine?: boolean;
   onDelete: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -219,7 +222,7 @@ export function ProjectorSlideCard({
           >
             <Copy className="size-3.5 shrink-0" />
           </button>
-          {onSplit && canSplit(slide.lyrics) && (
+          {onSplit && !editing && canSplit(slide.lyrics, { midLine: splitMidLine }) && (
             <button
               type="button"
               onClick={(e) => {
