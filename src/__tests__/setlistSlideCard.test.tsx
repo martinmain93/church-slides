@@ -77,13 +77,11 @@ describe("splitting a setlist slide", () => {
   });
 });
 
-describe("the selected setlist slide", () => {
-  it("grows to show every word, while the others stay 16:9", () => {
+describe("a setlist slide's picture", () => {
+  it("stays a 16:9 picture of the screen when selected: only typing grows it", () => {
     renderCard({}, "Amazing grace", true);
-    expect(document.querySelector("[data-expanded]")).not.toBeNull();
-    cleanup();
-    renderCard({}, "Amazing grace", false);
     expect(document.querySelector("[data-expanded]")).toBeNull();
+    expect(screen.getByTestId("mini-slide-words")).toHaveTextContent("Amazing grace");
   });
 });
 

@@ -17,12 +17,13 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Copy, MoreHorizontal, Pencil, Plus, Scissors, Trash2 } from "lucide-react";
 
-import { inkStyle, stageThumbnailStyle } from "@/components/presentation/StageSurface";
+import { stageThumbnailStyle } from "@/components/presentation/StageSurface";
 import { Textarea, growToFit } from "@/components/ui/textarea";
-import { SIZE_SCALE, type DisplayLook } from "@/lib/displayLook";
+import { type DisplayLook } from "@/lib/displayLook";
 import { sectionLabelClass, type SectionType } from "@/lib/parseSong";
 import { isTypingTarget } from "@/lib/slideKeys";
-import { isCrowded, offerSplit } from "@/lib/slideSplit";
+import { canSplit, isCrowded, offerSplit } from "@/lib/slideSplit";
+import { MiniSlide, useMiniStage } from "@/components/presentation/MiniSlide";
 
 const ACTION =
   "flex size-6 items-center justify-center rounded-md border border-white/15 bg-zinc-900/90 text-zinc-100 shadow-sm outline-none transition-colors duration-150 focus-visible:ring-1 focus-visible:ring-white/40";
@@ -57,7 +58,7 @@ interface Props {
   /** Whether a split may cut one long line (not in a song with chords). */
   splitMidLine?: boolean;
   onDelete: () => void;
-  /** The selected card grows to show every word (prep, not the live grid). */
+  /** The card grows while its words are being typed (prep, not the live grid). */
   growWhenSelected?: boolean;
   /** `data-*` attributes and the test id, which differ between the views. */
   data: Record<string, string | undefined>;
@@ -93,7 +94,10 @@ export function SetlistSlideCard({
   deleteOnKey = false,
 }: Props) {
   const [menu, setMenu] = useState(false);
-  const expanded = growWhenSelected && (selected || editing);
+  // A true-scale 16:9 picture of the screen; only the box being typed in grows.
+  const expanded = growWhenSelected && editing;
+  const mini = useMiniStage(look);
+  const [overflows, setOverflows] = useState(false);
   // The whole card is the drag handle — except while typing in it, where a
   // drag selects text.
   const { listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -176,6 +180,7 @@ export function SetlistSlideCard({
           <div
             className={`${expanded ? "relative col-start-1 row-start-1 pb-7" : "absolute inset-0 pb-3"} flex items-center justify-center px-3 pt-7`}
           >
+            <div ref={mini.ref} style={mini.container} className={expanded ? "w-full" : "h-full w-full"}>
             <Textarea
               autoFocus
               ref={expanded ? growToFit : undefined}
@@ -192,9 +197,11 @@ export function SetlistSlideCard({
                   e.currentTarget.blur();
                 }
               }}
-              className={`${expanded ? "min-h-0" : "h-full"} w-full resize-none rounded-sm border-none bg-transparent p-0 text-center text-xs leading-snug focus-visible:ring-0`}
-              style={inkStyle(look)}
+              className={`${expanded ? "min-h-0" : "h-full"} w-full resize-none rounded-sm border-none bg-transparent p-0 text-center font-bold leading-tight focus-visible:ring-0`}
+              // The same size as the card shows it: editing doesn't jump.
+              style={{ ...mini.text, maxWidth: undefined }}
             />
+            </div>
           </div>
         ) : (
           <button
@@ -205,17 +212,9 @@ export function SetlistSlideCard({
             }}
             onDoubleClick={onStartEdit}
             aria-label={selectLabel}
-            className={`${expanded ? "relative col-start-1 row-start-1 py-8" : "absolute inset-0 py-5"} flex cursor-pointer items-center justify-center overflow-hidden px-4 text-center`}
+            className="absolute inset-0 cursor-pointer overflow-hidden text-center"
           >
-            <div
-              className={`${expanded ? "" : "max-h-full "}overflow-hidden whitespace-pre-wrap text-center leading-snug`}
-              style={{
-                ...inkStyle(look),
-                fontSize: `${Math.round(12 * SIZE_SCALE[look.size])}px`,
-              }}
-            >
-              {lyrics || <span className="font-sans text-xs font-normal italic opacity-50">{emptyText}</span>}
-            </div>
+            <MiniSlide lyrics={lyrics} look={look} empty={emptyText} onOverflow={setOverflows} />
           </button>
         )}
 
@@ -228,11 +227,11 @@ export function SetlistSlideCard({
             <ActionButton label="Edit slide text" className="hover:border-white/40 hover:bg-zinc-700" onClick={onStartEdit}>
               <Pencil className="size-3.5" />
             </ActionButton>
-            {onSplit && offerSplit(lyrics, { midLine: splitMidLine }) && (
+            {onSplit && (offerSplit(lyrics, { midLine: splitMidLine }) || (overflows && canSplit(lyrics, { midLine: splitMidLine }))) && (
               <ActionButton
                 label="Split slide in two"
                 className={
-                  isCrowded(lyrics)
+                  overflows || isCrowded(lyrics)
                     ? "border-amber-400/70 text-amber-300 hover:border-amber-400 hover:bg-amber-500 hover:text-zinc-950"
                     : "hover:border-white/40 hover:bg-zinc-700"
                 }

@@ -10,10 +10,11 @@ import { Copy, GripVertical, Pencil, Scissors, Sparkles, Trash2 } from "lucide-r
 
 import { sectionLabel, sectionLabelClass, type ParsedSection, type SectionType } from "@/lib/parseSong";
 import type { SongSuggestion } from "@/lib/chords/suggestions";
-import { inkStyle, stageThumbnailStyle } from "@/components/presentation/StageSurface";
-import { SIZE_SCALE, type DisplayLook } from "@/lib/displayLook";
+import { stageThumbnailStyle } from "@/components/presentation/StageSurface";
+import { type DisplayLook } from "@/lib/displayLook";
 import { Textarea, growToFit } from "@/components/ui/textarea";
-import { isCrowded, offerSplit } from "@/lib/slideSplit";
+import { canSplit, isCrowded, offerSplit } from "@/lib/slideSplit";
+import { MiniSlide, useMiniStage } from "@/components/presentation/MiniSlide";
 
 const SECTION_CHOICES: { type: SectionType; label: string }[] = [
   { type: "verse", label: "Verse" },
@@ -102,10 +103,13 @@ export function ProjectorSlideCard({
     opacity: isDragging ? 0.6 : 1,
   };
 
-  const fontSizePx = Math.round(15 * SIZE_SCALE[look.size]);
   const lineCount = Math.max(1, editingDraft.split("\n").length);
+  const mini = useMiniStage(look);
+  const [overflows, setOverflows] = useState(false);
   // The open card grows to show every word; the others stay a 16:9 picture.
-  const expanded = selected || editing;
+  // A true-scale 16:9 picture of the screen; only the box being typed in
+  // grows, so nothing typed is ever hidden.
+  const expanded = editing;
   const contentPos = expanded ? "relative col-start-1 row-start-1 py-9" : "absolute inset-0 py-5";
 
   return (
@@ -197,12 +201,14 @@ export function ProjectorSlideCard({
           <CardAction label="Edit slide text" onClick={onStartEdit}>
             <Pencil className="size-3.5 shrink-0" />
           </CardAction>
-          {onSplit && offerSplit(editing ? editingDraft : slide.lyrics, { midLine: splitMidLine }) && (
+          {onSplit &&
+            (offerSplit(editing ? editingDraft : slide.lyrics, { midLine: splitMidLine }) ||
+              (overflows && canSplit(slide.lyrics, { midLine: splitMidLine }))) && (
             <CardAction
               label="Split slide in two"
               onClick={onSplit}
               // A crowded slide asks for it.
-              tone={isCrowded(editing ? editingDraft : slide.lyrics) ? "suggest" : "plain"}
+              tone={overflows || isCrowded(editing ? editingDraft : slide.lyrics) ? "suggest" : "plain"}
               // Clicking it while typing: the text box's blur mustn't eat the click.
               onMouseDown={(e) => e.preventDefault()}
             >
@@ -233,6 +239,7 @@ export function ProjectorSlideCard({
           onClick={() => onSelect()}
           className={`${contentPos} flex items-center justify-center overflow-hidden px-4 text-center`}
         >
+          <div ref={mini.ref} style={mini.container} className="w-full">
           <Textarea
             autoFocus
             ref={growToFit}
@@ -252,12 +259,10 @@ export function ProjectorSlideCard({
                 onStopEdit();
               }
             }}
-            className="min-h-0 w-full resize-none overflow-y-auto rounded-sm border-none bg-transparent p-0 text-center leading-snug shadow-none outline-none ring-offset-0 focus-visible:ring-0 focus-visible:ring-offset-0"
-            style={{
-              ...inkStyle(look),
-              fontSize: `${fontSizePx}px`,
-            }}
+            className="min-h-0 w-full resize-none overflow-y-auto rounded-sm font-bold leading-tight border-none bg-transparent p-0 text-center leading-snug shadow-none outline-none ring-offset-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+            style={{ ...mini.text, maxWidth: undefined }}
           />
+          </div>
         </div>
       ) : (
         <button
@@ -271,23 +276,9 @@ export function ProjectorSlideCard({
             }
           }}
           aria-label="Select slide"
-          className={`${contentPos} flex cursor-pointer items-center justify-center overflow-hidden px-4 text-center`}
+          className="absolute inset-0 cursor-pointer overflow-hidden text-center"
         >
-          <div
-            className={`${expanded ? "" : "max-h-full "}overflow-hidden whitespace-pre-wrap text-center leading-snug`}
-            style={{
-              ...inkStyle(look),
-              fontSize: `${fontSizePx}px`,
-            }}
-          >
-            {slide.lyrics ? (
-              slide.lyrics
-            ) : (
-              <span className="font-sans text-xs font-normal italic opacity-50">
-                Empty slide — click to edit
-              </span>
-            )}
-          </div>
+          <MiniSlide lyrics={slide.lyrics} look={look} empty="Empty slide — click to edit" onOverflow={setOverflows} />
         </button>
       )}
 
