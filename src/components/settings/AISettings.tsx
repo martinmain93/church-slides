@@ -28,11 +28,16 @@ export function GroqKeyField() {
   const [keyDraft, setKeyDraft] = useState("");
   // Signed in to an organization: its AI allowance stands in for a key.
   const [allowanceOf, setAllowanceOf] = useState<string | null>(null);
+  // Read again now and then: the key arrives within a minute of signing in.
   useEffect(() => {
-    hostedAiStatus().then(
-      (s) => setAllowanceOf(s.own_groq_key ? null : s.org_name),
-      () => undefined,
-    );
+    const read = () =>
+      hostedAiStatus().then(
+        (s) => setAllowanceOf(s.own_groq_key ? null : s.org_name),
+        () => undefined,
+      );
+    void read();
+    const timer = setInterval(read, 15_000);
+    return () => clearInterval(timer);
   }, []);
 
   useEffect(() => {

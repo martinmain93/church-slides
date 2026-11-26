@@ -32,6 +32,9 @@ const RENEW_BEFORE_MS: i64 = 10 * 60 * 1000;
 const CHECK_EVERY: Duration = Duration::from_secs(60);
 /// Retry soon after a failure: a key that runs out stops online speech.
 const AFTER_FAILURE: Duration = Duration::from_secs(2 * 60);
+/// The server has no allowance for this organization (or no AI gateway at
+/// all): ask again much later rather than every two minutes.
+const AFTER_NOT_OFFERED: Duration = Duration::from_secs(60 * 60);
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct HostedAi {
@@ -92,12 +95,22 @@ pub fn start(db: Arc<Db>, app_data: PathBuf) {
                 Ok(()) => CHECK_EVERY,
                 Err(e) => {
                     log::info!("AI allowance key: {e:#}");
-                    AFTER_FAILURE
+                    if not_offered(&e) {
+                        AFTER_NOT_OFFERED
+                    } else {
+                        AFTER_FAILURE
+                    }
                 }
             };
             tokio::time::sleep(wait).await;
         }
     });
+}
+
+/// The server said there's no key to have here (404: no such route or
+/// organization; 403: the role or plan doesn't include it).
+fn not_offered(e: &anyhow::Error) -> bool {
+    e.downcast_ref::<crate::account::ServerRefused>().is_some_and(|r| r.status == 403 || r.status == 404)
 }
 
 async fn refresh(db: &Db, app_data: &Path) -> anyhow::Result<()> {
@@ -113,7 +126,7 @@ async fn refresh(db: &Db, app_data: &Path) -> anyhow::Result<()> {
     let resp = match crate::account::api(app_data, "POST", &format!("/orgs/{org_id}/ai/key"), None).await {
         Ok(v) => v,
         Err(e) => {
-            if e.is::<crate::account::SignedOut>() {
+            if e.is::<crate::account::SignedOut>() || not_offered(&e) {
                 forget(app_data);
             }
             return Err(e);
@@ -138,8 +151,12 @@ pub struct HostedAiStatus {
     pub own_groq_key: bool,
 }
 
-/// Whether the AI engine's key file (`api_keys.py`) holds a Groq key.
+/// Whether the AI engine has a Groq key of the person's own: in its key
+/// file (`api_keys.py`), or the environment variable it reads first.
 fn own_groq_key(app_data: &Path) -> bool {
+    if std::env::var("AUTO_PRESENTER_GROQ_API_KEY").is_ok_and(|k| !k.is_empty()) {
+        return true;
+    }
     std::fs::read_to_string(app_data.join("instruction_api_keys.json"))
         .ok()
         .and_then(|t| serde_json::from_str::<Value>(&t).ok())
@@ -174,6 +191,15 @@ mod tests {
         assert_eq!(chosen_org(&ms, Some("a")), None, "a member's organization isn't charged");
         assert_eq!(chosen_org(&[m("a", "set_leader")], None), None);
         assert_eq!(chosen_org(&[], None), None);
+    }
+
+    #[test]
+    fn a_missing_route_or_refusal_waits_longer() {
+        let refused = |status| anyhow::Error::from(crate::account::ServerRefused { status, message: "No such route.".into() });
+        assert!(not_offered(&refused(404)));
+        assert!(not_offered(&refused(403)));
+        assert!(!not_offered(&refused(500)));
+        assert!(!not_offered(&anyhow::anyhow!("Couldn't reach the server")));
     }
 
     #[test]

@@ -51,6 +51,7 @@ describe("the published record formats", () => {
     delete items[0]!.song_id;
     expect(recordProblems({ ...s, fields: { ...s.fields, items } }).join()).toMatch(/no song_id/);
     expect(recordProblems({ ...s, fields: { ...s.fields, refs: [] } }).join()).toMatch(/refs/);
+    expect(recordProblems({ ...s, fields: { ...s.fields, items: [null] } }).join()).toMatch(/isn't an object/);
     expect(recordProblems({ type: "song", id: "x", fields: { title: "T", body_text: "", created_at: 0, updated_at: 0, ccli: null } }).join()).toMatch(
       /leave it out/,
     );

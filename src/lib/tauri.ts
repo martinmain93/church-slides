@@ -5,8 +5,6 @@ import type { NewSongInput, ReadingRow, SetlistDetail, SetlistRow, SongRow } fro
 
 export type { NewSongInput, ReadingRow, SetlistDetail, SetlistItemRow, SetlistItemWithSong, SetlistRow, SongRow } from "@/core/library";
 
-
-
 export type SortKey = "alphabetical" | "recently_edited" | "popular";
 
 export interface AppSettings {
@@ -45,11 +43,6 @@ export interface ImportSummary {
   songs_imported: number;
   songs_replaced: number;
 }
-
-
-
-
-
 
 // --- Sidecar ---------------------------------------------------------------
 
