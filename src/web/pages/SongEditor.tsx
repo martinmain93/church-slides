@@ -6,7 +6,7 @@ import { deleteSongMessage } from "@/lib/deleteSongText";
 import { parseSong } from "@/lib/parseSong";
 import { formatSlideOrder, parseSlideOrder } from "@/lib/slideSequence";
 import { go, goUnguarded, href, useLeaveGuard, type Route } from "@/web/route";
-import { ConfirmSheet, DangerButton, ErrorLine, Field, PageHeader, PrimaryButton, errorText, fieldClass, useTitle } from "@/web/ui";
+import { ConfirmSheet, DangerButton, ErrorLine, Field, PageHeader, PrimaryButton, QuietButton, Sheet, errorText, fieldClass, useTitle } from "@/web/ui";
 
 const BLANK: NewSongInput = { title: "", body_text: "", author: "", ccli: "", copyright: "", slide_order: "" };
 
@@ -49,6 +49,7 @@ export function SongEditor({ id }: { id: string | null }) {
   const [saving, setSaving] = useState(false);
   const [ask, setAsk] = useState<Ask>(null);
   const titleInput = useRef<HTMLInputElement>(null);
+  const orderInput = useRef<HTMLInputElement>(null);
   useTitle(id ? "Edit song" : "New song");
 
   useEffect(() => {
@@ -79,11 +80,17 @@ export function SongEditor({ id }: { id: string | null }) {
 
   const back = id ? href({ page: "song", id, key: null }) : href({ page: "songs" });
 
-  const save = async () => {
+  /** Save, then go to the song (or to `then`, when saving on the way out). */
+  const save = async (then?: Route) => {
     if (!form) return;
     if (!form.title.trim()) {
       setTitleError("A song needs a title.");
       titleInput.current?.focus();
+      return;
+    }
+    // An order naming a section the words don't have would be dropped: fix it first.
+    if (unknownTags.length) {
+      orderInput.current?.focus();
       return;
     }
     setSaving(true);
@@ -92,10 +99,12 @@ export function SongEditor({ id }: { id: string | null }) {
       const input = { ...form, default_tempo_wps: opened?.default_tempo_wps ?? null };
       if (id) {
         await lib.updateSong(id, input, opened ?? undefined);
-        go({ page: "song", id, key: null }, true);
+        if (then) goUnguarded(then);
+        else go({ page: "song", id, key: null }, true);
       } else {
         const newId = await lib.createSong(input);
-        go({ page: "song", id: newId, key: null }, true);
+        if (then) goUnguarded(then);
+        else go({ page: "song", id: newId, key: null }, true);
       }
     } catch (err) {
       setError(errorText(err));
@@ -173,14 +182,16 @@ export function SongEditor({ id }: { id: string | null }) {
           <Field
             label="Order"
             error={unknownTags.length ? `Not in the words: ${unknownTags.join(", ")}` : null}
-            hint={
+            hint="Like V1, C, V2, C. Empty: each section once."
+            info={
               <>
-                The order it&apos;s sung, using the sections above
-                {sections ? ` (${sections})` : ""}: V1 is [Verse 1], C is [Chorus], B is [Bridge]. Leave empty to sing each once.
+                V1 is [Verse 1], C is [Chorus], B is [Bridge], P is [Pre-Chorus], T is [Tag].
+                {sections ? ` This song's sections: ${sections}.` : ""}
               </>
             }
           >
             <input
+              ref={orderInput}
               className={fieldClass}
               value={form.slide_order ?? ""}
               onChange={set("slide_order")}
@@ -209,9 +220,27 @@ export function SongEditor({ id }: { id: string | null }) {
       )}
 
       {ask?.kind === "leave" && (
-        <ConfirmSheet title="Discard your changes?" action="Discard changes" onClose={() => setAsk(null)} onAction={() => goUnguarded(ask.to)}>
-          You changed this song but didn&apos;t save it.
-        </ConfirmSheet>
+        <Sheet title="Save your changes?" onClose={() => setAsk(null)}>
+          <div className="space-y-4">
+            <p className="text-sm leading-relaxed text-muted-foreground">You changed this song but didn&apos;t save it.</p>
+            <div className="flex flex-col gap-2">
+              <PrimaryButton
+                data-autofocus
+                onClick={() => {
+                  const to = ask.to;
+                  setAsk(null);
+                  void save(to);
+                }}
+              >
+                Save
+              </PrimaryButton>
+              <DangerButton onClick={() => goUnguarded(ask.to)}>Discard changes</DangerButton>
+              <QuietButton className="w-full" onClick={() => setAsk(null)}>
+                Keep editing
+              </QuietButton>
+            </div>
+          </div>
+        </Sheet>
       )}
       {ask?.kind === "delete" && (
         <ConfirmSheet title="Delete this song?" action="Delete song" onClose={() => setAsk(null)} onAction={() => void remove()}>

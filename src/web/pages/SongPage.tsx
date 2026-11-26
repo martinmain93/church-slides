@@ -74,7 +74,7 @@ export function SongWords({
             {s.stanzas.map((lines, li) => (
               <div key={li}>
                 {lines.map((l, i) => (
-                  <ChordLyrics key={i} text={l.text} chords={l.chords} showChords={showChords} chordClassName="font-semibold text-sky-400" />
+                  <ChordLyrics key={i} text={l.text} chords={l.chords} showChords={showChords} chordClassName="font-semibold text-sky-700 dark:text-sky-400" />
                 ))}
               </div>
             ))}
@@ -167,7 +167,7 @@ export function SongPage({
                 type="button"
                 className={cn(
                   "h-11 rounded-md border px-3 text-sm font-medium",
-                  showChords ? "border-sky-400/50 bg-sky-400/10 text-sky-300" : "border-border text-muted-foreground hover:text-foreground",
+                  showChords ? "border-sky-400/50 bg-sky-400/10 text-sky-700 dark:text-sky-300" : "border-border text-muted-foreground hover:text-foreground",
                 )}
                 onClick={() => setShowChords(!showChords)}
                 aria-pressed={showChords}

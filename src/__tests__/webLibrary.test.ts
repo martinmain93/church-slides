@@ -543,3 +543,15 @@ describe("the web app's pieces", () => {
     expect(matchingLine(song, "amazing")).toBeNull();
   });
 });
+
+describe("searching songs on the web", () => {
+  const song = (title: string, body_text = "") => ({ title, body_text, author: null, ccli: null });
+  it("forgives accents, British spellings and a one-letter slip", async () => {
+    const { matchesSearch } = await import("@/web/pages/SongsPage");
+    expect(matchesSearch(song("Safe Harbor"), "harbour")).toBe(true);
+    expect(matchesSearch(song("My Saviour"), "savior")).toBe(true);
+    expect(matchesSearch(song("Amazing Grace"), "amazng")).toBe(true);
+    expect(matchesSearch(song("Noël"), "noel")).toBe(true);
+    expect(matchesSearch(song("Holy, Holy, Holy"), "hymn")).toBe(false);
+  });
+});

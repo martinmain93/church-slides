@@ -1,4 +1,5 @@
 /** The web app at app.churchslides.app: planning and the library, no presenting. */
+import "./theme";
 import React from "react";
 import ReactDOM from "react-dom/client";
 

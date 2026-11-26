@@ -27,8 +27,9 @@ export interface WebLibrary extends LibrarySource {
   readonly store: RecordStore;
 }
 
+// "Psalm 9" before "Psalm 24": numbers in titles sort as numbers.
 const byTitle = (a: { title: string }, b: { title: string }) =>
-  a.title.localeCompare(b.title, undefined, { sensitivity: "base" });
+  a.title.localeCompare(b.title, undefined, { sensitivity: "base", numeric: true });
 
 export function webLibrary(
   store: RecordStore,

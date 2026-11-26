@@ -114,7 +114,7 @@ export function WebApp({ persist }: { persist?: (name: string) => Promise<Persis
         <PrimaryButton className="min-w-40" onClick={() => void startWebSignIn()} data-testid="web-sign-in">
           Sign in
         </PrimaryButton>
-        {state.error && <p className="max-w-sm text-sm text-red-400">{state.error}</p>}
+        {state.error && <p className="w-full max-w-sm text-sm text-red-600 dark:text-red-400">{state.error}</p>}
       </div>
     );
   }

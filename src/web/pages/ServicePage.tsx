@@ -767,7 +767,7 @@ function AddSheet({ serviceId, inService, onClose }: { serviceId: string; inServ
             <input type="search" className={fieldClass} placeholder="Search songs" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search songs" />
           )}
           {/* Room kept for the note, so the list doesn't jump when it shows. */}
-          <div className={cn("min-h-5 text-sm", note?.error ? "text-red-400" : "text-emerald-400")} role="status">
+          <div className={cn("min-h-5 text-sm", note?.error ? "text-red-600 dark:text-red-400" : "text-emerald-700 dark:text-emerald-400")} role="status">
             {note?.text}
           </div>
         </div>
