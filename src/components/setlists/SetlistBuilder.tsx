@@ -488,8 +488,8 @@ export function SetlistBuilder({
 
   async function handleDelete() {
     const ok = await confirm({
-      title: `Delete "${name || "this setlist"}"?`,
-      message: "This can't be undone. (The songs themselves stay in your library.)",
+      title: `Delete "${name || "this service"}"?`,
+      message: "It goes from every device. Its songs stay in the library.",
       confirmLabel: "Delete",
       variant: "destructive",
     });
@@ -673,7 +673,7 @@ export function SetlistBuilder({
             </MenuItem>
             <MenuSeparator />
             <MenuItem icon={<Trash2 />} onSelect={() => void handleDelete()} destructive>
-              Delete setlist
+              Delete service
             </MenuItem>
           </Menu>
         </div>
@@ -692,7 +692,7 @@ export function SetlistBuilder({
         <div className="flex h-full min-h-0 flex-col bg-muted/20">
           <div className="flex items-center justify-between border-b border-border px-3 py-2">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Setlist
+              Service
             </span>
             <span className="text-[11px] tabular-nums text-muted-foreground">
               {detail.items.length}
@@ -760,7 +760,7 @@ export function SetlistBuilder({
         >
           {detail.items.length === 0 ? (
             <div className="flex h-full items-center justify-center px-8 text-center text-sm text-muted-foreground">
-              Search for songs on the right and click to add them to this setlist.
+              Search for songs on the right and click to add them to this service.
               Bible passages and text slides are added from the right too.
             </div>
           ) : (
@@ -826,7 +826,7 @@ export function SetlistBuilder({
                       : "border-transparent text-muted-foreground hover:text-foreground",
                   )}
                 >
-                  {id === "songs" ? "Songs" : "Scripture"}
+                  {id === "songs" ? "Songs" : "Bible"}
                 </button>
               ))}
               {narrow && detail.items.length > 0 && (
@@ -899,8 +899,8 @@ export function SetlistBuilder({
                           <KeyBadge songKey={songKey} className="size-5 text-[10px]" />
                         )}
                         {alreadyIn ? (
-                          <span title="In the setlist — click to add it again (a reprise)">
-                            <Check aria-label="In the setlist" className="size-4 shrink-0 text-primary" />
+                          <span title="In the service — click to add it again (a reprise)">
+                            <Check aria-label="In the service" className="size-4 shrink-0 text-primary" />
                           </span>
                         ) : (
                           <Plus className="size-4 shrink-0 text-muted-foreground transition-colors group-hover:text-foreground" />
@@ -1038,8 +1038,8 @@ function SortableRailItem({
         <button
           type="button"
           onClick={onRemove}
-          title="Remove from setlist"
-          aria-label="Remove from setlist"
+          title="Remove from service"
+          aria-label="Remove from service"
           className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-destructive focus-visible:opacity-100 group-hover:opacity-100"
         >
           <X className="size-3.5" />

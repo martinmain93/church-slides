@@ -226,7 +226,7 @@ export function HomeScreen({
                         >
                           <div className="min-w-0 flex-1">
                             <div className="flex items-baseline gap-2">
-                              <span className="truncate font-medium">{sl.name || "Untitled"}</span>
+                              <span className="truncate font-medium">{sl.name || "Untitled service"}</span>
                               <span className="shrink-0 text-xs text-muted-foreground">
                                 {sl.service_date
                                   ? rowDate(sl)

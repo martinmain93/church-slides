@@ -429,11 +429,11 @@ function ItemSheet({
               data-testid="item-key"
             >
               {(!writtenKey || !(KEY_CHOICES as readonly string[]).includes(writtenKey)) && (
-                <option value="">{writtenKey ? `${writtenKey} (as written)` : "As written"}</option>
+                <option value="">{writtenKey ? `Original key (${writtenKey})` : "Original key"}</option>
               )}
               {KEY_CHOICES.map((k) => (
                 <option key={k} value={k === writtenKey ? "" : k}>
-                  {k === writtenKey ? `${k} (as written)` : k}
+                  {k === writtenKey ? `Original key (${k})` : k}
                 </option>
               ))}
             </select>
@@ -452,7 +452,7 @@ function ReadingSheet({ item, onSave, onRemove, onClose }: { item: SetlistItemWi
   const [reference, setReference] = useState(content?.reference ?? "");
   const changed = reference.trim() !== (content?.reference ?? "");
   return (
-    <Sheet title="Reading" onClose={onClose}>
+    <Sheet title="Bible passage" onClose={onClose}>
       <form
         className="space-y-5"
         onSubmit={(e) => {
@@ -485,7 +485,7 @@ function TextSheet({ item, onSave, onRemove, onClose }: { item: SetlistItemWithS
   const [words, setWords] = useState(was.words);
   const changed = title.trim() !== was.title || words !== was.words;
   return (
-    <Sheet title="Text" onClose={onClose}>
+    <Sheet title="Text slide" onClose={onClose}>
       <form
         className="space-y-5"
         onSubmit={(e) => {
@@ -625,8 +625,8 @@ function AddSheet({ serviceId, onClose }: { serviceId: string; onClose: () => vo
       <div className="space-y-4">
         <div className="flex gap-1 rounded-lg border border-border p-1" role="tablist">
           {tab("song", "Song")}
-          {tab("scripture", "Reading")}
-          {tab("text", "Text")}
+          {tab("scripture", "Bible")}
+          {tab("text", "Text slide")}
         </div>
         {kind === "song" && (
           <>
@@ -656,7 +656,7 @@ function AddSheet({ serviceId, onClose }: { serviceId: string; onClose: () => vo
               <input className={fieldClass} placeholder="John 3:16-17" value={reference} onChange={(e) => setReference(e.target.value)} />
             </Field>
             <PrimaryButton type="submit" className="w-full" disabled={!reference.trim()}>
-              Add reading
+              Add passage
             </PrimaryButton>
           </form>
         )}
@@ -676,7 +676,7 @@ function AddSheet({ serviceId, onClose }: { serviceId: string; onClose: () => vo
           >
             <TextFields title={title} words={words} onTitle={setTitle} onWords={setWords} />
             <PrimaryButton type="submit" className="w-full" disabled={!title.trim()}>
-              Add text
+              Add text slide
             </PrimaryButton>
           </form>
         )}

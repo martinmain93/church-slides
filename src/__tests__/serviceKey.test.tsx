@@ -46,7 +46,7 @@ describe("a song's key for one service", () => {
     expect(onChange).toHaveBeenLastCalledWith("Bb");
 
     rerender(<ServiceKeyBadge originalKey="G" serviceKey="Bb" onChange={onChange} />);
-    expect(screen.getByTestId("service-key").getAttribute("title")).toContain("(the song is in G)");
+    expect(screen.getByTestId("service-key").getAttribute("title")).toContain("(original key G)");
     fireEvent.click(screen.getByTestId("service-key"));
     fireEvent.click(screen.getByTestId("service-key-G"));
     expect(onChange).toHaveBeenLastCalledWith(null);

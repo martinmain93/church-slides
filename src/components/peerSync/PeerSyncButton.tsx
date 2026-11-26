@@ -1,7 +1,7 @@
 /**
  * Operator control for moving setlists between laptops on the same Wi-Fi.
  * Lists the other Church Slides operators found on the network and offers,
- * for each, "Send this setlist" and "Get a setlist". The panel opens by
+ * for each, "Send this service" and "Get a service". The panel opens by
  * itself the first time a new operator appears, so nobody has to know it's
  * there; it never takes over the screen (the service may be running).
  *
@@ -179,7 +179,7 @@ export function PeerSyncButton({
   const send = (peer: Peer, id: string) =>
     run(`send:${peer.id}`, async () => {
       const offerId = await sendSetlistToPeer(peer.id, id);
-      setFlow({ step: "sending", peer, offerId, status: "pending", what: `“${setlistName ?? "the setlist"}”` });
+      setFlow({ step: "sending", peer, offerId, status: "pending", what: `“${setlistName ?? "the service"}”` });
     });
 
   const sendLibrary = (peer: Peer) =>
@@ -228,8 +228,8 @@ export function PeerSyncButton({
           onClick={() => setOpen((v) => !v)}
           title={
             setlistId
-              ? "Send or get a setlist from another Church Slides computer on this network"
-              : "Get a setlist from another Church Slides computer on this network"
+              ? "Send or get a service from another Church Slides computer on this network"
+              : "Get a service from another Church Slides computer on this network"
           }
           data-testid="peer-sync-button"
         >
@@ -251,7 +251,7 @@ export function PeerSyncButton({
         >
           {flow.step === "picking" ? (
             <div className="flex flex-col gap-2">
-              <div className="font-medium">Setlists on {flow.peer.name}</div>
+              <div className="font-medium">Services on {flow.peer.name}</div>
               <button
                 type="button"
                 className="flex w-full items-baseline gap-2 rounded border border-border px-3 py-2 text-left hover:bg-muted disabled:opacity-50"
@@ -269,7 +269,7 @@ export function PeerSyncButton({
                   <Loader2 className="size-4 animate-spin" /> Loading…
                 </div>
               ) : flow.setlists.length === 0 ? (
-                <div className="text-muted-foreground">No setlists there yet.</div>
+                <div className="text-muted-foreground">No services there yet.</div>
               ) : (
                 <ul className="max-h-72 divide-y divide-border overflow-y-auto rounded border border-border">
                   {flow.setlists.map((s) => (
@@ -327,7 +327,7 @@ export function PeerSyncButton({
                         {setlistId && (
                           <Button size="sm" className="h-8 flex-1 gap-1" disabled={busy !== null || flow.step !== "idle"} onClick={() => void send(p, setlistId)}>
                             <ArrowUpFromLine className="size-4" />
-                            Send this setlist
+                            Send this service
                           </Button>
                         )}
                         <Button
@@ -338,7 +338,7 @@ export function PeerSyncButton({
                           onClick={() => void get(p)}
                         >
                           <ArrowDownToLine className="size-4" />
-                          Get a setlist
+                          Get a service
                         </Button>
                       </div>
                       <div className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">

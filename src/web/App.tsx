@@ -22,6 +22,7 @@ import { SongPage } from "@/web/pages/SongPage";
 import { SongsPage } from "@/web/pages/SongsPage";
 import { Empty, PageBoundary, PageHeader, PrimaryButton, QuietButton, useTitle } from "@/web/ui";
 import { cn } from "@/lib/utils";
+import { roleLabel } from "@/core/roles";
 
 const ORG_KEY = "church-slides.web.org";
 
@@ -99,7 +100,7 @@ export function WebApp({ persist }: { persist?: (name: string) => Promise<Persis
     if (state.kind !== "signed-in") document.title = "Church Slides";
   }, [state.kind]);
 
-  if (state.kind === "loading") return <div className={`${centred} text-muted-foreground`}>Signing in…</div>;
+  if (state.kind === "loading") return <div className={`${centred} text-muted-foreground`}>Opening…</div>;
   if (state.kind === "signing-out") return <div className={`${centred} text-muted-foreground`}>Signing out…</div>;
 
   if (state.kind === "signed-out") {
@@ -354,7 +355,7 @@ function TabBar({ route, orgName }: { route: Route; orgName: string }) {
         icon: Music,
         on: !inService && (route.page === "songs" || route.page === "song" || route.page === "edit-song"),
       },
-      { to: href({ page: "account" }), label: "You", icon: UserRound, on: route.page === "account" },
+      { to: href({ page: "account" }), label: "Account", icon: UserRound, on: route.page === "account" },
     ],
     [route.page, inService],
   );
@@ -394,13 +395,6 @@ function TabBar({ route, orgName }: { route: Route; orgName: string }) {
   );
 }
 
-const ROLE_NAMES: Record<string, string> = {
-  owner: "Owner",
-  admin: "Admin",
-  operator: "Operator",
-  set_leader: "Set leader",
-  member: "Member",
-};
 
 function AccountPage({
   email,
@@ -416,10 +410,10 @@ function AccountPage({
   onSignOut: () => void;
 }) {
   const perms = rolePermissions(org.role);
-  useTitle("You");
+  useTitle("Account");
   return (
     <>
-      <PageHeader title="You" />
+      <PageHeader title="Account" />
       <div className="space-y-6 px-4 py-5">
         <div>
           <div className="text-sm text-muted-foreground">Signed in as</div>
@@ -428,7 +422,7 @@ function AccountPage({
         <div>
           <div className="text-sm text-muted-foreground">Organization</div>
           <div className="font-medium">
-            {org.orgName} · {ROLE_NAMES[org.role] ?? org.role}
+            {org.orgName} · {roleLabel(org.role)}
           </div>
           <div className="mt-1 text-sm text-muted-foreground">
             {perms.editSongs ? "You can edit songs and services." : perms.editServices ? "You can plan services. Songs are read-only." : "You can see songs and services."}

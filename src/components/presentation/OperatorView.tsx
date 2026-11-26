@@ -390,7 +390,7 @@ export function OperatorView({
     async (item: SetlistItemWithSong) => {
       const ok = await confirm({
         title: `Remove "${item.song?.title ?? "this song"}"?`,
-        message: "Removes it from this setlist. The song stays in your library.",
+        message: "Removes it from this service. The song stays in your library.",
         confirmLabel: "Remove",
         variant: "destructive",
       });
@@ -604,7 +604,7 @@ export function OperatorView({
         <div className="flex h-full min-h-0 flex-col bg-muted/20">
           <div className="flex items-center justify-between border-b border-border px-3 py-2">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Setlist
+              Service
             </span>
             <span className="text-[11px] tabular-nums text-muted-foreground">
               {minimapItems.length}
@@ -648,7 +648,7 @@ export function OperatorView({
           <div ref={gridRef} className="h-full overflow-y-auto px-6 py-4">
             {ctx.items.length === 0 ? (
               <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                This setlist is empty. Search on the right to add songs.
+                This service is empty. Search on the right to add songs.
               </div>
             ) : (
               ctx.items.map((item, itemIdx) => (
@@ -751,7 +751,7 @@ function ProjectionBar({
   return (
     <header className="flex items-center gap-2 border-b border-border bg-muted/30 px-4 py-2">
       <span className="min-w-0 truncate text-sm font-semibold" title={setlistName}>
-        {setlistName || "Untitled setlist"}
+        {setlistName || "Untitled service"}
       </span>
 
       {!open ? (
@@ -967,8 +967,8 @@ function SortableMinimapRow({
         <button
           type="button"
           onClick={onRemove}
-          title="Remove song from setlist"
-          aria-label="Remove song from setlist"
+          title="Remove song from service"
+          aria-label="Remove song from service"
           className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-destructive focus-visible:opacity-100 group-hover:opacity-100"
         >
           <X className="size-3.5" />
@@ -1078,8 +1078,8 @@ const SongBlock = memo(function SongBlock({
         <button
           type="button"
           onClick={() => onRemoveSong(itemIdx)}
-          title="Remove from setlist"
-          aria-label="Remove from setlist"
+          title="Remove from service"
+          aria-label="Remove from service"
           className="rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:text-destructive focus-visible:opacity-100 group-hover/song:opacity-100"
         >
           <Trash2 className="size-3.5" />
@@ -1424,7 +1424,7 @@ function SearchResult({
           Add to end
         </Button>
         {alreadyIn && (
-          <span className="ml-auto text-[10px] text-muted-foreground">in setlist</span>
+          <span className="ml-auto text-[10px] text-muted-foreground">in service</span>
         )}
       </div>
     </li>

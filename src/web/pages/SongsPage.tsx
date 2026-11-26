@@ -66,8 +66,8 @@ export function SongsPage({ canEdit }: { canEdit: boolean }) {
             <input
               type="search"
               className={`${fieldClass} pl-9`}
-              placeholder="Search titles and words"
-              aria-label="Search titles and words"
+              placeholder="Search songs"
+              aria-label="Search songs"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => e.key === "Escape" && setQuery("")}

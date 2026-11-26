@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { NewSongInput, SongRow } from "@/core/library";
 import { useLibrary } from "@/library/context";
+import { deleteSongMessage } from "@/lib/deleteSongText";
 import { parseSong } from "@/lib/parseSong";
 import { formatSlideOrder, parseSlideOrder } from "@/lib/slideSequence";
 import { go, goUnguarded, href, useLeaveGuard, type Route } from "@/web/route";
@@ -191,7 +192,7 @@ export function SongEditor({ id }: { id: string | null }) {
           <Field label="Author">
             <input className={fieldClass} value={form.author ?? ""} onChange={set("author")} />
           </Field>
-          <Field label="CCLI song number">
+          <Field label="CCLI">
             <input className={fieldClass} value={form.ccli ?? ""} onChange={set("ccli", (v) => v.replace(/\D/g, ""))} inputMode="numeric" />
           </Field>
           <Field label="Copyright">
@@ -212,17 +213,11 @@ export function SongEditor({ id }: { id: string | null }) {
           You changed this song but didn&apos;t save it.
         </ConfirmSheet>
       )}
-      {ask?.kind === "delete" &&
-        (ask.usedBy.length > 0 ? (
-          <ConfirmSheet title="This song is still in use" onClose={() => setAsk(null)}>
-            {ask.usedBy.length === 1 ? `“${ask.usedBy[0]}” uses it.` : `${ask.usedBy.length} services use it: ${ask.usedBy.join(", ")}.`} Remove it from{" "}
-            {ask.usedBy.length === 1 ? "that service" : "them"} first, then delete it.
-          </ConfirmSheet>
-        ) : (
-          <ConfirmSheet title="Delete this song?" action="Delete song" onClose={() => setAsk(null)} onAction={() => void remove()}>
-            It goes from the library on every device.
-          </ConfirmSheet>
-        ))}
+      {ask?.kind === "delete" && (
+        <ConfirmSheet title="Delete this song?" action="Delete song" onClose={() => setAsk(null)} onAction={() => void remove()}>
+          {deleteSongMessage(ask.usedBy)}
+        </ConfirmSheet>
+      )}
     </>
   );
 }

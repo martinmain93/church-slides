@@ -32,17 +32,7 @@ export const signIn = (invite?: string) => invoke<AccountStatus>("account_sign_i
 export const signOut = () => invoke<AccountStatus>("account_sign_out");
 export const signOutEverywhere = () => invoke<AccountStatus>("account_sign_out_everywhere");
 
-const ROLE_LABELS: Record<string, string> = {
-  owner: "Owner",
-  admin: "Admin",
-  set_leader: "Set leader",
-  operator: "Operator",
-  member: "Member",
-};
-
-export function roleLabel(role: string): string {
-  return ROLE_LABELS[role] ?? role;
-}
+export { roleLabel } from "@/core/roles";
 
 // --- Organizations (signed in) -------------------------------------------------
 

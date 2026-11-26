@@ -216,7 +216,7 @@ export function ScriptureSettingsPanel() {
           override={{
             title: "Scripture look",
             description:
-              "How a Bible passage looks on screen, in every service on this computer. A song's or passage's own style in a setlist still wins.",
+              "How a Bible passage looks on screen, in every service on this computer. A song's or passage's own style in a service still wins.",
             value: scriptureLook ?? defaultLook,
             onChange: saveScriptureLook,
             onUseDefault: scriptureLook

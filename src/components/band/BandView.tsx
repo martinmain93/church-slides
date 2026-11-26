@@ -797,7 +797,7 @@ function LeaderPalette({
   }, [currentIdx]);
 
   return (
-    <section className="border-b border-border px-3 pb-1 pt-2" aria-label="Setlist">
+    <section className="border-b border-border px-3 pb-1 pt-2" aria-label="Service">
       {/* `relative`: the songs' offsetLeft is measured from the strip. */}
       <div ref={strip} className="relative flex gap-2 overflow-x-auto pb-1" data-testid="palette-strip">
         {songs.map((s, i) => {

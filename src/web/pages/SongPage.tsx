@@ -167,7 +167,7 @@ export function SongPage({ id, playKey, canEdit, back }: { id: string; playKey: 
               {facts.length > 0 && <div>{facts.join(" · ")}</div>}
               {playKey && writtenKey && playKey !== writtenKey && (
                 <div>
-                  In {playKey} for this service (written in {writtenKey})
+                  In {playKey} for this service (original key {writtenKey})
                 </div>
               )}
               {song.copyright && <div className="text-xs">{song.copyright}</div>}

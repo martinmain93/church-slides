@@ -18,7 +18,7 @@ import { applySetlistBundle, listSongs, type SetlistBundle, type SongRow, type S
 import { cn } from "@/lib/utils";
 
 const CHOICES: { value: ConflictChoice; label: string; hint: string }[] = [
-  { value: "mine", label: "Keep mine", hint: "This library's words; the setlist uses them" },
+  { value: "mine", label: "Keep mine", hint: "This library's words; the service uses them" },
   { value: "theirs", label: "Use theirs", hint: "Replace this library's song (a backup is kept)" },
   { value: "both", label: "Keep both", hint: "Add theirs as a second copy" },
 ];
@@ -74,7 +74,7 @@ export function SyncReviewDialog({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6"
       role="dialog"
       aria-modal="true"
-      aria-label={wholeLibrary ? "Review library" : "Review setlist"}
+      aria-label={wholeLibrary ? "Review library" : "Review service"}
     >
       <div className="flex max-h-full w-full max-w-3xl flex-col rounded-lg border border-border bg-background shadow-2xl">
         <header className="flex items-center justify-between border-b border-border px-5 py-3">
@@ -147,7 +147,7 @@ export function SyncReviewDialog({
                   : `Choose for ${undecided} more song${undecided === 1 ? "" : "s"}`
                 : wholeLibrary
                   ? "Import library"
-                  : "Import setlist"}
+                  : "Import service"}
             </Button>
           </div>
         </footer>

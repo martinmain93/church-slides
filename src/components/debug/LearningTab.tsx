@@ -68,11 +68,11 @@ export function LearningTab() {
             {" · "}audio {state.audio_now.toFixed(0)} s · {state.passes_run} look-backs
           </>
         ) : (
-          "Not collecting (no session with a setlist)."
+          "Not collecting (no session with a service)."
         )}
       </p>
       {state.songs.length === 0 && (
-        <p className="text-zinc-500">Start a session with a setlist to see what has been learned.</p>
+        <p className="text-zinc-500">Start a session with a service to see what has been learned.</p>
       )}
       {state.songs.map((song) => (
         <SongCard key={`${song.item_idx}-${song.song_id}`} song={song} onForget={forget} />

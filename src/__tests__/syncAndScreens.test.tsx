@@ -76,12 +76,12 @@ describe("getting a setlist from another computer", () => {
     peers.list = [{ id: "p1", name: "Martin's Mac", manual: false }];
     const { unmount } = render(<PeerSyncButton onMessage={vi.fn()} />);
     // A newcomer opens the panel by itself.
-    expect(screen.getByText("Get a setlist")).toBeInTheDocument();
-    expect(screen.queryByText("Send this setlist")).toBeNull();
+    expect(screen.getByText("Get a service")).toBeInTheDocument();
+    expect(screen.queryByText("Send this service")).toBeNull();
     unmount();
     render(<PeerSyncButton setlistId="s1" setlistName="Sunday" onMessage={vi.fn()} openSignal={1} />);
-    expect(screen.getByText("Send this setlist")).toBeInTheDocument();
-    expect(screen.getByText("Get a setlist")).toBeInTheDocument();
+    expect(screen.getByText("Send this service")).toBeInTheDocument();
+    expect(screen.getByText("Get a service")).toBeInTheDocument();
   });
 
   it("shows this network's code, and sends the whole library", async () => {

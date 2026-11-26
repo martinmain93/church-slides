@@ -451,7 +451,7 @@ export function SetlistSongSlides({
         {kind === "scripture" && (
           <>
             <BookOpen className="size-4 self-center text-sky-400" aria-hidden />
-            <h3 className="text-xl font-bold tracking-tight">{scripture?.reference ?? "Scripture"}</h3>
+            <h3 className="text-xl font-bold tracking-tight">{scripture?.reference ?? "Bible passage"}</h3>
             {scripture?.abbreviation && !scripture.own_text && (
               <span className="text-sm text-muted-foreground">{scripture.abbreviation}</span>
             )}
@@ -566,7 +566,7 @@ export function SetlistSongSlides({
           <button
             type="button"
             onClick={() => setStyling(true)}
-            title={ownLook ? "Look for this setlist (its own)" : "Give this a look of its own in this setlist"}
+            title={ownLook ? "Its own look in this service" : "Give this a look of its own in this service"}
             aria-label="Style"
             data-own-style={ownLook ? "true" : undefined}
             className={`rounded p-1 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover/song:opacity-100 ${
@@ -579,8 +579,8 @@ export function SetlistSongSlides({
             <button
               type="button"
               onClick={onRemoveSong}
-              title="Remove from setlist"
-              aria-label="Remove from setlist"
+              title="Remove from service"
+              aria-label="Remove from service"
               className="rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:text-destructive focus-visible:opacity-100 group-hover/song:opacity-100"
             >
               <Trash2 className="size-3.5" />
@@ -594,7 +594,7 @@ export function SetlistSongSlides({
           onClose={() => setStyling(false)}
           override={{
             title: `Look for “${item.song?.title ?? "this item"}”`,
-            description: "Only in this setlist. Everything else keeps its look.",
+            description: "Only in this service. Everything else keeps its look.",
             value: look,
             onChange: (next) => void saveOwnLook(next),
             onUseDefault: parseLook(ownLook)

@@ -8,6 +8,7 @@ import { LibrarySync, type Api } from "@/library/web/sync";
 import { applySet, type Fields } from "@/core/records";
 import { parseStoredChart } from "@/lib/chords/chart";
 import { textSlides } from "@/lib/serviceItemContent";
+import { deleteSongMessage } from "@/lib/deleteSongText";
 import { copiedService, groupServices, lastService, nameForDate, newService, nextServiceDate, rowDate } from "@/lib/setlistName";
 import { unknownOrderTags } from "@/web/pages/SongEditor";
 import { matchingLine } from "@/web/pages/SongsPage";
@@ -234,13 +235,18 @@ describe("the web app's library", () => {
     ]);
   });
 
-  it("a song a service uses can't be deleted", async () => {
+  it("deleting a song takes it out of the services that have it, as on the desktop", async () => {
     const server = new FakeServer();
     const d = await device(server);
     const songId = await d.lib.createSong({ title: "Amazing Grace", body_text: AMAZING });
+    const other = await d.lib.createSong({ title: "Holy, Holy, Holy", body_text: "[Verse 1]\nHoly, holy, holy" });
     const set = await d.lib.createSetlist("Sunday");
     await d.lib.addSong(set, songId);
-    await expect(d.lib.deleteSong(songId)).rejects.toThrow(/service still uses/);
+    await d.lib.addSong(set, other);
+    await d.lib.deleteSong(songId);
+    expect(await d.lib.getSong(songId)).toBeNull();
+    expect((await d.lib.getSetlist(set))!.items.map((i) => i.song_id)).toEqual([other]);
+    expect(deleteSongMessage(["Sunday 6 Dec"])).toMatch(/It's in 1 service \(Sunday 6 Dec\)\. It comes out of them/);
   });
 
   it("a change the server refuses is undone here, with the reason shown", async () => {

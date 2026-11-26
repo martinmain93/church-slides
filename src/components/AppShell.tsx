@@ -243,7 +243,7 @@ function Inner() {
     try {
       let detail = await getSetlist(setlistId);
       if (!detail) {
-        toast.error("Setlist not found.");
+        toast.error("This service was deleted.");
         return;
       }
       // A passage an assistant added has only its reference until a Bible
@@ -359,7 +359,7 @@ function Inner() {
             {view.kind === "editor" && (
               <SongEditor
                 songId={view.songId}
-                backLabel={view.fromSetlist ? "setlist" : "Library"}
+                backLabel={view.fromSetlist ? "service" : "Library"}
                 onClose={() => {
                   setView(view.fromSetlist ? { kind: "setlist", id: view.fromSetlist } : { kind: "library" });
                   bumpReload();
