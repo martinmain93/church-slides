@@ -29,6 +29,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import time
 from pathlib import Path
 
 from auto_presenter.config import app_data_dir
@@ -94,3 +95,48 @@ def get_key(provider: str) -> str | None:
     if env_key:
         return env_key
     return load_keys().get(provider)
+
+
+#: Where the app keeps the key for its organization's AI allowance, when
+#: signed in to one (`src-tauri/src/hosted_ai.rs`). The app passes the path,
+#: since its folder depends on its identifier.
+HOSTED_AI_FILE_ENV = "CHURCH_SLIDES_HOSTED_AI_FILE"
+
+#: Providers the server's AI gateway stands in for.
+_GATEWAY_PROVIDERS = {"groq"}
+
+
+def hosted_gateway() -> tuple[str, str] | None:
+    """(base_url, key) of the organization's AI gateway, while it's valid."""
+    path = os.environ.get(HOSTED_AI_FILE_ENV)
+    if not path:
+        return None
+    try:
+        data = json.loads(Path(path).read_text())
+    except (OSError, json.JSONDecodeError):
+        return None
+    base, key, expires = data.get("base_url"), data.get("key"), data.get("expires_at")
+    if not (isinstance(base, str) and isinstance(key, str) and isinstance(expires, (int, float))):
+        return None
+    if expires <= time.time() * 1000:
+        return None
+    return base.rstrip("/"), key
+
+
+def endpoint(provider: str, own_base_url: str) -> tuple[str, str] | None:
+    """Where to send a hosted call: (base_url, key).
+
+    The person's own key for the provider wins. Without one, the
+    organization's AI allowance through the Church Slides server, when this
+    computer is signed in to one. None when neither is available.
+    """
+    own = get_key(provider)
+    if own:
+        return own_base_url.rstrip("/"), own
+    return gateway_for(provider)
+
+
+def gateway_for(provider: str) -> tuple[str, str] | None:
+    """The organization's AI gateway for `provider`, when it stands in for
+    that provider and this computer has a valid key for it."""
+    return hosted_gateway() if provider in _GATEWAY_PROVIDERS else None
