@@ -17,6 +17,7 @@ import { CSS } from "@dnd-kit/utilities";
 import {
   ArrowLeft,
   BookOpen,
+  CalendarPlus,
   Check,
   Music,
   Palette,
@@ -342,6 +343,7 @@ export function SetlistBuilder({
     }
   }
   const dateField = useServiceDateField(detail?.service_date, changeDate);
+  const [addingDate, setAddingDate] = useState(false);
 
   async function persistName() {
     if (!detail || !nameDirty.current) return;
@@ -624,13 +626,23 @@ export function SetlistBuilder({
             placeholder="Untitled service"
             className="h-9 max-w-md text-base font-semibold"
           />
-          <Input
-            type="date"
-            {...dateField}
-            aria-label="Service date"
-            title="The day this service is for"
-            className="h-9 w-auto shrink-0 text-sm"
-          />
+          {detail.service_date || addingDate ? (
+            <Input
+              type="date"
+              {...dateField}
+              autoFocus={addingDate && !detail.service_date}
+              aria-label="Service date"
+              title="The day this service is for"
+              className="h-9 w-auto shrink-0 text-sm"
+            />
+          ) : (
+            // Made before services had dates. An empty date box shows today's
+            // date greyed out in WebKit, which reads as "this is today".
+            <Button variant="outline" size="sm" className="h-9 shrink-0" onClick={() => setAddingDate(true)}>
+              <CalendarPlus className="size-4" />
+              Add date
+            </Button>
+          )}
           <span className="shrink-0 whitespace-nowrap text-xs text-muted-foreground">
             {itemCountLabel(detail.items)}
           </span>

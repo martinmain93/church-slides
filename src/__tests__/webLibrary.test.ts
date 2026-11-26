@@ -492,7 +492,14 @@ describe("services' dates and names", () => {
   });
 
   it("the services list puts coming services first, soonest at the top", () => {
-    const row = (id: string, service_date: string | null, last_used_at: number | null = null) => ({ id, name: id, service_date, created_at: 0, last_used_at });
+    const recently = new Date(2026, 10, 20, 12).getTime();
+    const row = (id: string, service_date: string | null, last_used_at: number | null = null, created_at = recently, name = id) => ({
+      id,
+      name,
+      service_date,
+      created_at,
+      last_used_at,
+    });
     const { upcoming, past } = groupServices(
       [
         row("old", "2026-11-01"),
@@ -500,11 +507,14 @@ describe("services' dates and names", () => {
         row("later", "2026-12-06"),
         row("undated-run", null, new Date(2026, 9, 1, 12).getTime()),
         row("undated-planned", null),
+        // Made before dates: the day comes from the name, or it's stale after two weeks.
+        row("named-past", null, null, recently, "Sunday 22 Nov"),
+        row("stale-draft", null, null, new Date(2026, 8, 11, 12).getTime()),
       ],
       "2026-11-25",
     );
     expect(upcoming.map((s) => s.id)).toEqual(["next", "later", "undated-planned"]);
-    expect(past.map((s) => s.id)).toEqual(["old", "undated-run"]);
+    expect(past.map((s) => s.id)).toEqual(["named-past", "old", "undated-run", "stale-draft"]);
   });
 });
 

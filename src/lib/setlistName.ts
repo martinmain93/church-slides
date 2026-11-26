@@ -136,20 +136,44 @@ export function rowDate(s: DatedName, now: Date = new Date()): string | null {
   return shortServiceDate(s.service_date, now);
 }
 
+/** A service's day: its date, or for one made before services had dates,
+ * the day its name says ("Sunday 22 Nov", in the year it was made). */
+export function serviceDay(s: DatedName & { created_at: number }): string | null {
+  if (s.service_date) return s.service_date;
+  const m = /^(?:\w+) (\d{1,2}) (\w{3})(?: \(\d+\))?$/.exec(s.name.trim());
+  if (!m || !isDateName(s.name)) return null;
+  const made = new Date(s.created_at);
+  const month = MONTHS.indexOf(m[2]!);
+  // Named for a day near when it was made: December's service made in
+  // January belongs to the year before, January's made in December to the next.
+  let year = made.getFullYear();
+  if (month - made.getMonth() > 6) year--;
+  if (made.getMonth() - month > 6) year++;
+  return isoDate(new Date(year, month, Number(m[1]), 12));
+}
+
+/** How long an undated, never-run service counts as coming up. */
+const UNDATED_FRESH_MS = 14 * 86_400_000;
+
 /** Services as both apps list them: coming ones first, soonest at the
- * top; then past ones, latest first. A service with no date (made before
- * services had one) is coming until it has been run. */
+ * top; then past ones, latest first. One with no date at all (made before
+ * services had one) is coming up until it's run, or two weeks old. */
 export function groupServices<S extends DatedName & { created_at: number; last_used_at: number | null }>(
   services: S[],
   today: string = isoDate(new Date()),
 ): { upcoming: S[]; past: S[] } {
   const ran = (s: S) => (s.last_used_at ? isoDate(new Date(s.last_used_at)) : null);
-  const isPast = (s: S) => (s.service_date ? s.service_date < today : ran(s) !== null);
-  const soon = (s: S) => s.service_date ?? "9999";
+  const todayMs = fromIsoDate(today)!.getTime();
+  const isPast = (s: S) => {
+    const day = serviceDay(s);
+    if (day) return day < today;
+    return ran(s) !== null || todayMs - s.created_at > UNDATED_FRESH_MS;
+  };
+  const soon = (s: S) => serviceDay(s) ?? "9999";
   const upcoming = services
     .filter((s) => !isPast(s))
     .sort((a, b) => soon(a).localeCompare(soon(b)) || b.created_at - a.created_at);
-  const day = (s: S) => s.service_date ?? ran(s) ?? "";
+  const day = (s: S) => serviceDay(s) ?? ran(s) ?? isoDate(new Date(s.created_at));
   const past = services.filter(isPast).sort((a, b) => day(b).localeCompare(day(a)) || b.created_at - a.created_at);
   return { upcoming, past };
 }

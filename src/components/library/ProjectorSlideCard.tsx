@@ -13,6 +13,7 @@ import type { SongSuggestion } from "@/lib/chords/suggestions";
 import { stageThumbnailStyle } from "@/components/presentation/StageSurface";
 import { type DisplayLook } from "@/lib/displayLook";
 import { Textarea, growToFit } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import { canSplit, isCrowded, offerSplit } from "@/lib/slideSplit";
 import { MiniSlide, useMiniStage } from "@/components/presentation/MiniSlide";
 
@@ -227,7 +228,7 @@ export function ProjectorSlideCard({
             onClick={(e) => e.stopPropagation()}
             aria-label="Drag to reorder slide"
             title="Drag to reorder slide"
-            className={`${CARD_ACTION} cursor-grab hover:border-white/40 hover:bg-zinc-700 active:cursor-grabbing`}
+            className={cn(CARD_ACTION, "cursor-grab hover:border-white/40 hover:bg-zinc-700 active:cursor-grabbing")}
           >
             <GripVertical className="size-3.5 shrink-0" />
           </button>
@@ -355,7 +356,7 @@ export function CardAction({
       onMouseDown={onMouseDown}
       aria-label={label}
       title={label}
-      className={`${CARD_ACTION} ${TONE[tone]}`}
+      className={cn(CARD_ACTION, TONE[tone])}
     >
       {children}
     </button>

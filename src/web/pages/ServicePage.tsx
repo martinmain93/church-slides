@@ -292,6 +292,7 @@ function ServiceDetails({
 
   const nameNow = useRef(name);
   nameNow.current = name;
+  const [addingDate, setAddingDate] = useState(false);
   const dateField = useServiceDateField(service.service_date, async (date) => {
     try {
       await lib.setServiceDate(service.id, date);
@@ -332,7 +333,14 @@ function ServiceDetails({
       </div>
       <div className="shrink-0 sm:w-44">
         <Field label="Date">
-          <input type="date" className={fieldClass} {...dateField} data-testid="service-date" />
+          {service.service_date || addingDate ? (
+            <input type="date" className={fieldClass} {...dateField} autoFocus={addingDate && !service.service_date} data-testid="service-date" />
+          ) : (
+            // Made before services had dates: an empty date box would show today's date greyed out.
+            <QuietButton className="w-full" onClick={() => setAddingDate(true)}>
+              Add date
+            </QuietButton>
+          )}
         </Field>
       </div>
     </div>

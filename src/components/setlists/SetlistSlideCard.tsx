@@ -22,6 +22,7 @@ import { Textarea, growToFit } from "@/components/ui/textarea";
 import { type DisplayLook } from "@/lib/displayLook";
 import { sectionLabelClass, type SectionType } from "@/lib/parseSong";
 import { isTypingTarget } from "@/lib/slideKeys";
+import { cn } from "@/lib/utils";
 import { canSplit, isCrowded, offerSplit } from "@/lib/slideSplit";
 import { MiniSlide, useMiniStage } from "@/components/presentation/MiniSlide";
 
@@ -306,7 +307,7 @@ function ActionButton({
       }}
       aria-label={label}
       title={label}
-      className={`${ACTION} ${className}`}
+      className={cn(ACTION, className)}
     >
       {children}
     </button>
