@@ -16,6 +16,7 @@ refuses to release a version that has no entry here.
 - New: **slide cards show the screen as the room sees it.** A slide too long for the screen says so on its card, with the scissors ready.
 - Changed: the app says **service** everywhere (not "setlist"), and **Bible passage** for scripture, the same as on the web.
 - Changed: deleting a song says which services have it, then takes it out of them.
+- New (preview): **Settings → Account.** Sign in to your organization to share its songs and services with the web app and the rest of the team.
 - New: signed in to an organization whose plan includes AI, spoken requests work with no Groq key of your own.
 
 ## 0.3.0 — 23 November 2026
