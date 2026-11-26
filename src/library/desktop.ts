@@ -8,6 +8,7 @@
 import { LIBRARY_CHANGED_EVENT } from "@/lib/assistantConnect";
 import { isInTauri } from "@/lib/invoke";
 import * as tauri from "@/lib/tauri";
+import { DEFAULT_LOOK, parseLook } from "@/lib/look";
 import type { LibrarySource } from "@/library/source";
 
 export const desktopLibrary: LibrarySource = {
@@ -45,6 +46,8 @@ export const desktopLibrary: LibrarySource = {
     await tauri.setSetlistItemContent(setlistId, itemId, content);
     if (slidesOverride !== undefined) await tauri.setSetlistItemSlides(setlistId, itemId, slidesOverride);
   },
+
+  getLook: async () => parseLook((await tauri.getLibraryLook())?.display) ?? DEFAULT_LOOK,
 
   listReadings: (...a) => tauri.listReadings(...a),
   saveReading: (...a) => tauri.saveReading(...a),

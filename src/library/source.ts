@@ -10,6 +10,7 @@
  * `capabilities` what this platform can do rather than which platform it is.
  */
 
+import type { DisplayLook } from "@/lib/look";
 import type { NewSongInput, ReadingRow, SetlistDetail, SetlistRow, SongChart, SongRow, SongSort } from "@/core/library";
 
 export interface Capabilities {
@@ -68,6 +69,10 @@ export interface LibrarySource {
   setItemSlides(setlistId: string, itemId: string, slidesOverride: string | null): Promise<void>;
   /** Change a scripture or text item: its content and, for text, its slides. */
   setItemContent(setlistId: string, itemId: string, content: object, slidesOverride?: string | null): Promise<void>;
+
+  /** How the library's slides look on the screen (its display look), so a
+   * slide card is drawn as the room will see it. */
+  getLook(): Promise<DisplayLook>;
 
   listReadings(): Promise<ReadingRow[]>;
   saveReading(title: string, bodyText: string): Promise<string>;

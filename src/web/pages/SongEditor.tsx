@@ -1,8 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { SongPreview } from "@/components/library/SongPreview";
+
 import type { NewSongInput, SongRow } from "@/core/library";
 import { useLibrary } from "@/library/context";
+import { chartHasChords, parseStoredChart } from "@/lib/chords/chart";
 import { deleteSongMessage } from "@/lib/deleteSongText";
+import { DEFAULT_LOOK, type DisplayLook } from "@/lib/look";
 import { parseSong } from "@/lib/parseSong";
 import { formatSlideOrder, parseSlideOrder } from "@/lib/slideSequence";
 import { go, goUnguarded, href, useLeaveGuard, type Route } from "@/web/route";
@@ -44,6 +48,13 @@ export function SongEditor({ id }: { id: string | null }) {
   const [opened, setOpened] = useState<SongRow | null>(null);
   const [form, setForm] = useState<NewSongInput | null>(id ? null : BLANK);
   const [hasChart, setHasChart] = useState(false);
+  const [hasChords, setHasChords] = useState(false);
+  const [look, setLook] = useState<DisplayLook>(DEFAULT_LOOK);
+  // A new song is usually pasted in; an existing one is changed slide by slide.
+  const [asText, setAsText] = useState(!id);
+  /** The words before the last split, while it can still be undone. */
+  const [beforeSplit, setBeforeSplit] = useState<string | null>(null);
+  const splitting = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [titleError, setTitleError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -62,9 +73,16 @@ export function SongEditor({ id }: { id: string | null }) {
       }
       setOpened(song);
       setForm(formOf(song));
-      setHasChart(!!(await lib.getChart(id)));
+      const stored = await lib.getChart(id);
+      setHasChart(!!stored);
+      const chart = parseStoredChart(stored?.chart_json);
+      setHasChords(!!chart && chartHasChords(chart));
     })();
   }, [id, lib]);
+
+  useEffect(() => {
+    lib.getLook().then(setLook, () => undefined);
+  }, [lib]);
 
   const dirty = !!form && !saving && !same(form, opened ? formOf(opened) : BLANK);
   useLeaveGuard(dirty, (to) => setAsk({ kind: "leave", to }));
@@ -76,6 +94,18 @@ export function SongEditor({ id }: { id: string | null }) {
     const v = clean(e.target.value);
     setForm((f) => (f ? { ...f, [k]: v } : f));
     if (k === "title") setTitleError(null);
+  };
+
+  /** A change made on the slides. Any change but a split ends its Undo. */
+  const changeBody = (body: string) => {
+    if (!splitting.current) setBeforeSplit(null);
+    splitting.current = false;
+    setForm((f) => (f ? { ...f, body_text: body } : f));
+  };
+  const undoSplit = () => {
+    if (beforeSplit === null) return;
+    setForm((f) => (f ? { ...f, body_text: beforeSplit } : f));
+    setBeforeSplit(null);
   };
 
   const back = id ? href({ page: "song", id, key: null }) : href({ page: "songs" });
@@ -161,24 +191,53 @@ export function SongEditor({ id }: { id: string | null }) {
               data-testid="song-title"
             />
           </Field>
-          <Field
-            label="Words"
-            hint={
-              <>
-                A line like [Verse 1] starts a section; a blank line starts a new slide.
-                {hasChart && " The chords stay with the song."}
-              </>
-            }
-          >
-            <textarea
-              className={`${fieldClass} h-auto min-h-[50dvh] py-2 font-mono text-sm leading-relaxed`}
-              value={form.body_text}
-              onChange={set("body_text")}
-              spellCheck={false}
-              placeholder={"[Verse 1]\n…\n\n[Chorus]\n…"}
-              data-testid="song-body"
-            />
-          </Field>
+          <section className="space-y-1.5" aria-label="Words">
+            <div className="flex items-center gap-2">
+              <h2 className="min-w-0 flex-1 text-sm font-medium">Words</h2>
+              {beforeSplit !== null && !asText && (
+                <QuietButton className="h-9 px-3" onClick={undoSplit} data-testid="undo-split">
+                  Undo split
+                </QuietButton>
+              )}
+              <QuietButton className="h-9 px-3" 
+                onClick={() => {
+                  setAsText((t) => !t);
+                  setBeforeSplit(null);
+                }}
+                data-testid="words-as-text"
+              >
+                {asText ? "Show slides" : "Edit as text"}
+              </QuietButton>
+            </div>
+            {asText ? (
+              <textarea
+                className={`${fieldClass} h-auto min-h-[50dvh] py-2 font-mono text-sm leading-relaxed`}
+                value={form.body_text}
+                onChange={set("body_text")}
+                spellCheck={false}
+                placeholder={"[Verse 1]\n…\n\n[Chorus]\n…"}
+                aria-label="Words"
+                data-testid="song-body"
+              />
+            ) : (
+              <SongPreview
+                body={form.body_text}
+                look={look}
+                hasChords={hasChords}
+                onBeforeSplit={() => {
+                  splitting.current = true;
+                  setBeforeSplit(form.body_text);
+                }}
+                onChangeBody={changeBody}
+              />
+            )}
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              {asText
+                ? "A line like [Verse 1] starts a section; a blank line starts a new slide."
+                : "Tap a slide to change it. A long one gets scissors to split it in two."}
+              {hasChart && " The chords stay with the song."}
+            </p>
+          </section>
           <Field
             label="Order"
             error={unknownTags.length ? `Not in the words: ${unknownTags.join(", ")}` : null}

@@ -39,6 +39,7 @@ import { parseSong, sectionLabel, sectionLabelClass, type ParsedSection } from "
 import { formatSlideOrder, parseSlideOrder } from "@/lib/slideSequence";
 import { useConfirm } from "@/lib/confirm";
 import { useToast } from "@/lib/toast";
+import { useDisplayLook } from "@/lib/displayLook";
 import { deleteSongMessage } from "@/lib/deleteSongText";
 import {
   alignSlides,
@@ -120,6 +121,7 @@ const TIME_SIGNATURES = ["4/4", "3/4", "6/8", "12/8", "2/4", "2/2", "5/4", "9/8"
 
 export function SongEditor({ songId, onClose, backLabel = "Library" }: Props) {
   const toast = useToast();
+  const look = useDisplayLook();
   const confirm = useConfirm();
   // Earlier words are kept for an organization's library (its server keeps them).
   const [inOrgLibrary, setInOrgLibrary] = useState(false);
@@ -1441,6 +1443,7 @@ export function SongEditor({ songId, onClose, backLabel = "Library" }: Props) {
             />
             <SongPreview
               body={body}
+              look={look}
               slideOrder={slideOrder}
               chart={showChords ? chart : null}
               hasChords={!!chart && chartHasChords(chart)}

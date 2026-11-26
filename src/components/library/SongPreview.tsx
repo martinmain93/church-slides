@@ -27,7 +27,7 @@ import {
 import { diatonicChordItemsForKey, resolveChordInput } from "@/lib/chords/editorText";
 import type { SongSuggestion } from "@/lib/chords/suggestions";
 import { ChordLyrics } from "@/components/band/ChordLyrics";
-import { useDisplayLook } from "@/lib/displayLook";
+import { DEFAULT_LOOK, type DisplayLook } from "@/lib/look";
 import { Textarea } from "@/components/ui/textarea";
 import { ChordPickerPopover } from "@/components/library/ChordPickerPopover";
 import { AiChangeGlow, ProjectorSlideCard } from "@/components/library/ProjectorSlideCard";
@@ -62,6 +62,8 @@ export type ChordDisplayMode = "letters" | "numbers";
 
 interface Props {
   body: string;
+  /** How the slides look on the screen; the cards are drawn in it. */
+  look?: DisplayLook;
   /** Optional default slide order; repeated sections show repeated slides. */
   slideOrder?: string | null;
   /** When set, draw its chords above the lyrics (the band's view). */
@@ -223,6 +225,7 @@ const INSTRUMENTAL_LABELS = ["Intro", "Turnaround", "Interlude", "Instrumental",
 
 export function SongPreview({
   body,
+  look = DEFAULT_LOOK,
   slideOrder,
   chart,
   hasChords = false,
@@ -269,7 +272,6 @@ export function SongPreview({
 
   const interactive = Boolean(onSetWordChord);
   const isChordMode = interactive || Boolean(chart);
-  const look = useDisplayLook();
 
   const effectiveKey = chartKey || chart?.key || "G";
   const paletteItems = useMemo(

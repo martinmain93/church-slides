@@ -18,6 +18,7 @@ import {
   type Fields,
 } from "@/core/records";
 import { itemTitle, readingSlides, textSlides } from "@/lib/serviceItemContent";
+import { DEFAULT_LOOK, parseLook } from "@/lib/look";
 import { isoDate } from "@/lib/setlistName";
 import type { LibrarySource, ServiceItemKind } from "@/library/source";
 import type { RecordStore } from "@/library/web/store";
@@ -282,6 +283,11 @@ export function webLibrary(
     },
 
     // --- Readings -----------------------------------------------------------------
+
+    async getLook() {
+      const display = store.get("look", "default")?.display;
+      return parseLook(typeof display === "string" ? display : null) ?? DEFAULT_LOOK;
+    },
 
     async listReadings(): Promise<ReadingRow[]> {
       return store
