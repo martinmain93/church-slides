@@ -649,8 +649,10 @@ def test_slow_asr_does_not_stall_frame_observers(event_loop_in_thread):
     assert len(seen) >= n, f"observers only saw {len(seen)} of {n} frames"
     gaps = [seen[i] - seen[i - 1] for i in range(1, len(seen))]
     # Producer interval is 25 ms. A stalled observer would see ~200 ms gaps
-    # once the first pass starts. Keep the median well under that.
-    assert statistics.median(gaps) < 0.08, (
+    # (the 0.2 s pass) once the first pass starts. GitHub's macOS runners
+    # pace a 25 ms sleep at ~85 ms, so the bar sits between their pace and
+    # a stall rather than at 80 ms, where it failed on slow runners.
+    assert statistics.median(gaps) < 0.15, (
         f"observer cadence stalled: median gap {statistics.median(gaps):.3f}s"
     )
 
