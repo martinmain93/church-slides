@@ -456,3 +456,30 @@ fn moving_this_computers_library_into_an_organization() {
     // Only once: the organization has songs now.
     assert!(!crate::libraries::can_move_here(&db, "o1"));
 }
+
+/// The record formats every client writes (docs/server-protocol/records.md):
+/// each sample written into a library and read back comes out the same, so
+/// the desktop app reads and writes exactly the published shapes.
+#[test]
+fn the_published_sample_records_round_trip() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../docs/server-protocol/records");
+    let mut samples: Vec<(String, String, Map<String, Value>)> = std::fs::read_dir(&dir)
+        .unwrap()
+        .map(|e| {
+            let v: Value = serde_json::from_str(&std::fs::read_to_string(e.unwrap().path()).unwrap()).unwrap();
+            (v["type"].as_str().unwrap().to_string(), v["id"].as_str().unwrap().to_string(), v["fields"].as_object().unwrap().clone())
+        })
+        .collect();
+    assert!(samples.len() >= 6, "the samples are there");
+    // Songs before the services that use them.
+    let rank = |t: &str| ["song", "reading", "look", "setlist", "service"].iter().position(|x| *x == t).unwrap();
+    samples.sort_by_key(|(t, _, _)| rank(t));
+    let c = Computer::new();
+    let conn = c.db.conn().lock().unwrap();
+    for (ty, id, fields) in &samples {
+        local::write(&conn, ty, id, fields).unwrap();
+    }
+    for (ty, id, fields) in &samples {
+        assert_eq!(local::read(&conn, ty, id).unwrap().as_ref(), Some(fields), "{ty} {id}");
+    }
+}

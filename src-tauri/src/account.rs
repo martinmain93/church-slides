@@ -123,6 +123,7 @@ fn clear(app_data: &Path) {
     *ACCESS.lock().unwrap_or_else(|e| e.into_inner()) = None;
     let _ = secrets().delete();
     let _ = std::fs::remove_file(config_path(app_data));
+    crate::hosted_ai::forget(app_data);
 }
 
 // --- Keychain -------------------------------------------------------------------
@@ -505,6 +506,19 @@ impl std::fmt::Display for SignedOut {
 }
 impl std::error::Error for SignedOut {}
 
+/// The server answered with an error status. Shows as the server's message.
+#[derive(Debug)]
+pub struct ServerRefused {
+    pub status: u16,
+    pub message: String,
+}
+impl std::fmt::Display for ServerRefused {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.message)
+    }
+}
+impl std::error::Error for ServerRefused {}
+
 /// A valid access token, refreshing (and rotating the refresh token) when
 /// the one in memory has expired.
 async fn access_token(app_data: &Path, cfg: &AccountConfig) -> Result<String> {
@@ -610,7 +624,11 @@ pub async fn api(app_data: &Path, method: &str, path: &str, body: Option<Value>)
         let value: Value = if text.is_empty() { Value::Null } else { serde_json::from_str(&text).unwrap_or(Value::Null) };
         if !status.is_success() {
             let message = value.pointer("/error/message").and_then(Value::as_str).map(String::from);
-            bail!(message.unwrap_or_else(|| format!("The server replied {status}")));
+            return Err(ServerRefused {
+                status: status.as_u16(),
+                message: message.unwrap_or_else(|| format!("The server replied {status}")),
+            }
+            .into());
         }
         return Ok(value);
     }

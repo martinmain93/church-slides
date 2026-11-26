@@ -13,7 +13,7 @@ import {
 } from "@/lib/instructionModels";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { openLink } from "@/lib/tauri";
+import { hostedAiStatus, openLink } from "@/lib/tauri";
 import { useToast } from "@/lib/toast";
 
 /** The Groq key for spoken requests (`api_keys.py`). Shows "saved" once
@@ -26,6 +26,19 @@ export function GroqKeyField() {
   const toast = useToast();
   const models = useInstructionModels();
   const [keyDraft, setKeyDraft] = useState("");
+  // Signed in to an organization: its AI allowance stands in for a key.
+  const [allowanceOf, setAllowanceOf] = useState<string | null>(null);
+  // Read again now and then: the key arrives within a minute of signing in.
+  useEffect(() => {
+    const read = () =>
+      hostedAiStatus().then(
+        (s) => setAllowanceOf(s.own_groq_key ? null : s.org_name),
+        () => undefined,
+      );
+    void read();
+    const timer = setInterval(read, 15_000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     if (!models.seen) refreshInstructionModels().catch(() => undefined);
@@ -44,6 +57,9 @@ export function GroqKeyField() {
     }
   }
 
+  if (allowanceOf) {
+    return <div className="text-xs text-muted-foreground">Uses {allowanceOf}&rsquo;s AI allowance. No key needed.</div>;
+  }
   if (groqHasKey) return <div className="text-xs text-muted-foreground">Groq key saved.</div>;
   return (
     <div className="space-y-1 pt-1">

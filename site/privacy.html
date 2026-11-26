@@ -169,8 +169,10 @@
       charting when you ask for chord suggestions, and your recording when you use Voice. A
       service’s live audio stays on your computer: the AI recognises speech only there. Keys are
       stored unencrypted in the app’s folder on your computer.</li>
-    <li><strong>AI assistants.</strong> If you connect Claude or another assistant to your library,
-      the songs and setlists it reads go to that assistant’s provider under your own account.</li>
+    <li><strong>AI assistants.</strong> If you connect Claude or another assistant to your library
+      (this computer’s, or your organization’s through our server), the songs and setlists it reads go
+      to that assistant’s provider under your own account. Changes it makes to an organization’s
+      library are recorded with your name and the assistant’s, like your own changes.</li>
     <li><strong>Online band screens (your own relay).</strong> These run in your church’s own
       Cloudflare account, not ours.</li>
     <li><strong>Band screens and setlist sharing on your network.</strong> These talk directly
@@ -200,10 +202,17 @@
       the AI learned from your services are kept on our server so every computer in the team has
       them. When two people change a song’s words at once, the earlier words are kept too, with the
       name of the person whose change replaced them.</li>
+    <li><strong>AI through your organization.</strong> A computer signed in to an organization can
+      use its AI allowance instead of an AI account of its own, for spoken requests, finding Bible
+      verses, and chord suggestions and Voice in the song editor (a service’s live audio never goes;
+      it stays on your computer). Then the audio or text for each request goes through
+      our server to Groq, which runs the AI for us, and the answer comes back the same way. We don’t
+      keep the audio, the text or the answers: only how much was used each day (requests and seconds
+      of audio), for a week. A key of your own, if you enter one, is used instead.</li>
   </ul>
   <p>
-    Everyone in an organization can see its library, its live set, and who is in it (names, email
-    addresses and roles). We don’t look at your church’s content except where needed to keep
+    Everyone in an organization can see its library, its live set, and who is in it (names and
+    roles); its owner and admins also see members’ email addresses. We don’t look at your church’s content except where needed to keep
     the service running or when you ask us for help, and we never use it for anything else.
   </p>
   <p>
@@ -233,6 +242,9 @@
     <li><strong>Accounts, organizations, live sets and shared libraries:</strong> our own server on
       Cloudflare, under the same terms. Kept while the account or organization exists, except the
       live set (up to six hours after a service).</li>
+    <li><strong>AI through your organization:</strong> passed to
+      <a href="https://groq.com/privacy-policy/">Groq</a>, in the United States, which runs it for us
+      under its terms. We keep only daily usage counts, for a week.</li>
   </ul>
   <p>
     This means some data is stored outside Canada, where it can be accessed by courts and
@@ -240,7 +252,8 @@
   </p>
   <p>
     Only people working on Church Slides have access to this data. Sentry, Google and Cloudflare store it for us
-    under their data processing terms and don’t use it for themselves. It’s used to fix problems
+    under their data processing terms and don’t use it for themselves; Groq runs AI requests for us
+    under its terms. It’s used to fix problems
     and decide what to build next, and never for anything else.
   </p>
 

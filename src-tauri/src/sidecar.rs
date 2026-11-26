@@ -153,6 +153,10 @@ async fn spawn_sidecar(
             cmd.env("CHURCH_SLIDES_LOG_FILE", dir.join("church-slides.log"));
         }
     }
+    // Where the organization's AI allowance key is kept (`hosted_ai`).
+    if let Some(dir) = db_path.parent() {
+        cmd.env("CHURCH_SLIDES_HOSTED_AI_FILE", crate::hosted_ai::path(dir));
+    }
     cmd.arg("--port")
         .arg("0")
         .arg("--db-path")

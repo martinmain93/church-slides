@@ -7,6 +7,7 @@ mod commands;
 mod db;
 mod diagnostics;
 mod feedback;
+mod hosted_ai;
 mod keep_awake;
 mod libraries;
 mod library_look;
@@ -428,6 +429,7 @@ pub fn run() {
             log::info!("opened library at {}", db.open_path().display());
             let library_sync = Arc::new(library_sync::LibrarySync::default());
             library_sync.start(app.handle().clone(), db.clone(), app_data_dir.clone());
+            hosted_ai::start(db.clone(), app_data_dir.clone());
             app.manage(library_sync);
             app.manage(db);
             app.manage(sync);
@@ -477,6 +479,7 @@ pub fn run() {
             libraries::move_library_into,
             library_sync::library_song_revisions,
             library_sync::library_song_revision,
+            hosted_ai::hosted_ai_status,
             library_sync::library_sync_status,
             library_sync::library_sync_now,
             library_sync::library_sync_ticket,

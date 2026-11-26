@@ -49,7 +49,7 @@ GET {server}/.well-known/church-slides
 {
   "protocol": "0",
   "api": "/v1",
-  "capabilities": ["account", "organizations", "live"],
+  "capabilities": ["account", "organizations", "live", "sync", "ai", "mcp"],
   "auth": {
     "issuer": "https://api.churchslides.app",
     "resource": "https://api.churchslides.app/v1",
@@ -62,7 +62,7 @@ GET {server}/.well-known/church-slides
 | --- | --- |
 | `protocol` | Protocol version this server speaks. |
 | `api` | Path of the protected API, relative to the server. |
-| `capabilities` | What this server offers. A server may offer any subset. Values so far: `account`, `organizations`, `live`. Planned: `sync`, `live`, `ai`, `mcp`. The app shows only features whose capability is listed. |
+| `capabilities` | What this server offers. A server may offer any subset. Values so far: `account`, `organizations`, `live`, `sync`, `ai`, `mcp`. The app shows only features whose capability is listed. |
 | `auth.issuer` | The OAuth authorization server. Its metadata is at `{issuer}/.well-known/oauth-authorization-server` ([RFC 8414]). |
 | `auth.resource` | The resource indicator ([RFC 8707]) to request tokens for. |
 | `auth.scopes` | Scopes the app should request. |
@@ -448,6 +448,68 @@ on connecting, carries the latest number. The socket is only a nudge: a
 client that missed one pulls when it reconnects. Either side may
 send `ping`; the server answers `pong`. Removing a member or changing their
 role closes it (`4001`).
+
+## AI gateway
+
+Capability `ai`. An OpenAI-compatible endpoint, so a computer can use AI
+features (spoken requests, finding Bible verses, chord suggestions) without
+an AI account of its own. The server forwards each call to a provider and
+charges it to the organization's daily allowance.
+
+### `POST {api}/orgs/{orgId}/ai/key`
+
+For roles that run services (`run_live`). Returns a key for the gateway
+only, not for the API:
+
+```json
+{ "key": "csa_…", "expiresAt": 1731990000000, "baseUrl": "https://…/ai/v1",
+  "models": { "chat": ["openai/gpt-oss-20b", "openai/gpt-oss-120b"],
+              "transcription": ["whisper-large-v3-turbo", "whisper-large-v3"] } }
+```
+
+A key lasts 15 minutes; ask for a new one every few. The server checks the
+person's membership and role when it issues a key, not on each call, so a
+call is never slowed by a database lookup; someone who leaves the
+organization or loses the role loses AI within 15 minutes.
+
+### Calls
+
+`POST {baseUrl}/chat/completions` and `POST {baseUrl}/audio/transcriptions`,
+as OpenAI's API, with `Authorization: Bearer csa_…`. Only the listed models;
+no streaming; output tokens and uploads are capped. A call over the day's
+allowance gets `rate_limited` and is not forwarded. The count is kept after
+answering and may lag by up to a minute, so a busy day can run slightly over.
+Nothing sent is stored; the server keeps only counts. Each answer has a
+`Server-Timing: upstream;dur=…` header: how long the provider took, so the
+gateway's own cost is the rest.
+
+### `GET {api}/orgs/{orgId}/ai/usage`
+
+`{ "day": "2026-11-18", "used": { "requests": 12, "tokens": 9000, "audioSeconds": 40 },
+"allowance": { "requests": 500, "tokens": 1000000, "audioSeconds": 10800 } }`.
+Days are UTC.
+
+## AI assistants (MCP)
+
+Capability `mcp`; discovery's `mcp` field gives the path (`/mcp`). A remote
+[MCP](https://modelcontextprotocol.io) server over an organization's library,
+for Claude, ChatGPT or any MCP client.
+
+- **Transport:** Streamable HTTP. `POST /mcp` with one JSON-RPC request,
+  answered with one JSON reply (no server-sent streams). Notifications get
+  `202`.
+- **Sign-in:** MCP's authorization spec. Without a token the server answers
+  `401` with `WWW-Authenticate` pointing at its protected-resource metadata
+  (`/.well-known/oauth-protected-resource/mcp`, RFC 9728), whose resource is
+  `{server}/mcp`. The client registers (dynamic registration or a Client ID
+  Metadata Document), signs in with PKCE, and asks for `resource={server}/mcp`.
+  A token for `/mcp` isn't accepted by `/v1`, and the reverse. A sign-in that
+  names no resource is for `/v1`.
+- **Tools:** the same names, arguments and results as the app's local MCP
+  tools, plus an `organization` argument (its id or name; optional when the
+  person is in one) and `list_organizations`. Tools that read a computer's
+  files stay local. Every change is an ordinary sync push, so roles, the
+  record rules above and change notices apply.
 
 ## Live set
 

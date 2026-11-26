@@ -1,0 +1,10 @@
+{
+  "type": "song",
+  "id": "song_01HSAMPLEMINIMAL000000",
+  "fields": {
+    "title": "Doxology",
+    "body_text": "[Verse 1]\nPraise God from whom all blessings flow",
+    "created_at": 1731000000000,
+    "updated_at": 1731000000000
+  }
+}

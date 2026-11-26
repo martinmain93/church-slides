@@ -18,6 +18,7 @@ import time
 from websockets.asyncio.server import ServerConnection
 
 from auto_presenter.api_keys import get_key as get_instruction_api_key
+from auto_presenter.api_keys import gateway_for
 from auto_presenter.api_keys import save_key as save_instruction_api_key
 from auto_presenter.asr.types import TranscriptEvent
 from auto_presenter.decision import ollama_manager
@@ -323,13 +324,22 @@ def note_live_scripture(reference: str, display: str) -> None:
     _state.scripture_last = reference
 
 
+def _hosted_endpoint(spec) -> tuple[str, str] | None:
+    """(base_url, key) for a hosted model: the person's own key first, then
+    the organization's AI allowance. `api_keys.endpoint`'s rule, with the key
+    lookup through this module's name so tests can stand in for it."""
+    own = get_instruction_api_key(spec.provider)
+    if own:
+        return spec.base_url.rstrip("/"), own
+    return gateway_for(spec.provider)
+
+
 def hosted_key_on_file() -> bool:
-    """Whether the chosen instruction model is a hosted one with its key on
-    file — what "on by default" means for spoken requests."""
+    """Whether the chosen instruction model is a hosted one it can reach: a
+    key on file, or the organization's AI allowance. What "on by default"
+    means for spoken requests."""
     spec = find_instruction_model(_state.instruction_model_id)
-    return spec is not None and spec.kind == "hosted" and bool(
-        get_instruction_api_key(spec.provider)
-    )
+    return spec is not None and spec.kind == "hosted" and _hosted_endpoint(spec) is not None
 
 
 def apply_session_spoken_instructions(choice: bool | None) -> bool:
@@ -394,8 +404,8 @@ def _build_instruction_backend(model_id: str) -> InstructionBackend | None:
         return None
     if spec.kind == "local":
         return OllamaBackend(model=spec.model_name, host=ollama_manager.DEFAULT_HOST)
-    api_key = get_instruction_api_key(spec.provider)
-    if not api_key:
+    where = _hosted_endpoint(spec)
+    if where is None:
         # No key: fall all the way back rather than disabling the feature.
         # A hosted default that silently does nothing when no key was ever
         # entered is worse than quietly running on-device.
@@ -404,8 +414,9 @@ def _build_instruction_backend(model_id: str) -> InstructionBackend | None:
             "falling back to %s", model_id, spec.provider, FALLBACK_MODEL_ID
         )
         return _build_local_fallback()
+    base_url, api_key = where
     hosted = GenericLLMBackend(
-        base_url=spec.base_url, model=spec.model_name, api_key=api_key
+        base_url=base_url, model=spec.model_name, api_key=api_key
     )
     local = _build_local_fallback()
     if local is None:
@@ -448,7 +459,8 @@ def _instruction_model_info(model_id: str) -> InstructionModelInfo | None:
     if spec is None:
         return None
     installed = spec.kind == "local" and spec.pull_name in ollama_manager.installed_models()
-    has_key = spec.kind == "hosted" and bool(get_instruction_api_key(spec.provider))
+    # The organization's AI allowance counts: nothing to enter.
+    has_key = spec.kind == "hosted" and _hosted_endpoint(spec) is not None
     return InstructionModelInfo(
         id=spec.id, label=spec.label, model_kind=spec.kind, size_mb=spec.size_mb,
         provider=spec.provider, note=spec.note, installed=installed, has_api_key=has_key,

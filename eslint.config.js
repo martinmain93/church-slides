@@ -36,4 +36,35 @@ export default tseslint.config(
       "@typescript-eslint/no-unused-vars": "off",
     },
   },
+  // Layers (docs/roadmap/WEB_AND_MOBILE.md): `core` is shared by every
+  // client, so it imports no UI or platform; the library interface imports no
+  // platform. Each platform's implementation lives beside it.
+  {
+    files: ["src/core/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            { group: ["react", "react-dom", "react/*"], message: "src/core has no UI: it's shared by every client." },
+            { group: ["@tauri-apps/*"], message: "src/core runs on every platform, not only the desktop." },
+            { group: ["@/lib/*", "@/components/*", "@/library/*"], message: "src/core imports only from src/core." },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ["src/library/source.ts", "src/library/context.tsx"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            { group: ["@tauri-apps/*", "@/lib/tauri", "@/lib/invoke"], message: "Platform code goes in its own implementation (desktop.ts)." },
+          ],
+        },
+      ],
+    },
+  },
 );
