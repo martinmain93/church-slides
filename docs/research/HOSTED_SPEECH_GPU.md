@@ -103,9 +103,8 @@ raise this.
   audio to Modal, which needs the user's OK first.
 - **Batching steps** across streams on one GPU.
 - **The next-line check on the server.**
-- **The waking flow in the app:**
-  - wake the GPU when a service opens;
-  - say "starting the AI, about a minute";
-  - Whisper covers the wait, already built.
+- **Waking in the app:** under 10 s, so the GPU is woken when the AI starts,
+  with no warm-up message. Whisper covers the first seconds, and any wait
+  for capacity (already built).
 - **Tokens from our server** in place of the prototype's minting script.
 - **The privacy page**, if this ships.
