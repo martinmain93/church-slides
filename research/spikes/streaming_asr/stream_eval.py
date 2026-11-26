@@ -423,7 +423,11 @@ async def run_clip(clip: Clip, providers: list[str], keys: dict, variants: list[
         token = os.environ["REMOTE_SPEECH_TOKEN"]
         be = RemoteStreamingBackend(os.environ["REMOTE_SPEECH_URL"], lambda: token)
         label = os.environ.get("REMOTE_LABEL", "remote")
-        threads.append(threading.Thread(target=run_wrapper, args=(label, be, clip, t0, outdir / f"{label}.jsonl")))
+        # REMOTE_COPIES: that many streams at once, as that many churches would
+        for k in range(int(os.environ.get("REMOTE_COPIES", "1"))):
+            lab = label if k == 0 else f"{label}_{k}"
+            be_k = be if k == 0 else RemoteStreamingBackend(os.environ["REMOTE_SPEECH_URL"], lambda: token)
+            threads.append(threading.Thread(target=run_wrapper, args=(lab, be_k, clip, t0, outdir / f"{lab}.jsonl")))
     if "mlx" in providers:
         from auto_presenter.asr.mlx_backend import MLXWhisperBackend
 

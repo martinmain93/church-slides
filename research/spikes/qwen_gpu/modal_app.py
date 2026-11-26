@@ -86,7 +86,9 @@ app = modal.App("church-slides-speech", image=image)
     secrets=[modal.Secret.from_name("church-slides-speech")],
     # region="us" left the container waiting for an L4 (2026-11-26); unpinned schedules at once
 )
-@modal.concurrent(max_inputs=16)
+# one GPU step at a time per container (GPU_LOCK): 4 streams kept final words
+# at 2.5 s, 8 made them 7.5 s (2026-11-26), so 4 per container, then scale out
+@modal.concurrent(max_inputs=4)
 class Speech:
     @modal.enter()
     def load(self) -> None:
