@@ -260,8 +260,13 @@ export async function getSetlist(id: string): Promise<SetlistDetail | null> {
   return detail ? withServiceItems(detail) : null;
 }
 
-export async function createSetlist(name: string): Promise<string> {
-  return invoke<string>("create_setlist", { name });
+export async function createSetlist(name: string, serviceDate: string | null = null): Promise<string> {
+  return invoke<string>("create_setlist", { name, serviceDate });
+}
+
+/** Change the day a service is for (`YYYY-MM-DD`, or null for none). */
+export async function updateSetlistDate(id: string, serviceDate: string | null): Promise<void> {
+  await invoke<void>("update_setlist_date", { id, serviceDate });
 }
 
 export async function updateSetlistName(id: string, name: string): Promise<void> {
@@ -302,8 +307,8 @@ export async function setSetlistItemContent(
 }
 
 /** A new setlist holding a copy of another's items ("Copy last service"). */
-export async function duplicateSetlist(sourceId: string, name: string): Promise<string> {
-  return invoke<string>("duplicate_setlist", { sourceId, name });
+export async function duplicateSetlist(sourceId: string, name: string, serviceDate: string | null = null): Promise<string> {
+  return invoke<string>("duplicate_setlist", { sourceId, name, serviceDate });
 }
 
 export async function listReadings(): Promise<ReadingRow[]> {

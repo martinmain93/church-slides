@@ -1,0 +1,21 @@
+# Hosting headers for app.churchslides.app (Cloudflare Pages reads this file).
+# The page holds a sign-in that lasts weeks, so: only its own scripts, only
+# the account servers to talk to, and never inside another site's frame.
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://api.churchslides.app wss://api.churchslides.app https://church-slides-api-staging.martinmain93.workers.dev wss://church-slides-api-staging.martinmain93.workers.dev; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  Cross-Origin-Opener-Policy: same-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
+
+/
+  Cache-Control: no-cache
+
+/index.html
+  Cache-Control: no-cache
+
+/oauth/*
+  Content-Type: application/json
+  Access-Control-Allow-Origin: *

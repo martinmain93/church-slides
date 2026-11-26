@@ -191,7 +191,7 @@ fn a_new_computer_downloads_the_library_and_edits_flow_both_ways() {
     let mut server = Server::default();
     let (a, b) = (Computer::new(), Computer::new());
     let song = a.song("Amazing Grace", "[Verse 1]\nAmazing grace");
-    let list = setlists::create_setlist(&a.db, "Sunday").unwrap();
+    let list = setlists::create_setlist(&a.db, "Sunday", None).unwrap();
     setlists::add_setlist_item(&a.db, &list, &song).unwrap();
     assert!(a.waiting() >= 2);
     a.sync(&mut server);
@@ -298,7 +298,7 @@ fn deletes_reach_other_computers_and_a_used_song_comes_back() {
 
     a.db.delete_song(&gone).unwrap();
     // Meanwhile B, offline, puts `kept` in a service while A deletes it.
-    let list = setlists::create_setlist(&b.db, "Sunday").unwrap();
+    let list = setlists::create_setlist(&b.db, "Sunday", None).unwrap();
     setlists::add_setlist_item(&b.db, &list, &kept).unwrap();
     a.db.delete_song(&kept).unwrap();
     a.sync(&mut server);
@@ -423,7 +423,7 @@ fn moving_this_computers_library_into_an_organization() {
     let db = Db::open(&dir.path().join("library.db")).unwrap();
     let song = db.create_song(new_song("Our Song", "words")).unwrap();
     let db = Arc::new(db);
-    let list = setlists::create_setlist(&db, "Sunday").unwrap();
+    let list = setlists::create_setlist(&db, "Sunday", None).unwrap();
     setlists::add_setlist_item(&db, &list, &song).unwrap();
     db.home()
         .execute("INSERT INTO settings (key, value, updated_at) VALUES ('some_setting', '\"kept\"', 0)", [])

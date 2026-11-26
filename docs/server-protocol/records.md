@@ -47,6 +47,7 @@ A service and its items, in order.
 | Field | Type | |
 | --- | --- | --- |
 | `name` | string | Required |
+| `service_date` | string | The day it's for, `YYYY-MM-DD` with no time or zone. A new service gets the coming Sunday and a name made from it ("Sunday 29 Nov"); each is edited on its own |
 | `created_at` | number | Required |
 | `last_used_at` | number | When it was last run |
 | `items` | list | The items, below, sorted by `position` |

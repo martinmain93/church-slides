@@ -120,8 +120,18 @@ pub async fn get_setlist(
 pub async fn create_setlist(
     state: tauri::State<'_, Arc<Db>>,
     name: String,
+    service_date: Option<String>,
 ) -> Result<String, String> {
-    setlists::create_setlist(&state, &name).map_err(|e| e.to_string())
+    setlists::create_setlist(&state, &name, service_date.as_deref()).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn update_setlist_date(
+    state: tauri::State<'_, Arc<Db>>,
+    id: String,
+    service_date: Option<String>,
+) -> Result<(), String> {
+    setlists::update_setlist_date(&state, &id, service_date.as_deref()).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -186,8 +196,9 @@ pub async fn duplicate_setlist(
     state: tauri::State<'_, Arc<Db>>,
     source_id: String,
     name: String,
+    service_date: Option<String>,
 ) -> Result<String, String> {
-    setlists::duplicate_setlist(&state, &source_id, &name).map_err(|e| e.to_string())
+    setlists::duplicate_setlist(&state, &source_id, &name, service_date.as_deref()).map_err(|e| e.to_string())
 }
 
 #[tauri::command]

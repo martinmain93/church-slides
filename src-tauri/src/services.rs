@@ -128,7 +128,7 @@ mod tests {
         let (_d, db) = fresh();
         let a = song(&db, "Alpha");
         let b = song(&db, "Beta");
-        let sl = setlists::create_setlist(&db, "Sunday").unwrap();
+        let sl = setlists::create_setlist(&db, "Sunday", None).unwrap();
         setlists::add_setlist_item(&db, &sl, &a).unwrap();
         setlists::add_setlist_item(&db, &sl, &b).unwrap();
         setlists::mark_setlist_used(&db, &sl).unwrap();
@@ -147,7 +147,7 @@ mod tests {
         let (_d, db) = fresh();
         let a = song(&db, "Alpha");
         let c = song(&db, "Gamma");
-        let sl = setlists::create_setlist(&db, "Sunday").unwrap();
+        let sl = setlists::create_setlist(&db, "Sunday", None).unwrap();
         setlists::add_setlist_item(&db, &sl, &a).unwrap();
         setlists::mark_setlist_used(&db, &sl).unwrap();
         setlists::mark_setlist_used(&db, &sl).unwrap();
@@ -162,7 +162,7 @@ mod tests {
     fn planning_a_setlist_records_nothing() {
         let (_d, db) = fresh();
         let a = song(&db, "Alpha");
-        let sl = setlists::create_setlist(&db, "Next week").unwrap();
+        let sl = setlists::create_setlist(&db, "Next week", None).unwrap();
         setlists::add_setlist_item(&db, &sl, &a).unwrap();
         assert!(list_recent_services(&db, 10).unwrap().is_empty());
     }
@@ -171,7 +171,7 @@ mod tests {
     fn services_more_than_the_window_apart_are_separate_and_newest_first() {
         let (_d, db) = fresh();
         let a = song(&db, "Alpha");
-        let sl = setlists::create_setlist(&db, "Sunday").unwrap();
+        let sl = setlists::create_setlist(&db, "Sunday", None).unwrap();
         setlists::add_setlist_item(&db, &sl, &a).unwrap();
         {
             let conn = db.conn().lock().unwrap();
@@ -187,7 +187,7 @@ mod tests {
     fn a_deleted_setlist_keeps_its_history() {
         let (_d, db) = fresh();
         let a = song(&db, "Alpha");
-        let sl = setlists::create_setlist(&db, "Sunday").unwrap();
+        let sl = setlists::create_setlist(&db, "Sunday", None).unwrap();
         setlists::add_setlist_item(&db, &sl, &a).unwrap();
         setlists::mark_setlist_used(&db, &sl).unwrap();
         setlists::delete_setlist(&db, &sl).unwrap();

@@ -5,7 +5,8 @@ Status: **agreed 2026-11-18. Groundwork built 2026-11-18:** record formats
 (`src/core/records.ts`), the shared library types (`src/core/library.ts`),
 the data-source interface (`src/library/`) with the desktop version, and the
 lint rule for the layers. The desktop's views don't use the interface yet;
-they move over as the web app needs their pieces. Next: the web app.
+they move over as the web app needs their pieces. **Web app v1 built
+2026-11-24** (see "As built"); not yet deployed.
 
 Church Slides runs today as a desktop app. A web app at
 `app.churchslides.app` comes next, so a team can plan services from a phone
@@ -16,7 +17,7 @@ Android apps come later. This is how the code is shared between them.
 
 | | Desktop | Web (`app.churchslides.app`) | Mobile (later) |
 | --- | --- | --- | --- |
-| Library: browse, search, edit songs | Yes | Yes (words, order, credits; chords stay on the computer) | Yes |
+| Library: browse, search, edit songs | Yes | Yes (words, order, credits; chords shown, transposed to the service's key; editing them stays on the computer for now) | Yes |
 | Setlists: build, order, keys, readings, text slides, delete | Yes | Yes | Yes |
 | Team and account | Yes | Yes | Yes |
 | Present, AI following, audio, band screens on the network | Yes | No | iPad later |
@@ -92,3 +93,74 @@ to week (2026-11-18). So record formats may change now if that makes them
 cleaner, even if existing organization libraries need converting or, at
 worst, re-sending from the slides computer. This won't be true for long:
 once a church relies on it, formats only change with a migration.
+
+## As built (web app v1, 2026-11-24)
+
+- **Where it lives:** pages in `src/web/` (phone-first, a bottom tab bar:
+  Services, Songs, You), the entry in `web/` (`pnpm web:dev` on port 1430,
+  `pnpm web:build` into `web/dist`). Routes are in the address's fragment
+  (`#/services/…`), so it's one static page. Add `?server=http://localhost:8787`
+  to use a local server (`pnpm dev:test-sign-in` in the server repo).
+- **Signing in** is the band page's code, now shared
+  (`src/lib/account/browserSignIn.ts`): a public OAuth client identified by
+  `web/public/oauth/web-app-client.json`. Each browser has its own sign-in,
+  so the slides computer, band pages and any number of browsers stay signed
+  in together.
+- **The library** (`src/library/web/`) is the `LibrarySource` over a record
+  store in IndexedDB: each record as the server last sent it, plus the
+  changes waiting to go up, kept as the fields they set and the version
+  they were made on (so words edited on an older version become a revision
+  on the server, and someone else's edit to another field isn't
+  overwritten). The sync loop is the desktop's: push about a second after a
+  change, pull on the change-notice socket, when the page comes back into
+  view or online, and every minute. A notice shows only when offline, signed
+  out, or a change was refused.
+- **Chords** are shown read-only above the words (the band page's
+  `ChordLyrics` and `alignSlides`), transposed when opened from a service
+  with its own key. Editing words keeps the song's `chart`, scripture links
+  and lead-sheet data untouched: only changed fields go up.
+- **Roles:** owners, admins and operators edit songs and services; set
+  leaders plan services and read songs; members read.
+- **Services** have a date (`service_date`, `YYYY-MM-DD`, also on the
+  desktop: migration 014, a date field beside the name). A new one is for
+  the coming Sunday, named after it and made unique with "(2)"; its name
+  field is focused so it can be retyped at once. A name still made from the
+  date follows the date when it changes. The list shows Upcoming (soonest
+  first) and Past. Add songs, a reading by reference (the slides computer
+  fills in the verses) or a text slide, and edit readings and text slides
+  afterwards; set a song's key (only for songs with chords); drag items to
+  reorder (or the handle and arrow keys); copy for the next service; delete.
+- **Songs** show in the order they're sung (their Order, with repeats);
+  the editor checks the Order against the sections, warns before leaving
+  with unsaved changes, sends only the fields changed since it opened, and
+  says which services use a song before it can be deleted.
+- **Review fixes (2026-11-25)**, after UX, security and code reviews: a
+  delete during a create's push no longer comes back; a server reset sends
+  whole records; renames send only the name (canonical comparison, unknown
+  item fields kept); a 403 refuses the waiting changes instead of looping;
+  tabs refresh the sign-in one at a time (Web Locks); sign-out closes and
+  deletes the library; the library is tied to the person who signed in;
+  `iss` is checked; localhost servers only in development builds; the
+  socket address must be the server's; charts are cleaned before showing;
+  a page that fails shows a message instead of a blank app; hosting headers
+  (CSP, no framing) in `web/public/_headers`. The text-item helpers are
+  shared with the desktop (`src/lib/serviceItemContent.ts`).
+- **`LibrarySource` gained `getChart(songId)`**, implemented for the desktop
+  too.
+- **Checked** against a local server in the browser at phone size: sign-in,
+  download, chords, a service planned with a key change (chords moved G→A),
+  a words edit (the server kept the chart), and another device's change
+  showing up without a reload. The desktop's own sync code pulls a
+  web-planned service intact, date included (`e2e.rs`,
+  `a_service_planned_on_the_web`). Not yet tried: real Google sign-in,
+  deploying, the CSP on signed-in pages in a production build.
+
+### Not yet
+
+- Deploying `app.churchslides.app` (Cloudflare static site); the server
+  must accept the web app's client metadata document in production.
+- The team page (members, invites) and the chord editor.
+- Checking a reading's reference as it's typed (to discuss).
+- Undo after removing an item.
+- Several tabs share one library without coordinating (each keeps its own
+  copy in memory); one tab syncing for all is the fix.

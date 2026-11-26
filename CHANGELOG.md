@@ -10,6 +10,9 @@ refuses to release a version that has no entry here.
 
 ## Unreleased
 
+- New (preview): **Church Slides on the web.** Sign in at app.churchslides.app from a phone or any computer to see your organization's songs with their chords, edit words and credits, and plan services (songs, keys, readings, text slides). Changes show up on the slides computer, and theirs show up there. Presenting and chord editing stay in the app.
+- New: **services have a date.** A new service is dated for the coming Sunday and named after it, never with the same name as another; change either one in the setlist's header.
+
 ## 0.3.0 — 23 November 2026
 
 - Changed: **the AI hears the band better and sooner** on Macs with Apple silicon. It uses a newer speech engine: on our test services the wrong slide was up a little less often, and 179 of 225 slide changes landed on time, up from 169. Its speech model is a bigger one-time download, about 2.2 GB.

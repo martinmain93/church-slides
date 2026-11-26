@@ -22,6 +22,8 @@ export interface SongRow {
 export interface SetlistRow {
   id: string;
   name: string;
+  /** The day the service is for, `YYYY-MM-DD` (local, no time), or null. */
+  service_date?: string | null;
   created_at: number;
   last_used_at: number | null;
   /** Item names in order (song titles, passage references, text titles) —
@@ -77,4 +79,12 @@ export interface NewSongInput {
   copyright?: string | null;
   default_tempo_wps?: number | null;
   slide_order?: string | null;
+}
+
+/** A song's chord chart as stored beside it (`song_charts`; a song record's
+ * `chart` field). `chart_json` is a `ChordChart` (src/lib/chords/chart.ts). */
+export interface SongChart {
+  chart_json: string;
+  /** The key the chart is written in ("G"), if known. */
+  original_key: string | null;
 }
