@@ -6,6 +6,8 @@ vi.mock("@/components/home/SpeechModelStatus", () => ({ SpeechModelStatus: () =>
 import { HomeScreen } from "@/components/home/HomeScreen";
 import { shouldDiscardOnBack } from "@/components/setlists/SetlistBuilder";
 import { ConfirmProvider } from "@/lib/confirm";
+import { LibraryProvider } from "@/library/context";
+import { desktopLibrary } from "@/library/desktop";
 import * as tauri from "@/lib/tauri";
 import { ToastProvider } from "@/lib/toast";
 
@@ -16,6 +18,7 @@ function setlist(i: number, songs: string[] = []): tauri.SetlistRow {
 
 function renderHome() {
   return render(
+    <LibraryProvider source={desktopLibrary}>
     <ToastProvider>
       <ConfirmProvider>
         <HomeScreen
@@ -27,7 +30,8 @@ function renderHome() {
           onStartService={vi.fn()}
         />
       </ConfirmProvider>
-    </ToastProvider>,
+    </ToastProvider>
+    </LibraryProvider>,
   );
 }
 

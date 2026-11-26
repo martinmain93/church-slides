@@ -151,6 +151,39 @@ describe("the web app's library", () => {
     expect(server.revisions[0]).toContain("fears relieved");
   });
 
+  it("lists songs in the order the service builder asks for, and their chart keys", async () => {
+    const server = new FakeServer();
+    const a = await device(server);
+    const grace = await a.lib.createSong({ title: "Amazing Grace", body_text: AMAZING, ccli: null, author: null, copyright: null, slide_order: null });
+    const doxology = await a.lib.createSong({ title: "Doxology", body_text: "[Verse 1]\nPraise God from whom all blessings flow", ccli: null, author: null, copyright: null, slide_order: null });
+    const first = await a.lib.createSetlist("Sunday");
+    await a.lib.addSong(first, doxology);
+    const second = await a.lib.createSetlist("Next Sunday");
+    await a.lib.addSong(second, doxology);
+    await a.lib.addSong(second, grace);
+    const sang = (await a.lib.listSongs("popular")).map((s) => s.id);
+    expect(sang).toEqual([doxology, grace]);
+    expect((await a.lib.listSongs()).map((s) => s.title)).toEqual(["Amazing Grace", "Doxology"]);
+
+    server.records.set(`song/song_c`, {
+      type: "song",
+      id: "song_c",
+      seq: ++server.seq,
+      deleted: false,
+      bodySeq: server.seq,
+      fields: { title: "Old Hundredth", body_text: "[Verse 1]\nAll people that on earth do dwell", created_at: 1, updated_at: 1, chart: { chart_json: "{}", original_key: "A" } },
+    });
+    await a.sync.syncNow();
+    expect(await a.lib.listChartKeys()).toEqual({ song_c: "A" });
+  });
+
+  it("a passage added with its slides already made keeps them", async () => {
+    const a = await device(new FakeServer());
+    const id = await a.lib.createSetlist("Sunday");
+    const item = await a.lib.addServiceItem(id, "scripture", { reference: "John 3:16" }, { slidesOverride: "For God so loved the world" });
+    expect((await a.lib.getSetlist(id))?.items.find((i) => i.id === item)?.slides_override).toBe("For God so loved the world");
+  });
+
   it("an edit to the words keeps the song's chords and other data", async () => {
     const server = new FakeServer();
     const a = await device(server);
@@ -193,7 +226,7 @@ describe("the web app's library", () => {
     const setId = await phone.lib.createSetlist("Sunday 29 Nov");
     const item = await phone.lib.addSong(setId, songId);
     await phone.lib.addServiceItem(setId, "scripture", { reference: "John 3:16" });
-    await phone.lib.addServiceItem(setId, "text", { title: "Welcome", body: "Welcome\n\nNotices" }, null);
+    await phone.lib.addServiceItem(setId, "text", { title: "Welcome", body: "Welcome\n\nNotices" });
     await phone.lib.setItemKey(setId, item, "A");
     await phone.sync.syncNow();
     expect(phone.sync.getStatus().state).toBe("offline");

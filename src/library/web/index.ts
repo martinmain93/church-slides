@@ -90,11 +90,23 @@ export function webLibrary(
 
     // --- Songs ------------------------------------------------------------------
 
-    async listSongs() {
-      return store
+    async listSongs(sort = "alphabetical") {
+      const songs = store
         .all("song")
         .map(([id]) => song(id)!)
         .sort(byTitle);
+      if (sort === "recently_edited") return songs.sort((a, b) => b.updated_at - a.updated_at);
+      if (sort === "popular") {
+        // As the desktop counts use: the services a song is in.
+        const uses = new Map<string, number>();
+        for (const [id, f] of store.all("setlist")) {
+          for (const i of new Set(setlistFromRecord(id, f).items.map((i) => i.song_id))) {
+            if (i) uses.set(i, (uses.get(i) ?? 0) + 1);
+          }
+        }
+        return songs.sort((a, b) => (uses.get(b.id) ?? 0) - (uses.get(a.id) ?? 0));
+      }
+      return songs;
     },
 
     async getSong(id) {
@@ -142,6 +154,17 @@ export function webLibrary(
       const chart = store.get("song", songId)?.chart as Fields | undefined;
       if (!chart || typeof chart.chart_json !== "string") return null;
       return { chart_json: chart.chart_json, original_key: typeof chart.original_key === "string" ? chart.original_key : null };
+    },
+
+    async listChartKeys() {
+      const keys: Record<string, string | null> = {};
+      for (const [id, f] of store.all("song")) {
+        const chart = f.chart as Fields | undefined;
+        if (chart && typeof chart.chart_json === "string") {
+          keys[id] = typeof chart.original_key === "string" ? chart.original_key : null;
+        }
+      }
+      return keys;
     },
 
     // --- Setlists -----------------------------------------------------------------
@@ -208,7 +231,7 @@ export function webLibrary(
       return itemId;
     },
 
-    async addServiceItem(setlistId, kind: ServiceItemKind, content, afterItemId) {
+    async addServiceItem(setlistId, kind: ServiceItemKind, content, { afterItemId, slidesOverride } = {}) {
       const itemId = newId("item");
       const item: SetlistItemRow = {
         id: itemId,
@@ -217,6 +240,7 @@ export function webLibrary(
         song_id: null,
         position: 0,
         ...itemContent(kind, content),
+        ...(slidesOverride ? { slides_override: slidesOverride } : {}),
       };
       await editItems(setlistId, (items) => {
         const at = afterItemId ? items.findIndex((i) => i.id === afterItemId) : -1;

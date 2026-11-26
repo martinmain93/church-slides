@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, Copy, Library as LibraryIcon, Play, Plus, Search, Trash2 } from "lucide-react";
 
-import { deleteSetlist, listSetlists, listSongs, type SetlistRow } from "@/lib/tauri";
 import {
   clearLastSession,
   loadLastSession,
@@ -15,6 +14,8 @@ import { Input } from "@/components/ui/input";
 import { useConfirm } from "@/lib/confirm";
 import { useToast } from "@/lib/toast";
 import { groupServices, lastService, rowDate } from "@/lib/setlistName";
+import type { SetlistRow } from "@/core/library";
+import { useLibrary } from "@/library/context";
 
 const RECENT_LIMIT = 6;
 
@@ -42,6 +43,7 @@ export function HomeScreen({
   onOpenLibrary,
   onStartService,
 }: Props) {
+  const library = useLibrary();
   const toast = useToast();
   const confirm = useConfirm();
   const [setlists, setSetlists] = useState<SetlistRow[] | null>(null);
@@ -66,7 +68,7 @@ export function HomeScreen({
   useEffect(() => {
     let cancelled = false;
     setLastSession(loadLastSession());
-    Promise.all([listSetlists(), listSongs()])
+    Promise.all([library.listSetlists(), library.listSongs()])
       .then(([sl, songs]) => {
         if (cancelled) return;
         setSetlists(sl);
@@ -79,7 +81,7 @@ export function HomeScreen({
     return () => {
       cancelled = true;
     };
-  }, [toast, reloadKey, synced]);
+  }, [library, toast, reloadKey, synced]);
 
   const lastSessionSetlist = lastSession
     ? setlists?.find((s) => s.id === lastSession.setlistId)
@@ -113,7 +115,7 @@ export function HomeScreen({
       if (!ok) return;
     }
     try {
-      await deleteSetlist(sl.id);
+      await library.deleteSetlist(sl.id);
       setSetlists((prev) => (prev ? prev.filter((item) => item.id !== sl.id) : prev));
       if (lastSession?.setlistId === sl.id) {
         clearLastSession();

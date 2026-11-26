@@ -30,25 +30,6 @@ import {
   X,
 } from "lucide-react";
 
-import {
-  addServiceItem,
-  addSetlistItem,
-  deleteSetlist,
-  getSetlist,
-  listChartKeys,
-  listReadings,
-  listSetlists,
-  listSongsSorted,
-  removeSetlistItem,
-  reorderSetlist,
-  setSetlistItemKey,
-  updateSetlistDate,
-  updateSetlistName,
-  type SetlistDetail,
-  type ReadingRow,
-  type SetlistItemWithSong,
-  type SongRow,
-} from "@/lib/tauri";
 import { nameForDate } from "@/lib/setlistName";
 import { useServiceDateField } from "@/lib/useServiceDateField";
 import {
@@ -86,6 +67,8 @@ import { useConfirm } from "@/lib/confirm";
 import { useToast } from "@/lib/toast";
 import { isTypingTarget, slideAfterArrow } from "@/lib/slideKeys";
 import { cn } from "@/lib/utils";
+import type { ReadingRow, SetlistDetail, SetlistItemWithSong, SongRow } from "@/core/library";
+import { useLibrary } from "@/library/context";
 
 /** How many of the most-used songs the search panel offers before any typing. */
 const SUGGESTED_SONGS = 30;
@@ -126,6 +109,7 @@ export function SetlistBuilder({
   justCreated = false,
   onEditSong,
 }: Props) {
+  const library = useLibrary();
   const toast = useToast();
   const confirm = useConfirm();
   // So the band and the leader can get their devices connected before the
@@ -195,17 +179,17 @@ export function SetlistBuilder({
 
   useEffect(() => {
     let cancelled = false;
-    listSongsSorted("popular")
+    library.listSongs("popular")
       .then((rows) => {
         if (!cancelled) setSuggested(rows.slice(0, SUGGESTED_SONGS));
       })
       .catch(() => undefined);
-    listChartKeys()
+    library.listChartKeys()
       .then((keys) => {
         if (!cancelled) setChartKeys(keys);
       })
       .catch(() => undefined);
-    listReadings()
+    library.listReadings()
       .then((rows) => {
         if (!cancelled) setReadings(rows);
       })
@@ -213,7 +197,7 @@ export function SetlistBuilder({
     return () => {
       cancelled = true;
     };
-  }, [reloadKey]);
+  }, [library, reloadKey]);
 
   const nameSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const nameDirty = useRef(false);
@@ -233,7 +217,7 @@ export function SetlistBuilder({
   useEffect(() => {
     let cancelled = false;
     setDetail(null);
-    getSetlist(setlistId)
+    library.getSetlist(setlistId)
       .then((d) => {
         if (cancelled) return;
         if (!d) {
@@ -260,7 +244,8 @@ export function SetlistBuilder({
     return () => {
       cancelled = true;
     };
-  }, [setlistId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `refresh` changes with the view; loading once per service is enough.
+  }, [library, setlistId]);
 
   useEffect(() => {
     if (!detail || detail.items.length === 0) return;
@@ -326,15 +311,15 @@ export function SetlistBuilder({
     // Picking a date means this service is wanted, even with nothing in it yet.
     renamed.current = true;
     try {
-      await updateSetlistDate(setlistId, date);
+      await library.setServiceDate(setlistId, date);
       setDetail((d) => (d ? { ...d, service_date: date } : d));
       const current = nameNow.current;
-      const others = (await listSetlists()).filter((s) => s.id !== setlistId).map((s) => s.name);
+      const others = (await library.listSetlists()).filter((s) => s.id !== setlistId).map((s) => s.name);
       const next = nameForDate(current.trim(), date, others);
       if (next !== current) {
         nameNow.current = next;
         setName(next);
-        await updateSetlistName(setlistId, next);
+        await library.renameSetlist(setlistId, next);
         savedName.current = next;
       }
     } catch (err) {
@@ -350,7 +335,7 @@ export function SetlistBuilder({
     try {
       // An emptied name isn't saved; leaving the box puts the last one back.
       if (!name.trim()) return;
-      await updateSetlistName(setlistId, name.trim());
+      await library.renameSetlist(setlistId, name.trim());
       savedName.current = name.trim();
       nameDirty.current = false;
     } catch (err) {
@@ -365,7 +350,7 @@ export function SetlistBuilder({
   onLeave.current = () => {
     if (leftByButton.current) return;
     if (shouldDiscardOnBack({ justCreated, renamed: renamed.current, hadSongs: everHadSongs.current })) {
-      void deleteSetlist(setlistId).catch(() => undefined);
+      void library.deleteSetlist(setlistId).catch(() => undefined);
     } else if (nameDirty.current) {
       void persistName();
     }
@@ -384,13 +369,13 @@ export function SetlistBuilder({
   }, []);
 
   async function refresh() {
-    const d = await getSetlist(setlistId);
+    const d = await library.getSetlist(setlistId);
     if (d) setDetail(d);
   }
 
   async function handleAdd(song: SongRow) {
     try {
-      await addSetlistItem(setlistId, song.id);
+      await library.addSong(setlistId, song.id);
       setSearchQuery("");
       await refresh();
     } catch (err) {
@@ -408,12 +393,12 @@ export function SetlistBuilder({
 
   async function addImported(message: string, songIds: string[]) {
     try {
-      const fresh = await getSetlist(setlistId);
+      const fresh = await library.getSetlist(setlistId);
       const inService = new Set((fresh ?? detail)?.items.map((i) => i.song_id) ?? []);
       const toAdd = songIds.filter((id) => !inService.has(id));
-      for (const id of toAdd) await addSetlistItem(setlistId, id);
+      for (const id of toAdd) await library.addSong(setlistId, id);
       await refresh();
-      listChartKeys().then(setChartKeys).catch(() => undefined);
+      library.listChartKeys().then(setChartKeys).catch(() => undefined);
       const already = songIds.length - toAdd.length;
       toast.success(
         [
@@ -438,7 +423,7 @@ export function SetlistBuilder({
     let first: string | null = null;
     try {
       for (const a of adds) {
-        const id = await addServiceItem(setlistId, a.kind, a.content, {
+        const id = await library.addServiceItem(setlistId, a.kind, a.content, {
           slidesOverride: a.slidesOverride ?? null,
           afterItemId: after,
         });
@@ -472,7 +457,7 @@ export function SetlistBuilder({
   async function handleKeyChange(item: SetlistItemWithSong, key: string | null) {
     setDetail((d) => d && { ...d, items: d.items.map((it) => (it.id === item.id ? { ...it, song_key: key } : it)) });
     try {
-      await setSetlistItemKey(setlistId, item.id, key);
+      await library.setItemKey(setlistId, item.id, key);
     } catch (err) {
       toast.error(`Couldn't change the key: ${err instanceof Error ? err.message : err}`);
       await refresh();
@@ -481,7 +466,7 @@ export function SetlistBuilder({
 
   async function handleRemove(itemId: string) {
     try {
-      await removeSetlistItem(setlistId, itemId);
+      await library.removeItem(setlistId, itemId);
       await refresh();
     } catch (err) {
       toast.error(`Remove failed: ${err instanceof Error ? err.message : err}`);
@@ -497,7 +482,7 @@ export function SetlistBuilder({
     });
     if (!ok) return;
     try {
-      await deleteSetlist(setlistId);
+      await library.deleteSetlist(setlistId);
       onClose();
     } catch (err) {
       toast.error(`Delete failed: ${err instanceof Error ? err.message : err}`);
@@ -522,7 +507,7 @@ export function SetlistBuilder({
     scrollToSong(draggedId);
 
     try {
-      await reorderSetlist(
+      await library.reorderItems(
         setlistId,
         reordered.map((i) => i.id),
       );
@@ -564,7 +549,7 @@ export function SetlistBuilder({
     // "New setlist" then straight back out leaves nothing worth keeping, so
     // Home doesn't fill with empty drafts.
     if (shouldDiscardOnBack({ justCreated, renamed: renamed.current, hadSongs: everHadSongs.current })) {
-      await deleteSetlist(setlistId).catch(() => undefined);
+      await library.deleteSetlist(setlistId).catch(() => undefined);
     } else if (nameDirty.current) {
       await persistName();
     }

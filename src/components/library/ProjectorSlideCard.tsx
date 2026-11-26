@@ -11,7 +11,7 @@ import { Copy, GripVertical, Pencil, Scissors, Sparkles, Trash2 } from "lucide-r
 import { sectionLabel, sectionLabelClass, type ParsedSection, type SectionType } from "@/lib/parseSong";
 import type { SongSuggestion } from "@/lib/chords/suggestions";
 import { stageThumbnailStyle } from "@/components/presentation/StageSurface";
-import { type DisplayLook } from "@/lib/displayLook";
+import { type DisplayLook } from "@/lib/look";
 import { Textarea, growToFit } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { canSplit, isCrowded, offerSplit } from "@/lib/slideSplit";

@@ -23,12 +23,15 @@ import { HomeScreen } from "@/components/home/HomeScreen";
 import { PeerSyncButton } from "@/components/peerSync/PeerSyncButton";
 import { ScreensDialog, windowName } from "@/components/presentation/ScreensDialog";
 import { ConfirmProvider } from "@/lib/confirm";
+import { LibraryProvider } from "@/library/context";
+import { desktopLibrary } from "@/library/desktop";
 import type { ScreenInfo } from "@/lib/presentation/projection";
 import * as tauri from "@/lib/tauri";
 import { ToastProvider } from "@/lib/toast";
 
 function renderHome() {
   return render(
+    <LibraryProvider source={desktopLibrary}>
     <ToastProvider>
       <ConfirmProvider>
         <HomeScreen
@@ -40,7 +43,8 @@ function renderHome() {
           onStartService={vi.fn()}
         />
       </ConfirmProvider>
-    </ToastProvider>,
+    </ToastProvider>
+    </LibraryProvider>,
   );
 }
 

@@ -4,6 +4,10 @@
  * docs/roadmap/WEB_AND_MOBILE.md, "Layers".
  */
 
+/** How a song list is ordered: by title, last edited first, or most used
+ * in services first. */
+export type SongSort = "alphabetical" | "recently_edited" | "popular";
+
 export interface SongRow {
   id: string;
   title: string;

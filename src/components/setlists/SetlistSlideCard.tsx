@@ -19,7 +19,7 @@ import { Copy, MoreHorizontal, Pencil, Plus, Scissors, Trash2 } from "lucide-rea
 
 import { stageThumbnailStyle } from "@/components/presentation/StageSurface";
 import { Textarea, growToFit } from "@/components/ui/textarea";
-import { type DisplayLook } from "@/lib/displayLook";
+import { type DisplayLook } from "@/lib/look";
 import { sectionLabelClass, type SectionType } from "@/lib/parseSong";
 import { isTypingTarget } from "@/lib/slideKeys";
 import { cn } from "@/lib/utils";

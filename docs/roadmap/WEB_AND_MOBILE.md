@@ -86,6 +86,54 @@ server      closed source: accounts, record storage, live room, AI
    editing, phone-first.
 3. **Desktop catches up:** shared pieces replace the old ones view by view.
 
+## Step 3: the desktop catches up (started 2026-11-26)
+
+The web app v1 shares the data layer and the rules (`src/core`, `src/lib`)
+but not the screens: its pages in `src/web/` are its own, about 2,500 lines
+beside the desktop's. Every fix to a song editor, service builder or slide
+card has to be made twice, and the two drift (slide splitting is on the
+desktop only). This step makes the screens one set.
+
+How a view becomes shared:
+
+1. **It gets its data from `useLibrary()`**, never `@/lib/tauri`. What the
+   interface lacks it gains, implemented for both. Desktop-only actions in
+   the view (importing files, presenting, band screens) are asked of
+   `capabilities`, or stay in a desktop-only part the shared view is given.
+2. **It imports nothing desktop-only**, so the web's lint rule allows it.
+3. **The web page uses it** in place of its own copy, phone-first where the
+   desktop's layout is wide.
+
+Order, smallest risk first:
+
+| Piece | Data through `useLibrary()` | Browser-safe | Used by the web |
+| --- | --- | --- | --- |
+| Slide cards (`MiniSlide`, `ProjectorSlideCard`, `SetlistSlideCard`, `StageSurface`) | needs none | **done**: the look's style is `src/lib/look.ts` | next |
+| Home's service list | **done** | band and peer-sync parts are desktop-only | later |
+| Service builder (`SetlistBuilder`) | **done** | Bibles, band, AI-ready and start-service parts are desktop-only | after the slide cards |
+| Song slides in a service (`SetlistSongSlides`) | to do: item looks, saving a song | | |
+| Song editor (`SongEditor`, `SongPreview`) | to do: chart import and removal, lead sheets, libraries | `SongPreview` takes its look from `displayLook` | |
+| Library list (`LibraryView`) | to do: sorted lists, chart metadata for search | export and import stay desktop-only | |
+
+Done so far: the interface gained `listSongs(sort)`, `listChartKeys()` and
+`addServiceItem(…, { afterItemId, slidesOverride })`; `desktopLibrary` looks
+each command up when it's called, so tests that replace a command
+(`vi.spyOn(tauri, …)`) reach it through the interface too.
+
+### What it opens up
+
+- **AI on the web.** The organization's AI allowance already runs through
+  the server, not this computer: a signed-in client asks
+  `POST /orgs/{id}/ai/key` for a short-lived key and calls the server's
+  gateway with it (Groq behind it; `src-tauri/src/hosted_ai.rs`). A browser
+  can do the same, once the gateway allows the web app's origin. Once the song
+  editor and service builder are shared, the AI parts that need no audio
+  from the room (spoken or typed requests in the song editor, finding a
+  Bible verse, chord suggestions) can work in a browser too: a capability
+  (`canUseOrgAI`) the web turns on when the person's organization has an
+  allowance. Following a live service stays on the slides computer.
+- **Mobile.** Tauri mobile reuses the same views over `desktopLibrary`.
+
 ## Changing existing data
 
 Only two churches have tried organizations, and neither depends on them week

@@ -19,7 +19,7 @@
 import type { CSSProperties, ReactNode } from "react";
 
 import { useContainerUnits } from "@/lib/containerUnits";
-import { faceStyle, useStageLook, type DisplayLook } from "@/lib/displayLook";
+import { faceStyle, useStageLook, type DisplayLook } from "@/lib/look";
 import type { BlankMode } from "@/lib/presentation/state";
 
 interface Props {

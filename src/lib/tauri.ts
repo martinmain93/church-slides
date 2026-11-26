@@ -5,7 +5,8 @@ import type { NewSongInput, ReadingRow, SetlistDetail, SetlistRow, SongRow } fro
 
 export type { NewSongInput, ReadingRow, SetlistDetail, SetlistItemRow, SetlistItemWithSong, SetlistRow, SongRow } from "@/core/library";
 
-export type SortKey = "alphabetical" | "recently_edited" | "popular";
+import type { SongSort } from "@/core/library";
+export type SortKey = SongSort;
 
 export interface AppSettings {
   default_tempo_wps: number;

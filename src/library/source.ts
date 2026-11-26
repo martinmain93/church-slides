@@ -10,7 +10,7 @@
  * `capabilities` what this platform can do rather than which platform it is.
  */
 
-import type { NewSongInput, ReadingRow, SetlistDetail, SetlistRow, SongChart, SongRow } from "@/core/library";
+import type { NewSongInput, ReadingRow, SetlistDetail, SetlistRow, SongChart, SongRow, SongSort } from "@/core/library";
 
 export interface Capabilities {
   /** Run a service: projector, AI following, band screens. */
@@ -30,7 +30,8 @@ export type ServiceItemKind = "scripture" | "text";
 export interface LibrarySource {
   readonly capabilities: Capabilities;
 
-  listSongs(): Promise<SongRow[]>;
+  /** Every song, by title unless another order is asked for. */
+  listSongs(sort?: SongSort): Promise<SongRow[]>;
   getSong(id: string): Promise<SongRow | null>;
   createSong(input: NewSongInput): Promise<string>;
   /** Save a song. `opened` is the song as the editor opened it: then only
@@ -40,6 +41,8 @@ export interface LibrarySource {
   deleteSong(id: string): Promise<void>;
   /** The song's chord chart, or null when it has none. */
   getChart(songId: string): Promise<SongChart | null>;
+  /** Song id → its chart's written key, for every song with chords. */
+  listChartKeys(): Promise<Record<string, string | null>>;
 
   listSetlists(): Promise<SetlistRow[]>;
   getSetlist(id: string): Promise<SetlistDetail | null>;
@@ -51,7 +54,14 @@ export interface LibrarySource {
   copySetlist(sourceId: string, name: string, serviceDate?: string | null): Promise<string>;
 
   addSong(setlistId: string, songId: string): Promise<string>;
-  addServiceItem(setlistId: string, kind: ServiceItemKind, content: object, afterItemId?: string | null): Promise<string>;
+  /** Add a passage or text slide, after `afterItemId` (else at the end),
+   * with its own slides if they were already made. */
+  addServiceItem(
+    setlistId: string,
+    kind: ServiceItemKind,
+    content: object,
+    opts?: { afterItemId?: string | null; slidesOverride?: string | null },
+  ): Promise<string>;
   removeItem(setlistId: string, itemId: string): Promise<void>;
   reorderItems(setlistId: string, itemIds: string[]): Promise<void>;
   setItemKey(setlistId: string, itemId: string, key: string | null): Promise<void>;
