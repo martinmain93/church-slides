@@ -16,19 +16,11 @@ import { Input } from "@/components/ui/input";
 import { hostedAiStatus, openLink } from "@/lib/tauri";
 import { useToast } from "@/lib/toast";
 
-/** The Groq key for spoken requests (`api_keys.py`). Shows "saved" once
- * there is one.
- *
- * @deprecated Groq is deprecated (2026-11-23): its free tier can't carry a
- * service and paid tiers aren't available. Hosted speech is gone; spoken
- * requests still use this key until they have another home. */
-export function GroqKeyField() {
-  const toast = useToast();
-  const models = useInstructionModels();
-  const [keyDraft, setKeyDraft] = useState("");
-  // Signed in to an organization: its AI allowance stands in for a key.
+/** Whose AI allowance this computer uses (signed in to an organization),
+ * or null. Read again now and then: the key arrives within a minute of
+ * signing in. */
+export function useOrgAllowance(): string | null {
   const [allowanceOf, setAllowanceOf] = useState<string | null>(null);
-  // Read again now and then: the key arrives within a minute of signing in.
   useEffect(() => {
     const read = () =>
       hostedAiStatus().then(
@@ -39,6 +31,23 @@ export function GroqKeyField() {
     const timer = setInterval(read, 15_000);
     return () => clearInterval(timer);
   }, []);
+  return allowanceOf;
+}
+
+/** The Groq key for spoken requests (`api_keys.py`): a field until there is
+ * one. Signed in to an organization, its AI covers spoken requests, and a
+ * key of your own stays one tap away (it's used instead, as the privacy
+ * page says).
+ *
+ * @deprecated Groq is deprecated (2026-11-23): its free tier can't carry a
+ * service and paid tiers aren't available. Hosted speech is gone; spoken
+ * requests still use this key until they have another home. */
+export function GroqKeyField() {
+  const toast = useToast();
+  const models = useInstructionModels();
+  const [keyDraft, setKeyDraft] = useState("");
+  const allowanceOf = useOrgAllowance();
+  const [ownKey, setOwnKey] = useState(false);
 
   useEffect(() => {
     if (!models.seen) refreshInstructionModels().catch(() => undefined);
@@ -57,10 +66,19 @@ export function GroqKeyField() {
     }
   }
 
-  if (allowanceOf) {
-    return <div className="text-xs text-muted-foreground">Uses {allowanceOf}&rsquo;s AI allowance. No key needed.</div>;
+  if (allowanceOf && !ownKey) {
+    return (
+      <button
+        type="button"
+        className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+        onClick={() => setOwnKey(true)}
+      >
+        Use my own Groq key instead
+      </button>
+    );
   }
-  if (groqHasKey) return <div className="text-xs text-muted-foreground">Groq key saved.</div>;
+  // The toggle above already says a key is saved.
+  if (groqHasKey && !allowanceOf) return null;
   return (
     <div className="space-y-1 pt-1">
       <form

@@ -83,8 +83,10 @@ export async function smartSearch(query: string, deps: SearchDeps): Promise<Smar
     return { parsed, songs, reasons: {}, meaning: "unused", historySince: null, notes };
   }
 
-  const raw = hasFilters(parsed) ? null : await deps.searchSongs(query);
-  if (raw && raw.length > 0 && titleTier(raw[0]!.title, query) <= 1) {
+  // A title typed out wins over reading it as filters: "Old Country Hymn"
+  // is that song, not "hymns" about old countries.
+  const raw = await deps.searchSongs(query);
+  if (raw.length > 0 && titleTier(raw[0]!.title, query) <= 1) {
     return { parsed, songs: raw, reasons: {}, meaning: "unused", historySince: null, notes };
   }
 
@@ -119,7 +121,7 @@ export async function smartSearch(query: string, deps: SearchDeps): Promise<Smar
       ? parsed.keywords
         ? deps.searchSongs(parsed.keywords)
         : Promise.resolve([] as SongRow[])
-      : Promise.resolve(raw ?? deps.searchSongs(query)),
+      : Promise.resolve(raw),
     texts.length > 0
       ? // Filtered: rank every song, so a filter never drops one that ranked low.
         deps.semanticSearch(texts, filtered ? 5000 : 200).catch(() => ({ status: "unavailable" as const, hits: [] }))
