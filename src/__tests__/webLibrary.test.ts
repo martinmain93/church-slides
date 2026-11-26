@@ -565,3 +565,18 @@ describe("searching songs on the web", () => {
     expect(matchesSearch(song("Holy, Holy, Holy"), "hymn")).toBe(false);
   });
 });
+
+describe("an organization whose library is still empty", () => {
+  it("counts as downloaded once a pull has finished, not as a failed download", async () => {
+    const { RecordStore } = await import("@/library/web/store");
+    const { memoryPersist } = await import("@/library/web/persist");
+    const persist = memoryPersist();
+    const store = await RecordStore.open(persist, "u1");
+    expect(store.downloaded).toBe(false);
+    await store.afterPull([], 0);
+    expect(store.downloaded).toBe(true);
+    expect(store.empty).toBe(true);
+    // And still after a reload.
+    expect((await RecordStore.open(persist, "u1")).downloaded).toBe(true);
+  });
+});

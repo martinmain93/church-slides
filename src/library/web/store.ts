@@ -89,6 +89,9 @@ export class RecordStore {
   private nextOrder = 1;
   /** The last change number pulled. */
   cursor = 0;
+  /** A pull has finished here at least once: an organization whose library
+   * is still empty is downloaded too (its change number stays 0). */
+  private pulled = false;
   /** A stable id for this browser's copy of the library. */
   device = "";
 
@@ -111,6 +114,7 @@ export class RecordStore {
       if (k.startsWith("s:")) store.shadows.set(k.slice(2), v as Shadow);
       else if (k.startsWith("p:")) store.pending.set(k.slice(2), v as Pending);
       else if (k === "m:cursor") store.cursor = Number(v) || 0;
+      else if (k === "m:pulled") store.pulled = v === true;
       else if (k === "m:device") store.device = String(v);
     }
     for (const p of store.pending.values()) store.nextOrder = Math.max(store.nextOrder, p.order + 1);
@@ -161,7 +165,12 @@ export class RecordStore {
 
   /** Whether the library has ever been downloaded here. */
   get downloaded(): boolean {
-    return this.cursor > 0 || this.shadows.size > 0;
+    return this.pulled || this.cursor > 0 || this.shadows.size > 0;
+  }
+
+  /** Nothing at all in the library, here or on the server. */
+  get empty(): boolean {
+    return this.shadows.size === 0 && this.pending.size === 0;
   }
 
   // --- Changing -------------------------------------------------------------------
@@ -280,10 +289,11 @@ export class RecordStore {
       writes.push([`s:${k}`, shadow]);
       n++;
     }
-    writes.push(["m:cursor", seq]);
+    writes.push(["m:cursor", seq], ["m:pulled", true]);
     await this.persist.put(writes);
     // Only once it's kept: a failed write (storage full) is pulled again.
     this.cursor = seq;
+    this.pulled = true;
     return n;
   }
 

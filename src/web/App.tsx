@@ -279,12 +279,17 @@ function OrgLibrary({
   if (!opened || !status) return <div className={`${centred} text-muted-foreground`}>Opening {org.orgName}…</div>;
   if (!opened.lib.store.downloaded) {
     if (status.state === "loading") return <div className={`${centred} text-muted-foreground`}>Downloading {org.orgName}&apos;s library…</div>;
+    const signedOut = status.state === "signed_out";
     return (
       <div className={centred}>
-        <p className="max-w-sm text-sm text-muted-foreground">
-          {status.state === "offline" ? `You're offline. Connect once to download ${org.orgName}'s library.` : (status.message ?? "Couldn't download the library.")}
+        <p className="w-full max-w-sm text-sm text-muted-foreground">
+          {status.state === "offline"
+            ? `You're offline. Connect once to download ${org.orgName}'s library.`
+            : signedOut
+              ? "You've been signed out. Reload to sign in again."
+              : (status.message ?? `Couldn't download ${org.orgName}'s library.`)}
         </p>
-        <QuietButton onClick={() => void opened.sync.syncNow()}>Try again</QuietButton>
+        <QuietButton onClick={() => (signedOut ? window.location.reload() : void opened.sync.syncNow())}>{signedOut ? "Reload" : "Try again"}</QuietButton>
       </div>
     );
   }

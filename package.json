@@ -19,6 +19,7 @@
     "build:relay": "node scripts/build_relay.mjs",
     "web:dev": "vite --config web/vite.web.config.ts",
     "web:build": "vite build --config web/vite.web.config.ts",
+    "web:deploy": "pnpm --package=wrangler@4.157.0 dlx wrangler deploy --config web/wrangler.jsonc",
     "relay:dev": "node scripts/build_relay.mjs && wrangler dev --config relay/wrangler.toml"
   },
   "dependencies": {
