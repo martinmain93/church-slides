@@ -221,6 +221,10 @@ export function recordProblems(r: SyncRecord): string[] {
       if (!Array.isArray(items)) p.push(`setlist ${r.id}: items must be a list`);
       else {
         for (const i of items) {
+          if (!i || typeof i !== "object") {
+            p.push(`setlist ${r.id}: an item isn't an object`);
+            continue;
+          }
           if (typeof i.id !== "string") p.push(`setlist ${r.id}: an item has no id`);
           if (!["song", "scripture", "text"].includes(String(i.kind))) p.push(`setlist ${r.id}: item ${String(i.id)} has kind ${String(i.kind)}`);
           if (i.kind === "song" && typeof i.song_id !== "string") p.push(`setlist ${r.id}: song item ${String(i.id)} has no song_id`);

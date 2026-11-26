@@ -1,5 +1,8 @@
 """API keys for hosted providers, shared across features.
 
+Deprecated (2026-11-23): Groq's free tier can't carry a church's use and
+paid tiers aren't available, so Groq integrations are on their way out.
+
 Originally written for hosted spoken-instruction models
 (`decision.instructions`); a provider's key is just an account credential,
 not a feature credential, so the same "groq" entry a user saves here also
@@ -130,6 +133,10 @@ def endpoint(provider: str, own_base_url: str) -> tuple[str, str] | None:
     own = get_key(provider)
     if own:
         return own_base_url.rstrip("/"), own
-    if provider in _GATEWAY_PROVIDERS:
-        return hosted_gateway()
-    return None
+    return gateway_for(provider)
+
+
+def gateway_for(provider: str) -> tuple[str, str] | None:
+    """The organization's AI gateway for `provider`, when it stands in for
+    that provider and this computer has a valid key for it."""
+    return hosted_gateway() if provider in _GATEWAY_PROVIDERS else None

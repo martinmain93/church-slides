@@ -706,6 +706,7 @@ export interface ParticleFilterTunables {
   score_follower_cpu?: boolean;
   assist_tier?: boolean;
   asr_short_context?: boolean;
+  asr_qwen_streaming?: boolean;
   music_change_watch?: boolean;
   song_openings_watch?: boolean;
   openings_mid_song_nudge?: number;
@@ -1417,6 +1418,7 @@ export const DEFAULT_PARTICLE_FILTER_TUNABLES: ParticleFilterTunables = {
   score_follower_cpu: false,
   assist_tier: false,
   asr_short_context: false,
+  asr_qwen_streaming: true,
   music_change_watch: true,
   song_openings_watch: true,
   openings_mid_song_nudge: 0.5,

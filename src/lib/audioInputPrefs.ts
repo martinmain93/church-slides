@@ -110,16 +110,16 @@ export function saveAudioInputPrefs(prefs: AudioInputPrefs): void {
  * Factory prefs are `whisper` / `tiny.en` with `asr_chosen=false`. That used
  * to be what present mode shipped, which left Apple GPU idle. Until the
  * operator (or the wizard) picks something, ask the sidecar's
- * `recommend_model` — on this host that is MLX `small.en`. Groq is always
- * treated as an explicit choice: it cannot be recommended.
+ * `recommend_model` — on this host that is MLX `small.en`.
+ *
+ * Groq's hosted speech is deprecated (2026-11-23: its free tier can't carry a
+ * service and paid tiers aren't available), so a saved Groq choice is
+ * ignored and the computer's own engine is used, or no live AI.
  */
 export async function resolveLiveAsr(
   prefs: AudioInputPrefs = loadAudioInputPrefs(),
 ): Promise<{ backend: AudioInputPrefs["asr_backend"]; model: string }> {
-  if (prefs.asr_backend === "groq") {
-    return { backend: prefs.asr_backend, model: prefs.asr_model };
-  }
-  if (prefs.asr_chosen) {
+  if (prefs.asr_chosen && prefs.asr_backend !== "groq") {
     return onCpuPath({ backend: prefs.asr_backend, model: prefs.asr_model });
   }
   try {
@@ -127,7 +127,8 @@ export async function resolveLiveAsr(
     const backend = rec.backend === "mlx" ? "mlx" : "whisper";
     return onCpuPath({ backend, model: rec.model_size });
   } catch {
-    return onCpuPath({ backend: prefs.asr_backend, model: prefs.asr_model });
+    const backend = prefs.asr_backend === "groq" ? "whisper" : prefs.asr_backend;
+    return onCpuPath({ backend, model: prefs.asr_model });
   }
 }
 

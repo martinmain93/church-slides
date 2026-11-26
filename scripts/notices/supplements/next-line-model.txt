@@ -1,15 +1,16 @@
-Church Slides next-line phone model
+Church Slides next-line phone models
 
-A small phone-recognition network (4.4 million parameters) that reads the
-Whisper small.en encoder's output, made for Church Slides. Its weights are our
-own work and ship with the Apple-silicon engine.
+Two small phone-recognition networks, made for Church Slides: one (5.0
+million parameters) reads the audio encoder output of Qwen3-ASR 0.6B, the
+other (4.4 million parameters) reads Whisper small.en's. Their weights are
+our own work and ship with the Apple-silicon engine.
 
-It was trained only on public music: songs from the Free Music Archive
+They were trained only on public music: songs from the Free Music Archive
 dataset (FMA: A Dataset for Music Analysis, Defferrard, Benzi, Vandergheynst
 and Bresson, ISMIR 2017; https://github.com/mdeff/fma), with lyrics
 transcribed automatically by Whisper. No church recordings were used.
 
 Each FMA track is published by its artist under the licence the artist chose,
-mostly Creative Commons licences, some of them non-commercial. The model holds
+mostly Creative Commons licences, some of them non-commercial. The models hold
 no audio or lyrics from those tracks: only learned weights. Church Slides is
 free of charge.

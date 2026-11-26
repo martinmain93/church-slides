@@ -110,7 +110,7 @@ def test_every_cpu_gets_the_model_the_machine_check_judges():
     # the check times the same model
     import inspect
 
-    assert inspect.signature(machine_check.assess).parameters[
+    assert inspect.signature(machine_check.assess_cpu_path).parameters[
         "whisper_model_size"
     ].default == rec.model_size
 

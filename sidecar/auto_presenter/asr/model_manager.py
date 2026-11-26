@@ -319,7 +319,8 @@ class ModelManager:
         """Heuristic: does the HF cache contain a directory for this model?
 
         `backend="mlx"` checks the MLX conversion, which is a different repo
-        (and a different download) from the CTranslate2 one.
+        (and a different download) from the CTranslate2 one; `backend="qwen"`
+        checks Qwen3-ASR's weights (one model whatever `model_size` says).
         """
         # The HF hub layout puts shard files under `snapshots/<hash>/`, and
         # links a file in there only once it has finished downloading. Look
@@ -335,8 +336,13 @@ class ModelManager:
         target = self._model_cache_dir(model_size, backend) / "snapshots"
         if not target.exists():
             return False
-        names = _MLX_WEIGHTS if backend == "mlx" else _WHISPER_WEIGHTS
-        for snapshot in target.iterdir():
+        names = {"mlx": _MLX_WEIGHTS, "qwen": _QWEN_WEIGHTS}.get(backend, _WHISPER_WEIGHTS)
+        snapshots = list(target.iterdir())
+        if backend == "qwen":  # only the pinned revision loads
+            from auto_presenter.asr.qwen_backend import QWEN_REVISION
+
+            snapshots = [target / QWEN_REVISION]
+        for snapshot in snapshots:
             for name in names:
                 weights = snapshot / name
                 if _is_complete_file(weights):
@@ -500,6 +506,10 @@ class ModelManager:
             from auto_presenter.asr.mlx_backend import repo_for
 
             return self._cache() / ("models--" + repo_for(model_size).replace("/", "--"))
+        if backend == "qwen":
+            from auto_presenter.asr.qwen_backend import QWEN_REPO
+
+            return self._cache() / ("models--" + QWEN_REPO.replace("/", "--"))
         return self._cache() / f"models--Systran--faster-whisper-{model_size}"
 
     def _actual_bytes_on_disk(self, model_size: ModelSize) -> int:
@@ -527,6 +537,7 @@ def _guarded(callback: ProgressCallback) -> ProgressCallback:
 #: `weights.npz` (older) or `weights.safetensors` (newer).
 _WHISPER_WEIGHTS = ("model.bin",)
 _MLX_WEIGHTS = ("weights.safetensors", "weights.npz")
+_QWEN_WEIGHTS = ("model.safetensors",)
 
 
 def _is_complete_file(path: Path) -> bool:
@@ -596,6 +607,11 @@ def download_size_mb(model_size: str) -> int:
     return _MODEL_SIZE_MB.get(model_size, 500)
 
 
+def _size_text(mb: int) -> str:
+    """ "464 MB" or "2.2 GB", as the interface says it (`sizeText`)."""
+    return f"{mb / 1024:.1f} GB" if mb >= 1000 else f"{mb} MB"
+
+
 def download_failed_message(model_size: str, total_bytes: int) -> str:
     """What the operator reads when a first-time model download fails.
 
@@ -605,7 +621,7 @@ def download_failed_message(model_size: str, total_bytes: int) -> str:
     """
     mb = round(total_bytes / (1024 * 1024))
     return (
-        f"Couldn't download the {model_size} speech model (about {mb} MB). "
+        f"Couldn't download the AI's speech model (about {_size_text(mb)}). "
         "It needs an internet connection the first time; after that it works "
         "offline. You can still present by hand."
     )

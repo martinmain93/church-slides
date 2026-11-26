@@ -135,7 +135,9 @@ def _utf8_mode() -> str:
 def _mlx() -> str:
     """The Apple-silicon engine's GPU path, where it's meant to be there:
     loads MLX, runs a kernel on the GPU (the Metal shaders are bundled data),
-    imports mlx_whisper. Skipped elsewhere and on macOS before 14."""
+    imports mlx_whisper and mlx_qwen3_asr (with its mel filters, bundled
+    data), and reads both next-line phone models. Skipped elsewhere and on
+    macOS before 14."""
     import platform
 
     if sys.platform != "darwin" or platform.machine() != "arm64":
@@ -152,9 +154,21 @@ def _mlx() -> str:
     mx.eval(total)
     if float(total.item()) != 90.0:
         raise RuntimeError(f"MLX GPU arithmetic is wrong: {total.item()}")
+    import mlx_qwen3_asr
     import mlx_whisper
+    import numpy as np
+    from mlx_qwen3_asr.audio import compute_features
 
-    return f"{mx.__version__} (gpu), mlx_whisper {mlx_whisper.__version__}"
+    compute_features(np.zeros(16000, np.float32))  # reads assets/mel_filters.npz
+    from auto_presenter.follower import next_line
+
+    for name in (next_line.MODEL_FILE, next_line.QWEN_MODEL_FILE):
+        if next_line.load_head(name) is None and getattr(sys, "frozen", False):
+            raise RuntimeError(f"next-line model {name} isn't bundled")
+    return (
+        f"{mx.__version__} (gpu), mlx_whisper {mlx_whisper.__version__}, "
+        f"mlx_qwen3_asr {mlx_qwen3_asr.__version__}"
+    )
 
 
 def _error_reports() -> str:

@@ -91,7 +91,14 @@ describe("describeAiAvailability", () => {
       progress("downloading", { bytes_downloaded: 120 * 1024 * 1024 }),
     );
     expect(a).toMatchObject({ kind: "downloading", mbDone: 120 });
-    expect(availabilitySummary(a)).toMatch(/120 of about 480 MB/);
+    expect(availabilitySummary(a)).toMatch(/120 MB of about 480 MB/);
+  });
+
+  it("says a download over a gigabyte in GB, and names no model", () => {
+    const a = describeAiAvailability(ready, model({ download_mb: 2259 }), null);
+    const text = availabilitySummary(a);
+    expect(text).toMatch(/about 2\.2 GB/);
+    expect(text).not.toMatch(/small\.en|whisper|qwen/i);
   });
 });
 
@@ -133,7 +140,19 @@ describe("the machine check (off Apple silicon)", () => {
     const text = availabilitySummary(slow);
     expect(text).toMatch(/Too slow/);
     expect(text).toMatch(/Presenting by hand works/);
-    expect(text).toMatch(/cloud option/);
+  });
+
+  it("says no before offering any download: live AI can't run here", () => {
+    const missing = model({ downloaded: false });
+    const no = describeAiAvailability(ready, missing, null, {
+      state: "done",
+      verdict: "insufficient",
+      reason: "Live AI needs a Mac with Apple silicon (M1 or newer) on macOS 14 or later.",
+    });
+    expect(no.kind).toBe("too_slow");
+    expect(describeAiAvailability(ready, missing, null, { state: "running" }).kind).toBe(
+      "checking_machine",
+    );
   });
 
   it("asks for another check when it couldn't judge", () => {

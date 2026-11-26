@@ -187,8 +187,8 @@ class AudioSession:
         wrapper_kwargs: dict[str, Any] | None = None,
         frame_observer: FrameObserver | None = None,
         level_observer: LevelObserver | None = None,
-        health_observer: "HealthObserver | None" = None,
-        perf: "PerfMonitor | None" = None,
+        health_observer: HealthObserver | None = None,
+        perf: PerfMonitor | None = None,
     ) -> None:
         self._capture = capture
         self._backend = backend
@@ -208,11 +208,16 @@ class AudioSession:
         # (tens of MB) then waited for a full collection, which a heap this big
         # rarely triggers. The Windows soak measured it as 67 MB a restart.
         perf_monitor = self.perf
-        self._wrapper = SlidingWindowWrapper(
-            backend,
+        hooks: dict[str, Any] = dict(
             pass_timer=lambda: perf_monitor.stage(STAGE_ASR),
             emission_observer=self.latency.observe,
             **(wrapper_kwargs or {}),
+        )
+        # A backend that streams its own words (`QwenStreamingBackend`) takes
+        # the wrapper's place, with the same hooks; every other one is windowed.
+        streamer = getattr(backend, "streamer", None)
+        self._wrapper: Any = (
+            streamer(**hooks) if callable(streamer) else SlidingWindowWrapper(backend, **hooks)
         )
 
         self._thread: threading.Thread | None = None

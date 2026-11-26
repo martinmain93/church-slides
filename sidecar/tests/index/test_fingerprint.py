@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from auto_presenter.decision.library_recovery import (
-    LibrarySearchConfig,
     OffSetlistWatcher,
     append_imported_song,
     search_lyrics,
@@ -118,80 +117,92 @@ def test_spontaneous_search_ignores_songs_already_in_the_set():
     assert found is None
 
 
-def test_watcher_needs_a_sustained_lost_singing_window():
-    index = _index(MERCY, GRACE)
-    watcher = OffSetlistWatcher(index, LibrarySearchConfig(min_lost_seconds=2.0, min_words=4))
-    setlist = _setlist(("grace", [["amazing", "grace"]]))
-    words = "oh the deep unending mercy of god".split()
-    kwargs = dict(
-        display_marginal=0.05,
-        talking_score=0.2,
-        silent=False,
-        setlist=setlist,
-        chord=None,
-        chord_t=None,
-        chords_enabled=False,
-    )
-    assert watcher.observe(words=words, t_seconds=1.0, **kwargs) is None
-    hit = watcher.observe(words=words, t_seconds=4.0, **kwargs)
-    assert hit is not None
-    assert hit.song_id == "mercy"
-    assert hit.reason == "spontaneous"
+# Spontaneous recovery. Lines below are invented, not from any real song.
+LANTERN = catalog_song_from_body(
+    "lantern",
+    "Harbour Lantern",
+    "[verse 1]\nLantern burning on the harbour wall\nguide the weary sailors home tonight\n\n"
+    "[chorus]\nShining river carry me along\nevery morning brings a brand new song",
+)
+LANTERN_COPY = catalog_song_from_body(
+    "lantern_2",
+    "Harbour Lantern (2)",
+    "[verse 1]\nLantern burning on the harbour wall\nguide the weary sailors home tonight",
+)
+MEADOW = catalog_song_from_body(
+    "meadow",
+    "Golden Meadow",
+    "[verse 1]\nGolden meadow under silver skies\nquiet waters where the swallows fly",
+)
+SUNG = "lantern burning on the harbour wall guide the weary sailors home tonight".split()
+OTHER_SET = [["golden", "meadow", "under", "silver", "skies"]]
+
+
+def _watch(watcher, setlist, times=(1.0, 3.0, 5.0), words=SUNG, **over):
+    kwargs = dict(talking_score=0.1, silent=False, setlist=setlist,
+                  chord=None, chord_t=None, chords_enabled=False) | over
+    hits = [watcher.observe(words=words, t_seconds=t, **kwargs) for t in times]
+    return [h for h in hits if h is not None]
+
+
+def test_watcher_imports_a_song_that_keeps_winning_off_the_setlist():
+    watcher = OffSetlistWatcher(_index(LANTERN, MEADOW))
+    hits = _watch(watcher, _setlist(("meadow", OTHER_SET)), times=(1.0, 3.0, 5.0))
+    assert len(hits) == 1
+    assert hits[0].song_id == "lantern"
+    assert hits[0].reason == "spontaneous"
+    assert hits[0].score > hits[0].runner_up_score
+
+
+def test_watcher_needs_more_than_one_win():
+    watcher = OffSetlistWatcher(_index(LANTERN, MEADOW))
+    assert _watch(watcher, _setlist(("meadow", OTHER_SET)), times=(1.0,)) == []
+
+
+def test_watcher_leaves_a_setlist_song_alone_even_when_not_in_the_library():
+    """The setlist's own slides are in the contest: an item edited for tonight,
+    or never saved to the library, still wins over nothing."""
+    watcher = OffSetlistWatcher(_index(MEADOW))
+    setlist = _setlist(("tonight_only", [SUNG[:6], SUNG[6:]]))
+    assert _watch(watcher, setlist) == []
+
+
+def test_watcher_treats_a_library_copy_of_a_setlist_song_as_that_song():
+    watcher = OffSetlistWatcher(_index(LANTERN, LANTERN_COPY, MEADOW))
+    assert _watch(watcher, _setlist(("lantern", [list(s) for s in LANTERN.slides]))) == []
+
+
+def test_watcher_imports_a_song_the_library_holds_twice():
+    """Duplicates ("Song", "Song (2)") must not tie each other out."""
+    watcher = OffSetlistWatcher(_index(LANTERN, LANTERN_COPY, MEADOW))
+    hits = _watch(watcher, _setlist(("meadow", OTHER_SET)))
+    assert [h.song_id for h in hits] in (["lantern"], ["lantern_2"])
 
 
 def test_watcher_will_not_search_during_a_sermon():
-    index = _index(MERCY)
-    watcher = OffSetlistWatcher(index, LibrarySearchConfig(min_lost_seconds=1.0, min_words=4))
-    setlist = _setlist(("grace", [["amazing"]]))
-    kwargs = dict(
-        words="oh the deep unending mercy".split(),
-        display_marginal=0.05,
-        talking_score=0.9,
-        silent=False,
-        setlist=setlist,
-        chord=None,
-        chord_t=None,
-        chords_enabled=False,
-    )
-    assert watcher.observe(t_seconds=1.0, **kwargs) is None
-    assert watcher.observe(t_seconds=5.0, **kwargs) is None
+    watcher = OffSetlistWatcher(_index(LANTERN, MEADOW))
+    assert _watch(watcher, _setlist(("meadow", OTHER_SET)), talking_score=0.9) == []
 
 
-def test_watcher_default_refuses_conversation_that_is_only_half_talky():
-    """Reported live 2026-09-28: background conversation moved the screen. A
-    smoothed talking score of 0.5 passed the old 0.55 bar; sung events run
-    median 0.03 / p95 0.41."""
-    index = _index(MERCY)
-    watcher = OffSetlistWatcher(index, LibrarySearchConfig(min_lost_seconds=1.0, min_words=4))
-    setlist = _setlist(("grace", [["amazing"]]))
-    kwargs = dict(
-        words="oh the deep unending mercy".split(),
-        display_marginal=0.05,
-        talking_score=0.5,
-        silent=False,
-        setlist=setlist,
-        chord=None,
-        chord_t=None,
-        chords_enabled=False,
-    )
-    assert watcher.observe(t_seconds=1.0, **kwargs) is None
-    assert watcher.observe(t_seconds=5.0, **kwargs) is None
+def test_watcher_needs_enough_words():
+    watcher = OffSetlistWatcher(_index(LANTERN, MEADOW))
+    assert _watch(watcher, _setlist(("meadow", OTHER_SET)), words=SUNG[:4],
+                  times=(1.0, 1.1)) == []
 
 
 def test_watcher_requires_a_recent_chord_when_the_analyser_is_on():
-    index = _index(MERCY)
-    watcher = OffSetlistWatcher(index, LibrarySearchConfig(min_lost_seconds=1.0, min_words=4))
-    setlist = _setlist(("grace", [["amazing"]]))
-    words = "oh the deep unending mercy of god".split()
-    kwargs = dict(
-        words=words,
-        display_marginal=0.05,
-        talking_score=0.2,
-        silent=False,
-        setlist=setlist,
-        chords_enabled=True,
-    )
-    assert watcher.observe(t_seconds=1.0, chord=None, chord_t=None, **kwargs) is None
-    assert watcher.observe(t_seconds=3.0, chord=None, chord_t=None, **kwargs) is None
-    hit = watcher.observe(t_seconds=3.1, chord="G", chord_t=3.0, **kwargs)
-    assert hit is not None
+    watcher = OffSetlistWatcher(_index(LANTERN, MEADOW))
+    setlist = _setlist(("meadow", OTHER_SET))
+    assert _watch(watcher, setlist, chords_enabled=True) == []
+    hits = _watch(watcher, setlist, times=(7.0, 9.0, 11.0), chords_enabled=True,
+                  chord="G", chord_t=10.5)
+    assert [h.song_id for h in hits] == ["lantern"]
+
+
+def test_watcher_ignores_a_transcription_loop():
+    """Whisper on near-silence repeats itself ("hi it's hi it's ..."); a lyric
+    that repeats a word matches that one pair over and over."""
+    loop = catalog_song_from_body("loop", "Echo", "[chorus]\nit's yours it's yours it's yours it's yours")
+    watcher = OffSetlistWatcher(_index(loop, MEADOW))
+    words = "hi it's yours hi it's yours hi it's yours hi it's yours".split()
+    assert _watch(watcher, _setlist(("meadow", OTHER_SET)), words=words) == []

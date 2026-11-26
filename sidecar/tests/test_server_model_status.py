@@ -68,6 +68,9 @@ async def test_a_cached_model_needs_nothing(tmp_path, monkeypatch, sent):
 async def test_mlx_checks_its_own_conversion(tmp_path, monkeypatch, sent):
     """The MLX weights are a different repo and a different download: having
     the CTranslate2 model cached says nothing about them."""
+    from auto_presenter.asr.qwen_backend import QwenStreamingBackend
+
+    monkeypatch.setattr(QwenStreamingBackend, "is_available", staticmethod(lambda: False))
     _cache_model(tmp_path, "models--Systran--faster-whisper-small.en")
     monkeypatch.setattr(server_mod._state, "model_manager", ModelManager(cache_dir=tmp_path))
     await server_mod._handle_model_status(
@@ -79,6 +82,38 @@ async def test_mlx_checks_its_own_conversion(tmp_path, monkeypatch, sent):
         None, ModelStatusRequest(id=2, backend="mlx", model_size="small.en")
     )
     assert sent[-1].downloaded is True
+
+
+@pytest.mark.asyncio
+async def test_on_apple_silicon_the_speech_model_includes_qwen(tmp_path, monkeypatch, sent):
+    """Qwen3-ASR is the speech engine and Whisper small.en its scorer: the
+    speech model is both, and only Qwen's pinned revision counts."""
+    from auto_presenter.asr.qwen_backend import (
+        QWEN_DOWNLOAD_MB,
+        QWEN_REVISION,
+        QwenStreamingBackend,
+    )
+
+    monkeypatch.setattr(QwenStreamingBackend, "is_available", staticmethod(lambda: True))
+    monkeypatch.setattr(server_mod._state, "model_manager", ModelManager(cache_dir=tmp_path))
+
+    async def status() -> tuple[bool, int]:
+        await server_mod._handle_model_status(
+            None, ModelStatusRequest(id=1, backend="mlx", model_size="small.en")
+        )
+        return sent[-1].downloaded, sent[-1].download_mb
+
+    assert await status() == (False, 464 + QWEN_DOWNLOAD_MB)
+    _cache_model(tmp_path, "models--mlx-community--whisper-small.en-mlx")
+    assert await status() == (False, QWEN_DOWNLOAD_MB)
+    other = tmp_path / "models--Qwen--Qwen3-ASR-0.6B" / "snapshots" / "not-the-pinned-one"
+    other.mkdir(parents=True)
+    (other / "model.safetensors").write_bytes(b"\0" * 2_000_000)
+    assert await status() == (False, QWEN_DOWNLOAD_MB)
+    pinned = other.parent / QWEN_REVISION
+    pinned.mkdir()
+    (pinned / "model.safetensors").write_bytes(b"\0" * 2_000_000)
+    assert await status() == (True, 0)
 
 
 @pytest.mark.asyncio

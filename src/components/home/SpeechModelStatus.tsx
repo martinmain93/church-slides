@@ -13,7 +13,7 @@ import { useState } from "react";
 import { AlertTriangle, Download, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { availabilitySummary, useAiAvailability } from "@/lib/aiAvailability";
+import { availabilitySummary, sizeText, useAiAvailability } from "@/lib/aiAvailability";
 
 export function SpeechModelStatus() {
   const { availability: a, prepare, recheck } = useAiAvailability();
@@ -130,7 +130,7 @@ export function SpeechModelStatus() {
         </div>
         <Button size="sm" onClick={download}>
           <Download className="size-4" />
-          {failed || a.kind !== "needs_download" ? "Try again" : `Download (${a.mb} MB)`}
+          {failed || a.kind !== "needs_download" ? "Try again" : `Download (${sizeText(a.mb)})`}
         </Button>
       </section>
     );

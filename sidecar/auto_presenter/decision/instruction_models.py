@@ -1,5 +1,9 @@
 """The catalog of models spoken instructions can run on.
 
+Deprecated (2026-11-23): Groq's free tier can't carry a church's use and
+paid tiers aren't available, so Groq integrations are on their way out.
+The Groq entries stay until spoken requests have another home.
+
 Two kinds, both behind the same `GenericLLMBackend` (see
 `decision.instructions`) now that ollama, Groq, and Gemini's
 OpenAI-compatibility layer all speak the same `/chat/completions` shape:

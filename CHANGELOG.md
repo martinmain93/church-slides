@@ -13,6 +13,18 @@ refuses to release a version that has no entry here.
 - New (preview): **Church Slides on the web.** Sign in at app.churchslides.app from a phone or any computer to see your organization's songs with their chords, edit words and credits, and plan services (songs, keys, readings, text slides). Changes show up on the slides computer, and theirs show up there. Presenting and chord editing stay in the app.
 - New: **services have a date.** A new service is dated for the coming Sunday and named after it, never with the same name as another; change either one in the setlist's header.
 
+## 0.3.0 — 23 November 2026
+
+- Changed: **the AI hears the band better and sooner** on Macs with Apple silicon. It uses a newer speech engine: on our test services the wrong slide was up a little less often, and 179 of 225 slide changes landed on time, up from 169. Its speech model is a bigger one-time download, about 2.2 GB.
+- Changed: **live AI now needs a Mac with Apple silicon (M1 or newer) on macOS 14 or later.** On other computers, including Intel Macs and Windows, the AI is off and you present by hand, as always. The app says so before offering any download.
+- Removed: **Groq's online speech** in Settings. Its free tier couldn't keep up with a service. Spoken requests still use a Groq key for now.
+- Changed: the terms of use now say plainly that the app's own source code is under the MIT licence, which they don't limit, and the privacy page that a service's live audio stays on your computer.
+- New: **the worship leader can stop a surprise song jump.** With nobody on the operator view, when the AI goes to a different song (not just the next one at the end of a song), the leader's screen shows "Going to …" and the words it heard for 3 seconds, with Go now and Stop. If nobody answers, it goes.
+
+## 0.2.4 — 23 November 2026
+
+- Fixed: **a song the band starts that isn't in the setlist is found again.** In Auto, the app now recognises it from your library, usually within a minute of singing, and adds it to the setlist. Before, this almost never happened.
+
 ## 0.2.3 — 18 November 2026
 
 - Changed: **adding songs to a setlist no longer shuffles the list.** A song you add stays where it is, with a tick, so the next click lands on the song you meant. Click it again to add a reprise.

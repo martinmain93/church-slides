@@ -123,3 +123,38 @@ def test_one_slow_pass_does_not_flip_the_verdict():
     score = [478.1, 542.3, 466.7, 519.5, 554.5]
     assert mc.speech_load(transcribe, score) == pytest.approx(0.672, abs=0.005)
     assert mc.speech_load(transcribe, score) <= mc.LOAD_LIMIT
+
+
+def test_off_apple_silicon_live_ai_is_not_offered_without_a_download(monkeypatch, tmp_path):
+    """Qwen3-ASR on the GPU is the only on-device engine (2026-11-23):
+    anywhere else the answer is no, at once, with no models and no timing."""
+    from auto_presenter.asr import machine_check
+    from auto_presenter.asr.mlx_backend import MLXWhisperBackend
+
+    monkeypatch.setattr(MLXWhisperBackend, "is_available", staticmethod(lambda: False))
+    a = machine_check.assess(None)
+    assert a.verdict == "insufficient"
+    assert "Apple silicon" in a.reason
+
+
+def test_the_intel_build_on_an_apple_silicon_mac_says_to_get_the_other_download(monkeypatch):
+    """Seen 2026-11-24: the Intel build, opened on an M1, said live AI needs
+    Apple silicon. Under Rosetta the fix is the Apple-silicon download."""
+    from auto_presenter.asr import machine_check
+    from auto_presenter.asr.mlx_backend import MLXWhisperBackend
+
+    monkeypatch.setattr(MLXWhisperBackend, "is_available", staticmethod(lambda: False))
+    monkeypatch.setattr(machine_check, "_under_rosetta", lambda: True)
+    a = machine_check.assess(None)
+    assert a.verdict == "insufficient"
+    assert "Intel version" in a.reason and "Apple-silicon version" in a.reason
+    monkeypatch.setattr(machine_check, "_under_rosetta", lambda: False)
+    monkeypatch.setattr(machine_check, "_apple_silicon_on_old_macos", lambda: True)
+    assert "Updating macOS" in machine_check.assess(None).reason
+
+
+def test_rosetta_is_read_from_the_system(monkeypatch):
+    """Natively on this Mac or a PC: not translated."""
+    from auto_presenter.asr import machine_check
+
+    assert machine_check._under_rosetta() is False

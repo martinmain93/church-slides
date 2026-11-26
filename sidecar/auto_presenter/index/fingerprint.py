@@ -178,6 +178,22 @@ class FingerprintIndex:
         hits.sort(key=lambda h: (h.score, h.votes), reverse=True)
         return hits[:top_k]
 
+    def slide_matches(
+        self, fps: frozenset[tuple[str, str, int]]
+    ) -> dict[tuple[str, int], set[tuple[str, str, int]]]:
+        """Which of the query's fingerprints each slide holds.
+
+        Raw votes, before any rescoring. A slide the band is singing shares a
+        run of word pairs with the query; one that only shares a common word
+        or two does not, so the count separates them far better than
+        `_rescore`, which gives any slide with the same few words ~0.75.
+        """
+        out: dict[tuple[str, int], set[tuple[str, str, int]]] = defaultdict(set)
+        for fp in fps:
+            for song_id, slide_idx in self._postings.get(fp, ()):
+                out[(song_id, slide_idx)].add(fp)
+        return out
+
     def query_title(self, query: str, *, top_k: int = 8) -> list[TitleHit]:
         q = query.strip()
         if not q:

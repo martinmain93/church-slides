@@ -18,6 +18,11 @@ history.
 
 ## The AI that follows the band
 
+Live AI runs on Macs with Apple silicon on macOS 14 or later, with the
+Qwen3-ASR speech engine on the graphics chip
+([QWEN3_ASR_IMPROVEMENTS](research/QWEN3_ASR_IMPROVEMENTS.md)). Other
+computers present by hand.
+
 - **Change slides for me**: the AI listens and moves the slides just before
   each line. ([ARCHITECTURE](ARCHITECTURE.md#the-ai-engine),
   [PHASE_6](done/PHASE_6.md), [PHASE_7](done/PHASE_7.md))
@@ -28,8 +33,7 @@ history.
   against a lead sheet, or against how this church plays the song.
   ([LEARNED_REFERENCES](done/LEARNED_REFERENCES.md))
 - **Assist**: the operator changes the slides and the AI highlights where the
-  band has gone. On a computer too slow for automatic mode, this is what's
-  offered. ([AI_ASSISTED_MODE](done/AI_ASSISTED_MODE.md))
+  band has gone. ([AI_ASSISTED_MODE](done/AI_ASSISTED_MODE.md))
 - **Spoken requests**: "go to the chorus", "let's sing Way Maker", "bring up
   John 3:16". ([SPOKEN_INSTRUCTIONS](done/SPOKEN_INSTRUCTIONS.md))
 - **Songs not in the setlist** are found from the whole library.

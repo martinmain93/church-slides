@@ -50,7 +50,7 @@ def main() -> int:
     if args.providers:
         a = assess_with(onnx_dir, args.providers.split(","))
     else:
-        a = machine_check.assess(onnx_dir)
+        a = machine_check.assess_cpu_path(onnx_dir)
     print(f"\nverdict: {a.verdict}\n{a.reason}")
     if a.speech_load is not None:
         print(f"speech load {a.speech_load:.2f} (limit {machine_check.LOAD_LIMIT:.2f}), "

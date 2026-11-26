@@ -18,7 +18,7 @@ import time
 from websockets.asyncio.server import ServerConnection
 
 from auto_presenter.api_keys import get_key as get_instruction_api_key
-from auto_presenter.api_keys import hosted_gateway
+from auto_presenter.api_keys import gateway_for
 from auto_presenter.api_keys import save_key as save_instruction_api_key
 from auto_presenter.asr.types import TranscriptEvent
 from auto_presenter.decision import ollama_manager
@@ -326,11 +326,12 @@ def note_live_scripture(reference: str, display: str) -> None:
 
 def _hosted_endpoint(spec) -> tuple[str, str] | None:
     """(base_url, key) for a hosted model: the person's own key first, then
-    the organization's AI allowance (`api_keys.endpoint`)."""
+    the organization's AI allowance. `api_keys.endpoint`'s rule, with the key
+    lookup through this module's name so tests can stand in for it."""
     own = get_instruction_api_key(spec.provider)
     if own:
         return spec.base_url.rstrip("/"), own
-    return hosted_gateway() if spec.provider == "groq" else None
+    return gateway_for(spec.provider)
 
 
 def hosted_key_on_file() -> bool:

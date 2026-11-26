@@ -7,6 +7,8 @@ through a 2.5 s window, the way the live listener reads the encoder."""
 
 from __future__ import annotations
 
+from typing import ClassVar
+
 import numpy as np
 import pytest
 
@@ -221,3 +223,88 @@ def test_lines_without_phones_are_never_candidates(bad):
     slides = [[], [bad], *SLIDES[1:3]]
     check = nl.NextLineCheck(slides)
     assert 1 not in check._distinct
+
+
+# ---------------------------------------------------------------- the Qwen3-ASR head
+
+QWEN_FPS = 33 / 2.5  # Qwen's audio tower: 33 frames a 2.5 s window
+
+
+def _sing_qwen(*lines: tuple[float, list[str]], end: float) -> np.ndarray:
+    """As `_sing` (a phone about every 80 ms), at Qwen's frame rate: each
+    phone one frame, a blank between a phone and its repeat."""
+    n = int(end * QWEN_FPS) + 1
+    lg = np.zeros((n, len(nl.PHONES) + 1))
+    lg[:, 0] = 10.0
+    for t0, words in lines:
+        f = int(t0 * QWEN_FPS)
+        prev = None
+        for p in nl.line_phones(tuple(words)):
+            f += p == prev
+            if f < n:
+                lg[f] = 0.0
+                lg[f, p] = 10.0
+            f, prev = f + 1, p
+    return lg
+
+
+def _run_qwen(lg: np.ndarray, shown: int, t_from: float, t_to: float):
+    check = nl.NextLineCheck(SLIDES, nl.qwen_tuning())
+    mass = np.zeros(len(SLIDES))
+    mass[shown] = 1.0
+    t = t_from
+    while t <= t_to:
+        f = round(t * QWEN_FPS)
+        check.step(t, lg[f - 33 : f], mass, shown, shown)
+        flip = check.take_flip()
+        if flip is not None:
+            return flip
+        t += 0.25
+    return None
+
+
+def test_the_qwen_tuning_hears_the_next_line_at_its_frame_rate():
+    lg = _sing_qwen((0.5, SLIDES[1]), (3.2, SLIDES[2]), end=8.0)
+    flip = _run_qwen(lg, shown=1, t_from=2.5, t_to=8.0)
+    assert flip is not None and flip[0] == 2
+    assert flip[1] < 3.2 + 1.5
+
+
+def test_the_qwen_tuning_moves_nothing_while_the_line_goes_on():
+    lg = _sing_qwen((0.5, SLIDES[3]), (3.0, SLIDES[3][:4]), end=6.0)
+    assert _run_qwen(lg, shown=3, t_from=2.5, t_to=6.0) is None
+    assert _run_qwen(_sing_qwen(end=8.0), shown=1, t_from=2.5, t_to=8.0) is None
+
+
+def test_a_qwen_session_gets_the_qwen_head(monkeypatch, tmp_path):
+    from auto_presenter import server_follower
+    from auto_presenter.asr.qwen_backend import QwenStreamingBackend
+
+    monkeypatch.setenv("AUTO_PRESENTER_NEXT_LINE_MODEL", str(tmp_path))
+    started = {}
+
+    class Followers:
+        songs: ClassVar[dict] = {}
+
+        def start_next_line(self, encode, head, tuning):
+            started.update(head=head, tuning=tuning)
+
+    backend = QwenStreamingBackend(None)
+    server_follower.start_next_line_check(Followers(), backend)  # type: ignore[arg-type]
+    assert not started  # no Qwen model on disk: off, quietly
+    rng = np.random.default_rng(0)
+    w = {
+        "conv.0.weight": rng.normal(size=(8, 4, 5)), "conv.0.bias": np.zeros(8),
+        "rnn.weight_ih_l0": rng.normal(size=(12, 8)), "rnn.weight_hh_l0": rng.normal(size=(12, 4)),
+        "rnn.bias_ih_l0": np.zeros(12), "rnn.bias_hh_l0": np.zeros(12),
+        "rnn.weight_ih_l0_reverse": rng.normal(size=(12, 8)),
+        "rnn.weight_hh_l0_reverse": rng.normal(size=(12, 4)),
+        "rnn.bias_ih_l0_reverse": np.zeros(12), "rnn.bias_hh_l0_reverse": np.zeros(12),
+        "out.weight": rng.normal(size=(len(nl.PHONES) + 1, 8)),
+        "out.bias": np.zeros(len(nl.PHONES) + 1),
+        "mu": np.zeros(4), "sd": np.ones(4),
+    }  # fmt: skip
+    np.savez(tmp_path / nl.QWEN_MODEL_FILE, **w)
+    server_follower.start_next_line_check(Followers(), backend)  # type: ignore[arg-type]
+    assert started["head"].mu is not None
+    assert started["tuning"].g == nl.qwen_tuning().g != nl.G

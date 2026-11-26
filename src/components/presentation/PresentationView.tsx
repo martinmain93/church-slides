@@ -28,6 +28,7 @@ import { anchorForItem } from "@/lib/presentation/flow";
 import { useBandHost } from "@/lib/band/useBandHost";
 import { BandScreensButton } from "@/components/band/BandScreensButton";
 import { useKeepAwake } from "@/lib/presentation/useKeepAwake";
+import { useJumpHold } from "@/lib/presentation/jumpHold";
 import {
   useHumanActions,
   useLiveScripture,
@@ -73,6 +74,9 @@ export function PresentationView({
   const [aiEnabled] = useState(isAiEnabled);
   const displayPref = useDisplayPref();
   const itemKinds = useMemo(() => ctx.items.map((i) => i.kind), [ctx.items]);
+  // Nobody at the laptop: an AI jump to another song waits for the leader's
+  // OK on their screen, while one is unlocked (`useBandHost` says).
+  const jumpHold = useJumpHold();
   const { recording, liveAiMode, displayMode, flowAnchor } = usePresentationSession({
     itemKinds,
     screen: "single",
@@ -89,6 +93,11 @@ export function PresentationView({
     jumpTo: actions.jumpTo,
     itemCount: ctx.items.length,
     onSetlistMutated: setDetail,
+    jumpHold,
+    songFor: (i) => {
+      const item = ctx.items[i];
+      return item && { title: item.song.title, slideCount: item.slides.length };
+    },
     // On unless the AI is switched off beside "Start service" (or in
     // Settings). The pill in the bottom bar switches it for this service.
     initialAiMode: serviceStartAiMode(),
@@ -158,6 +167,7 @@ export function PresentationView({
     addSong: addSongHere,
     toggleBlank: actions.toggleBlank,
     setKey: saveKey,
+    jumpHold,
   });
 
   // The arrow keys and the drawer's slide list: moving the slide also lifts
