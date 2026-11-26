@@ -38,6 +38,8 @@ FIRST_BACKOFF_S = 2.0
 MAX_BACKOFF_S = 60.0
 #: A slow answer is as bad as none: the window has moved on.
 TIMEOUT_S = 4.0
+#: Words of context carried into the next window's prompt (`carry_prompt`).
+PROMPT_WORDS = 30
 
 
 @dataclass(frozen=True)
@@ -61,7 +63,8 @@ class HostedSpeechBackend:
         language: str | None = "en",
         timeout_seconds: float = TIMEOUT_S,
         clock: Callable[[], float] = time.monotonic,
-        call: Callable[[HostedCredentials, bytes], dict] | None = None,
+        call: Callable[..., dict] | None = None,
+        carry_prompt: bool = False,
     ) -> None:
         self._credentials = credentials
         self._fallback = fallback
@@ -74,6 +77,10 @@ class HostedSpeechBackend:
         self._next_try = 0.0
         self.calls = 0
         self.failures = 0
+        #: Send the words already heard before each window as its `prompt`,
+        #: so a stateless call keeps some of the song's context.
+        self._carry_prompt = carry_prompt
+        self._heard: list[tuple[str, float]] = []  # (word, start), audio clock
 
     # ---------------------------------------------------------------- state
 
@@ -115,15 +122,25 @@ class HostedSpeechBackend:
                 audio = np.concatenate([f.samples for f in chunks]).astype(np.float32, copy=False)
                 wav = _encode_wav(audio, sample_rate=chunks[0].sample_rate)
                 self.calls += 1
+                t0 = chunks[0].t_start
+                prompt = None
+                if self._carry_prompt:
+                    before = [w for w, ts in self._heard if ts < t0][-PROMPT_WORDS:]
+                    prompt = " ".join(before) or None
                 try:
-                    response = self._call_impl(creds, wav)
+                    response = self._call_impl(creds, wav, prompt)
                 except REQUEST_ERRORS as exc:
                     self._failed(self._clock(), exc)
                 else:
                     if self._failing_since is not None:
                         log.info("online speech is answering again")
                     self._failing_since, self._backoff, self._next_try = None, 0.0, 0.0
-                    return _convert_response(response, t_origin=chunks[0].t_start)
+                    events = list(_convert_response(response, t_origin=t0))
+                    if self._carry_prompt:
+                        self._heard = [h for h in self._heard if h[1] < t0][-4 * PROMPT_WORDS:] + [
+                            (w.text, w.t_start) for e in events for w in e.words
+                        ]
+                    return iter(events)
             else:
                 self._failed(now, "no speech key")
         if self._given_up(self._clock()) and self._fallback is not None:
@@ -146,7 +163,7 @@ class HostedSpeechBackend:
         self._backoff = min(MAX_BACKOFF_S, max(FIRST_BACKOFF_S, self._backoff * 2))
         self._next_try = now + self._backoff * random.uniform(0.8, 1.2)
 
-    def _post(self, creds: HostedCredentials, wav: bytes) -> dict:
+    def _post(self, creds: HostedCredentials, wav: bytes, prompt: str | None = None) -> dict:
         fields = {
             "model": creds.model,
             "response_format": "verbose_json",
@@ -154,6 +171,8 @@ class HostedSpeechBackend:
         }
         if self._language:
             fields["language"] = self._language
+        if prompt:
+            fields["prompt"] = prompt
         with open_multipart_post(
             f"{creds.base_url.rstrip('/')}/audio/transcriptions",
             fields,

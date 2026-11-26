@@ -80,7 +80,7 @@ def load_keys() -> dict[str, str]:
             if line and not line.startswith("#") and "=" in line:
                 k, v = line.split("=", 1)
                 keys[k.strip()] = v.strip().strip('"').strip("'")
-    for k in ("DEEPGRAM_API_KEY", "ASSEMBLYAI_API_KEY", "GROQ_API_KEY"):
+    for k in ("DEEPGRAM_API_KEY", "ASSEMBLYAI_API_KEY", "GROQ_API_KEY", "DEEPINFRA_API_KEY"):
         if os.environ.get(k):
             keys[k] = os.environ[k]
     return {k: v for k, v in keys.items() if v}
@@ -282,7 +282,7 @@ async def run_ws(stream: Stream, clip: Clip, keys: dict, t0: float, out: Path, v
         log.close()
 
 
-def run_wrapper(label: str, backend, clip: Clip, t0: float, out: Path) -> None:
+def run_wrapper(label: str, backend, clip: Clip, t0: float, out: Path, window: float | None = None) -> None:
     """A chunked-Whisper baseline through the app's SlidingWindowWrapper,
     fed in real time. The wrapper's `available_at` (window end + pass time)
     is when each event could first act — the app's own latency definition."""
@@ -312,7 +312,8 @@ def run_wrapper(label: str, backend, clip: Clip, t0: float, out: Path) -> None:
                 time.sleep(delay)  # a frame exists only once it has been sung
             yield AudioFrame(samples[i : i + n], t_start, (i + len(samples[i : i + n])) / SR)
 
-    wrapper = SlidingWindowWrapper(backend, emission_observer=observe)
+    kw = {"window_seconds": window} if window else {}
+    wrapper = SlidingWindowWrapper(backend, emission_observer=observe, **kw)
     with out.open("w") as log:
         log.write(json.dumps({"meta": {"label": label, "model": backend.name()}}) + "\n")
         try:
@@ -360,6 +361,24 @@ def groq_backend(key: str, prompt: str | None):
     return be
 
 
+_DI_TOKENS: dict[str, str] = {}
+
+
+def deepinfra_backend(key: str, model: str, *, carry_prompt: bool):
+    """DeepInfra's OpenAI-compatible endpoint with a scoped JWT for one model,
+    as the app would get one from its server (docs/roadmap/HOSTED_SPEECH.md)."""
+    from auto_presenter.asr.hosted_backend import HostedCredentials, HostedSpeechBackend
+
+    if model not in _DI_TOKENS:
+        _DI_TOKENS[model] = _post_json(
+            "https://api.deepinfra.com/v1/scoped-jwt",
+            {"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+            {"models": [model], "expires_delta": 7200, "spending_limit": 2.0},
+        )["token"]
+    creds = HostedCredentials("https://api.deepinfra.com/v1/openai", model, _DI_TOKENS[model])
+    return HostedSpeechBackend(lambda: creds, carry_prompt=carry_prompt)
+
+
 async def run_clip(clip: Clip, providers: list[str], keys: dict, variants: list[str], via_token: bool, outdir: Path) -> None:
     outdir.mkdir(parents=True, exist_ok=True)
     terms = keyterms(clip.lines)
@@ -385,6 +404,14 @@ async def run_clip(clip: Clip, providers: list[str], keys: dict, variants: list[
             prompt = " ".join(terms)[:800] if v == "kt" else None
             be = groq_backend(keys["GROQ_API_KEY"], prompt)
             threads.append(threading.Thread(target=run_wrapper, args=(f"groq-{v}", be, clip, t0, outdir / f"groq-{v}.jsonl")))
+    if "deepinfra" in providers and "DEEPINFRA_API_KEY" in keys:
+        # DI_STREAMS: label=model:window[:p], comma-separated (p = carry the
+        # words heard so far as the prompt). Online speech, asr.hosted_backend.
+        for spec in os.environ.get("DI_STREAMS", "di06=Qwen/Qwen3-ASR-0.6B:6").split(","):
+            label, rest = spec.split("=")
+            model, window, *flags = rest.split(":")
+            be = deepinfra_backend(keys["DEEPINFRA_API_KEY"], model, carry_prompt="p" in flags)
+            threads.append(threading.Thread(target=run_wrapper, args=(label, be, clip, t0, outdir / f"{label}.jsonl", float(window))))
     if "mlx" in providers:
         from auto_presenter.asr.mlx_backend import MLXWhisperBackend
 

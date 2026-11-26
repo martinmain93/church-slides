@@ -36,7 +36,7 @@ class Fallback:
 def make(results, fallback=None, creds=CREDS):
     clock, sent = Clock(), []
 
-    def call(c, wav):
+    def call(c, wav, prompt=None):
         sent.append(c)
         r = results.pop(0)
         if isinstance(r, Exception):
