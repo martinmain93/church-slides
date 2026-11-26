@@ -6,9 +6,8 @@
  *
  * The rule, in order:
  *  1. Several lines: break at the line break that best halves the words,
- *     weighed by characters rather than line count (so two short lines and
- *     two long ones don't split 2 + 2 when 3 + 1 is the real middle). A break
- *     after a line ending in punctuation (a breath) wins a near tie.
+ *     weighed by characters rather than line count, keeping line pairs
+ *     together, and much preferring the end of a sentence over a comma.
  *  2. One long line: break after a sentence or clause mark (. ! ? ; : , —)
  *     in the middle half of the line, the one nearest the middle.
  *  3. Otherwise: break at the space nearest the middle.
@@ -24,10 +23,17 @@ export interface SplitOptions {
   midLine?: boolean;
 }
 
-/** How much a break after punctuation is preferred, as a share of the slide's length. */
-const BREATH_BONUS = 0.08;
+/** How much a break is preferred, as a share of the slide's length: after
+ * a sentence ends far more than after a comma, so a split never leaves
+ * "Was blind, but now I see." on its own when the sentence ended a line
+ * earlier. */
+const SENTENCE_BONUS = 0.3;
+const CLAUSE_BONUS = 0.05;
+/** Lines in hymns and songs go in pairs: cutting a pair costs this much. */
+const COUPLET_PENALTY = 0.25;
 
-const LINE_END_PUNCT = /[,;:.!?—–-]["'”’)]*$/;
+const SENTENCE_END = /[.!?;]["'”’)]*$/;
+const CLAUSE_END = /[,:—–-]["'”’)]*$/;
 const CLAUSE_MARK = /[.!?;:,—–]["'”’)]*\s+/g;
 
 function trimLines(lyrics: string): string[] {
@@ -53,8 +59,10 @@ export function splitLineIndex(lines: string[]): number | null {
     // Never leave a half with no words in it.
     if (left === 0 || left === total) continue;
     const imbalance = Math.abs(left - (total - left)) / total;
-    const breath = LINE_END_PUNCT.test(lines[i]!.trim()) ? BREATH_BONUS : 0;
-    const score = imbalance - breath;
+    const end = lines[i]!.trim();
+    const breath = SENTENCE_END.test(end) ? SENTENCE_BONUS : CLAUSE_END.test(end) ? CLAUSE_BONUS : 0;
+    const splitsPair = lines.length % 2 === 0 && (i + 1) % 2 === 1 ? COUPLET_PENALTY : 0;
+    const score = imbalance + splitsPair - breath;
     // On a tie the later break wins: the first slide takes the extra line.
     if (score <= bestScore) {
       bestScore = score;

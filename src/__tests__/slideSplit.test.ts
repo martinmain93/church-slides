@@ -33,6 +33,19 @@ describe("smartSplit", () => {
     expect(splitLineIndex(nearTie)).toBe(0);
   });
 
+  it("splits at a sentence end and keeps line pairs, not mid-sentence", () => {
+    const verse = [
+      "Amazing grace how sweet the sound",
+      "That saved a wretch like me.",
+      "I once was lost, but now am found,",
+      "Was blind, but now I see.",
+      "Through many dangers, toils and snares",
+      "I have already come.",
+    ];
+    // 3 + 3 would cut "now am found, / Was blind": a sentence ends after line 2 or 4.
+    expect([1, 3]).toContain(splitLineIndex(verse));
+  });
+
   it("gives the first slide the extra line on a tie", () => {
     expect(smartSplit("one two\nthree four\nfive six")).toEqual(["one two\nthree four", "five six"]);
   });
