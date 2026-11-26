@@ -36,23 +36,42 @@ by 1.6 s on final words.
 
 ## Start-up
 
+**First try (2026-11-26 morning): about 2.5–3 min from zero.**
+
 | Step | Time |
 |---|---|
 | Import MLX on the L4 | 1.7 s |
 | Load both models (baked into the image) | 3.4 s |
 | First step: MLX compiles its CUDA kernels | 31.7 s |
-| In the container in all (`load_s`) | 42.7 s |
-| From zero, with no GPU warm, as a church would see it | about 2.5–3 min |
+| Finding an L4 and pulling the image | most of the rest |
 
-Most of the cold start is Modal finding an L4 and pulling the image. The
-image is NVIDIA's CUDA *devel* image, which MLX needs for the headers it
-compiles kernels with. Pinning `region="us"` left the container waiting for
-an L4 on US Thanksgiving, and unpinned it scheduled at once.
+**Cut to 4.5–8.5 s (same day):**
+- **The kernels are compiled at image build time.** `_compile_kernels`
+  streams 40 s of a public-domain hymn through the engine on the same GPU
+  type. MLX keeps its PTX in `MLX_PTX_CACHE_DIR`, and the driver keeps its
+  binaries in `CUDA_CACHE_PATH`, both inside the image. In the container,
+  start-up fell from 42.7 s to **1.8–4.3 s**.
+- **GPU fallbacks:** `gpu=["L4", "A10", "L40S"]`. With L4 alone (and with
+  `region="us"`), Modal sometimes queued the container for minutes waiting
+  for a free L4.
 
-**Ways to cut start-up, untried:**
-- keep MLX's compiled kernels on a Modal volume;
-- a slimmer image with only the CUDA headers;
-- Modal's GPU memory snapshots.
+| Cold start (container stopped first) | Total | In the container |
+|---|---|---|
+| 1 | 8.0 s | 3.6 s |
+| 2 | 8.5 s | 4.3 s |
+| 3 | 4.5 s | 1.8 s |
+| 4 | 4.8 s | 2.0 s |
+| 5 | 6.1 s | 2.4 s |
+| 6 | 6.8 s | 2.4 s |
+
+Kernels the build missed don't seem to matter. A song streamed straight
+after a cold start scored WER 0.333, first words p50 0.66 s, final p50
+1.92 s. That's no worse than warm (0.374 / 2.42 s on the same song).
+
+**The risk left is capacity, not start-up.** When Modal has no GPU of these
+types free, the wait is minutes. The app's fallback (Whisper on the
+computer, after 3 s) covers that, and so would waking the GPU when the
+setlist opens.
 
 ## Streams per GPU
 
@@ -84,7 +103,6 @@ raise this.
   audio to Modal, which needs the user's OK first.
 - **Batching steps** across streams on one GPU.
 - **The next-line check on the server.**
-- **Faster cold starts** (above).
 - **The waking flow in the app:**
   - wake the GPU when a service opens;
   - say "starting the AI, about a minute";

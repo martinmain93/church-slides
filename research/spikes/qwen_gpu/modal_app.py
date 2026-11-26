@@ -38,6 +38,9 @@ HERE = Path(__file__).resolve().parent
 # in the container this file sits at /root/modal_app.py: only paths built locally matter
 SIDECAR = HERE.parents[2] / "sidecar" / "auto_presenter" if len(HERE.parents) > 2 else HERE
 GPU = os.environ.get("SPEECH_GPU", "L4")
+WARM_AUDIO = Path(os.environ.get(
+    "WARM_AUDIO", Path.home() / "Development/auto-presenter-research/work/hosted_speech/warm_hymn.npy"
+))
 
 QWEN = "Qwen/Qwen3-ASR-0.6B"
 ALIGNER = "Qwen/Qwen3-ForcedAligner-0.6B"
@@ -48,6 +51,28 @@ def _download() -> None:
 
     for repo in (QWEN, ALIGNER):
         snapshot_download(repo)
+
+
+def _compile_kernels() -> None:
+    """Stream 40 s of a public-domain hymn through the engine at build time, so
+    every kernel a service needs is compiled before any church connects."""
+    import time
+
+    import numpy as np
+
+    from auto_presenter.asr.qwen_backend import QwenStreamingBackend
+    from auto_presenter.audio.types import AudioFrame
+
+    t = time.monotonic()
+    pcm = np.load("/root/spike/warm_hymn.npy").astype(np.float32) / 32768.0
+    b = QwenStreamingBackend(None)
+    b.load()
+    frames = [
+        AudioFrame(samples=pcm[i : i + 1600], t_start=i / 16000, t_end=(i + 1600) / 16000)
+        for i in range(0, len(pcm), 1600)
+    ]
+    words = [w.text for e in b.streamer().transcribe(frames) for w in e.words if e.is_final]
+    print(f"compiled kernels in {time.monotonic() - t:.1f}s; heard {len(words)} words")
 
 
 image = (
@@ -71,8 +96,19 @@ image = (
                   "nvjitlink", "cufft", "curand", "nccl", "cuda_cupti")
     )})
     .run_function(_download)  # weights baked into the image: no download at start
-    .env({"HF_HUB_OFFLINE": "1", "AUTO_PRESENTER_QWEN_NO_PROBS": os.environ.get("NO_PROBS", "0")})
-    .add_local_dir(SIDECAR, remote_path="/root/auto_presenter")
+    .env({
+        "HF_HUB_OFFLINE": "1",
+        "AUTO_PRESENTER_QWEN_NO_PROBS": os.environ.get("NO_PROBS", "0"),
+        # MLX's compiled kernels (PTX) and the driver's (SASS) live in the image:
+        # compiled once at build, on the same GPU type (`_compile_kernels`)
+        "MLX_PTX_CACHE_DIR": "/root/kernels/mlx",
+        "CUDA_CACHE_PATH": "/root/kernels/nv",
+        "CUDA_CACHE_MAXSIZE": "4294967296",
+    })
+    .add_local_dir(SIDECAR, remote_path="/root/auto_presenter", copy=True)
+    # 40 s of a LibriVox (public-domain) hymn, kept outside the repo
+    .add_local_file(WARM_AUDIO, remote_path="/root/spike/warm_hymn.npy", copy=True)
+    .run_function(_compile_kernels, gpu=GPU)
     .add_local_file(HERE / "speech_server.py", remote_path="/root/spike/speech_server.py")
 )
 
@@ -80,7 +116,9 @@ app = modal.App("church-slides-speech", image=image)
 
 
 @app.cls(
-    gpu=GPU,
+    # L4 first; when Modal has none free (2026-11-26: queued minutes for one),
+    # take the next type rather than wait. PTX kernels carry across types.
+    gpu=[GPU, "A10", "L40S"],
     scaledown_window=20 * 60,  # a service's quiet stretches never cold-start it
     timeout=4 * 60 * 60,  # one websocket can last a whole service
     secrets=[modal.Secret.from_name("church-slides-speech")],
@@ -144,5 +182,33 @@ def probe() -> str:
 
 
 @app.local_entrypoint()
-def main() -> None:
-    print(probe.remote())
+def main(which: str = "probe") -> None:
+    print({"probe": probe, "cache": probe_cache}[which].remote())
+
+
+@app.function(gpu=GPU, timeout=900)
+def probe_cache() -> str:
+    """Where (if anywhere) MLX keeps compiled CUDA kernels, and what warm costs."""
+    import glob
+    import os
+    import subprocess
+    import time
+
+    import mlx.core as mx
+
+    lib = glob.glob("/usr/local/lib/python3.12/site-packages/mlx/lib/libmlx*.so*")
+    out = [f"libs {lib}"]
+    for f in lib:
+        s = subprocess.run(f"strings {f} | grep -iE 'MLX_[A-Z_]*(CACHE|JIT|PTX)|cache_dir|\\.cache/mlx|XDG_CACHE' | sort -u | head -20",
+                           shell=True, capture_output=True, text=True).stdout
+        out.append(s)
+    t = time.monotonic()
+    from auto_presenter.asr.qwen_backend import QwenStreamingBackend
+
+    b = QwenStreamingBackend(None)
+    b.warm()
+    out.append(f"warm {time.monotonic() - t:.1f}s")
+    s = subprocess.run("find / -xdev -newer /tmp -type f \\( -name '*.ptx' -o -name '*.cubin' -o -path '*mlx*' \\) 2>/dev/null | grep -v site-packages | head -20; du -sh ~/.cache 2>/dev/null; ls -la ~/.cache 2>/dev/null",
+                       shell=True, capture_output=True, text=True).stdout
+    out.append(s)
+    return "\n".join(out)
