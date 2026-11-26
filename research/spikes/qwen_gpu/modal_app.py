@@ -183,7 +183,7 @@ def probe() -> str:
 
 @app.local_entrypoint()
 def main(which: str = "probe") -> None:
-    print({"probe": probe, "cache": probe_cache}[which].remote())
+    print({"probe": probe, "cache": probe_cache, "gather": probe_gather}[which].remote())
 
 
 @app.function(gpu=GPU, timeout=900)
@@ -211,4 +211,52 @@ def probe_cache() -> str:
     s = subprocess.run("find / -xdev -newer /tmp -type f \\( -name '*.ptx' -o -name '*.cubin' -o -path '*mlx*' \\) 2>/dev/null | grep -v site-packages | head -20; du -sh ~/.cache 2>/dev/null; ls -la ~/.cache 2>/dev/null",
                        shell=True, capture_output=True, text=True).stdout
     out.append(s)
+    return "\n".join(out)
+
+
+@app.function(gpu=GPU, timeout=900)
+def probe_gather() -> str:
+    """Which steps fail with "Failed to load compiled ... kernel" (2026-11-26
+    gate), and does it depend on the thread or the audio?"""
+    import glob
+    import logging
+    import os
+    import threading
+
+    import numpy as np
+
+    from auto_presenter.asr.qwen_backend import QwenStreamingBackend
+    from auto_presenter.audio.types import AudioFrame
+
+    fails: list[str] = []
+
+    class H(logging.Handler):
+        def emit(self, r):
+            if "step failed" in r.getMessage():
+                fails.append(r.getMessage())
+
+    logging.getLogger().addHandler(H())
+    out = []
+    cache = sorted(glob.glob("/root/kernels/mlx/**/*", recursive=True))
+    g = [c for c in cache if "gather" in c]
+    out.append(f"cache files {len(cache)}; gather {len(g)}: {[ (os.path.basename(c), os.path.getsize(c)) for c in g][:12]}")
+    out.append(f"cache writable {os.access('/root/kernels/mlx', os.W_OK)}")
+    b = QwenStreamingBackend(None)
+    b.load()
+    hymn = np.load("/root/spike/warm_hymn.npy").astype(np.float32) / 32768.0
+    rng = np.random.default_rng(0)
+    noisy = np.concatenate([hymn * 0.5 + rng.normal(0, 0.02, len(hymn)).astype(np.float32)] * 3)
+
+    def run(pcm, label):
+        fails.clear()
+        fr = [AudioFrame(samples=pcm[i:i + 1600], t_start=i / 16000, t_end=(i + 1600) / 16000)
+              for i in range(0, len(pcm), 1600)]
+        n = sum(len(e.words) for e in b.streamer().transcribe(fr) if e.is_final)
+        out.append(f"{label}: {n} final words, {len(fails)} failed steps {fails[:1]}")
+
+    run(hymn, "hymn main thread")
+    t = threading.Thread(target=run, args=(hymn, "hymn new thread")); t.start(); t.join()
+    t = threading.Thread(target=run, args=(noisy, "120 s noisy new thread")); t.start(); t.join()
+    new = sorted(set(glob.glob("/root/kernels/mlx/**/*", recursive=True)) - set(cache))
+    out.append(f"new cache files {len(new)}: {[os.path.basename(c) for c in new][:10]}")
     return "\n".join(out)

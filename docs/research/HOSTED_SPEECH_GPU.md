@@ -73,6 +73,38 @@ types free, the wait is minutes. The app's fallback (Whisper on the
 computer, after 3 s) covers that, and so would waking the GPU when the
 setlist opens.
 
+## Real-time gate (9 church recordings, 2026-11-26)
+
+`run_follower_eval.py`, nosheet, real time. The processor path's follower
+(ONNX base.en scorer, `score_follower_cpu`) with `asr_remote` streaming to the
+L4. Whisper small.en on the processor is the fallback. On mains power with
+Low Power Mode off, at 772c602.
+
+| Speech | Wrong-slide | Perceived | Anticipation | Engine CPU |
+|---|---|---|---|---|
+| Whisper small.en on the processor (baseline) | 0.295 | 0.182 | +190 ms | 114% of a core |
+| **Qwen streaming on Modal L4** | **0.292** | 0.196 | +739 ms | 78% |
+| DeepInfra Qwen 1.7B (per call) | 0.320 | — | — | — |
+| DeepInfra Qwen 0.6B (per call) | 0.352 | 0.246 | +470 ms | 81% |
+
+Per recording, Modal against the baseline: 0.312/0.325, 0.227/0.204,
+0.485/0.513, 0.270/0.233, 0.264/0.297, 0.320/0.300, 0.191/0.193, 0.472/0.434,
+0.090/0.154. No audio was dropped, and the server failed no steps.
+
+- **A tie on accuracy, not a win.** The streaming bench's better words
+  (WER 0.390 vs 0.466, final words 1.4 s sooner) don't reach the slides on
+  their own. The follower and its timing were tuned on Whisper.
+- **What it does buy:** the best hosted result so far (DeepInfra was 0.320
+  at best). It switches slides about 0.5 s earlier. It also uses about a
+  third less of the computer's processor, which matters on the slow
+  machines it's meant for.
+- **One fault, not reproduced.** The first attempt ran on a container left
+  over from the cold-start tests. Almost every step there failed with
+  "Failed to load compiled gather_int32_uint32_1 kernel" (a kernel the build
+  hadn't compiled), and the run was stopped. A fresh container, a
+  `probe_gather` run and the full gate all ran clean. If it comes back, the
+  server should restart its container when steps keep failing.
+
 ## Streams per GPU
 
 One song (HILA), N copies streamed at once to one container:
@@ -99,8 +131,10 @@ raise this.
 
 ## Not yet done
 
-- **The real-time gate** (9 church recordings vs 0.295). It sends church
-  audio to Modal, which needs the user's OK first.
+- **Tuning the follower on Qwen's words.** The gate is a tie with Whisper's
+  tuning. Qwen's sooner, cleaner words are the lever.
+- **A health check on the server:** restart the container when steps keep
+  failing (the kernel fault above).
 - **Batching steps** across streams on one GPU.
 - **The next-line check on the server.**
 - **Waking in the app:** under 10 s, so the GPU is woken when the AI starts,
