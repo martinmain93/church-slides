@@ -219,6 +219,8 @@ export function SetlistBuilder({
   // Unlike `nameDirty`, never reset by the autosave: a name typed on this
   // visit means the setlist is wanted, even with no songs in it yet.
   const renamed = useRef(false);
+  /** The name as last saved, for putting back an emptied box. */
+  const savedName = useRef("");
   const everHadSongs = useRef(false);
   if (detail && detail.items.length > 0) everHadSongs.current = true;
 
@@ -234,11 +236,12 @@ export function SetlistBuilder({
       .then((d) => {
         if (cancelled) return;
         if (!d) {
-          setError("Setlist not found.");
+          setError("This service was deleted.");
           return;
         }
         setDetail(d);
         setName(d.name);
+        savedName.current = d.name;
         if (d.items.length > 0) {
           setActiveItemId(d.items[0]!.id);
           setSelectedSlide({ itemId: d.items[0]!.id, slideIdx: 0 });
@@ -318,18 +321,20 @@ export function SetlistBuilder({
   /** A new date; a name still made from the old date follows it. */
   const nameNow = useRef(name);
   nameNow.current = name;
-  async function changeDate(date: string | null, previous: string | null) {
+  async function changeDate(date: string) {
+    // Picking a date means this service is wanted, even with nothing in it yet.
+    renamed.current = true;
     try {
       await updateSetlistDate(setlistId, date);
       setDetail((d) => (d ? { ...d, service_date: date } : d));
-      if (!date) return;
       const current = nameNow.current;
       const others = (await listSetlists()).filter((s) => s.id !== setlistId).map((s) => s.name);
-      const next = nameForDate(current.trim(), previous, date, others);
+      const next = nameForDate(current.trim(), date, others);
       if (next !== current) {
         nameNow.current = next;
         setName(next);
         await updateSetlistName(setlistId, next);
+        savedName.current = next;
       }
     } catch (err) {
       toast.error(`Couldn't change the date: ${err instanceof Error ? err.message : err}`);
@@ -341,7 +346,10 @@ export function SetlistBuilder({
   async function persistName() {
     if (!detail || !nameDirty.current) return;
     try {
-      await updateSetlistName(setlistId, name.trim() || "Untitled");
+      // An emptied name isn't saved; leaving the box puts the last one back.
+      if (!name.trim()) return;
+      await updateSetlistName(setlistId, name.trim());
+      savedName.current = name.trim();
       nameDirty.current = false;
     } catch (err) {
       toast.error(`Rename failed: ${err instanceof Error ? err.message : err}`);
@@ -605,8 +613,15 @@ export function SetlistBuilder({
               nameDirty.current = true;
               renamed.current = true;
             }}
-            onBlur={persistName}
-            placeholder="Untitled setlist"
+            onBlur={() => {
+              if (!name.trim()) {
+                setName(savedName.current);
+                nameDirty.current = false;
+                return;
+              }
+              void persistName();
+            }}
+            placeholder="Untitled service"
             className="h-9 max-w-md text-base font-semibold"
           />
           <Input

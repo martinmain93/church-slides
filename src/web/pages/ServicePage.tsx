@@ -14,13 +14,13 @@ import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, v
 import { CSS } from "@dnd-kit/utilities";
 import { BookOpen, GripVertical, MoreHorizontal, Music, Plus, Type } from "lucide-react";
 
-import type { SetlistDetail, SetlistItemWithSong } from "@/core/library";
+import type { SetlistDetail, SetlistItemWithSong, SetlistRow } from "@/core/library";
 import { KeyBadge } from "@/components/KeyBadge";
 import { useLibrary } from "@/library/context";
 import { KEY_CHOICES } from "@/lib/chords/chord";
 import { itemTitle, readingBody, readingSlides, scriptureContent, textContent, textSlides } from "@/lib/serviceItemContent";
 import { parseSlidesOverride } from "@/lib/slideSequence";
-import { nameForDate, newService } from "@/lib/setlistName";
+import { copiedService, nameForDate, shortServiceDate } from "@/lib/setlistName";
 import { useServiceDateField } from "@/lib/useServiceDateField";
 import { go, href } from "@/web/route";
 import { matchesSearch } from "@/web/pages/SongsPage";
@@ -48,13 +48,24 @@ interface Loaded {
   /** Each song's written key, or null when it has chords but no key. Songs
    * without chords are left out: there's no key to change. */
   keys: Record<string, string | null>;
-  /** Other services' names, to keep names unique. */
-  otherNames: string[];
+  /** The other services, to keep names unique and dates free. */
+  others: SetlistRow[];
 }
 
 type Menu = { kind: "add" } | { kind: "service" } | { kind: "item"; id: string } | null;
 
-export function ServicePage({ id, canEdit, created = false }: { id: string; canEdit: boolean; created?: boolean }) {
+export function ServicePage({
+  id,
+  canEdit,
+  created = false,
+  copied = false,
+}: {
+  id: string;
+  canEdit: boolean;
+  created?: boolean;
+  /** Just made by "Copy for the next service": say so, or it looks like the same service. */
+  copied?: boolean;
+}) {
   const lib = useLibrary();
   const { data, error: loadError } = useLibraryData(
     async (l): Promise<Loaded> => {
@@ -65,8 +76,8 @@ export function ServicePage({ id, canEdit, created = false }: { id: string; canE
         const chart = await l.getChart(item.song_id);
         if (chart) keys[item.song_id] = writtenKeyOf(chart);
       }
-      const otherNames = (await l.listSetlists()).filter((s) => s.id !== id).map((s) => s.name);
-      return { service, keys, otherNames };
+      const others = (await l.listSetlists()).filter((s) => s.id !== id);
+      return { service, keys, others };
     },
     [id],
   );
@@ -100,7 +111,8 @@ export function ServicePage({ id, canEdit, created = false }: { id: string; canE
   }, [data, dragged]);
 
   if (!data) return <PageHeader title="" back={href({ page: "services" })} />;
-  const { service, keys, otherNames } = data;
+  const { service, keys, others } = data;
+  const otherNames = others.map((s) => s.name);
   if (!service) {
     return (
       <>
@@ -123,7 +135,8 @@ export function ServicePage({ id, canEdit, created = false }: { id: string; canE
   return (
     <>
       <PageHeader
-        title={service.name || "Untitled service"}
+        // An editor has the name in its own field just below: once is enough.
+        title={canEdit ? "Service" : service.name || "Untitled service"}
         back={href({ page: "services" })}
         wrap
         action={
@@ -135,6 +148,16 @@ export function ServicePage({ id, canEdit, created = false }: { id: string; canE
         }
       />
       {(error ?? loadError) && <ErrorLine>{error ?? loadError}</ErrorLine>}
+      {copied && service.service_date && (
+        <p className="border-b border-border bg-muted px-4 py-2.5 text-sm" role="status">
+          Copied. This is the new service for {shortServiceDate(service.service_date)}.
+        </p>
+      )}
+      {!canEdit && service.service_date && (
+        <p className="px-4 pt-3 text-sm text-muted-foreground" data-testid="service-day">
+          {shortServiceDate(service.service_date)}
+        </p>
+      )}
       {canEdit && <ServiceDetails key={service.id} service={service} otherNames={otherNames} focusName={created} onError={setError} />}
 
       {items.length === 0 ? (
@@ -167,7 +190,7 @@ export function ServicePage({ id, canEdit, created = false }: { id: string; canE
       )}
 
       {menu?.kind === "add" && <AddSheet serviceId={service.id} onClose={() => setMenu(null)} />}
-      {menu?.kind === "service" && <ServiceMenu service={service} otherNames={otherNames} onClose={() => setMenu(null)} onError={setError} />}
+      {menu?.kind === "service" && <ServiceMenu service={service} others={others} onClose={() => setMenu(null)} onError={setError} />}
       {open && (
         <ItemSheet
           item={open}
@@ -246,11 +269,10 @@ function ServiceDetails({
 
   const nameNow = useRef(name);
   nameNow.current = name;
-  const dateField = useServiceDateField(service.service_date, async (date, previous) => {
+  const dateField = useServiceDateField(service.service_date, async (date) => {
     try {
       await lib.setServiceDate(service.id, date);
-      if (!date) return;
-      const renamed = nameForDate(nameNow.current, previous, date, otherNames);
+      const renamed = nameForDate(nameNow.current, date, otherNames);
       if (renamed !== nameNow.current) {
         nameNow.current = renamed;
         setName(renamed);
@@ -263,7 +285,8 @@ function ServiceDetails({
   });
 
   return (
-    <div className="flex gap-3 px-4 py-4">
+    <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row">
+      <div className="min-w-0 flex-1">
       <Field label="Name">
         <input
           ref={input}
@@ -283,7 +306,8 @@ function ServiceDetails({
           data-testid="service-name"
         />
       </Field>
-      <div className="w-40 shrink-0">
+      </div>
+      <div className="shrink-0 sm:w-44">
         <Field label="Date">
           <input type="date" className={fieldClass} {...dateField} data-testid="service-date" />
         </Field>
@@ -495,12 +519,12 @@ function TextFields({ title, words, onTitle, onWords }: { title: string; words: 
 
 function ServiceMenu({
   service,
-  otherNames,
+  others,
   onClose,
   onError,
 }: {
   service: SetlistDetail;
-  otherNames: string[];
+  others: SetlistRow[];
   onClose: () => void;
   onError: (e: string) => void;
 }) {
@@ -538,10 +562,10 @@ function ServiceMenu({
           className="w-full"
           onClick={() =>
             void act(async () => {
-              // The copy is for the next service: dated and named for it.
-              const { name, date } = newService([...otherNames, service.name]);
+              // The copy is for the week after: dated and named for it.
+              const { name, date } = copiedService(service, [...others, service]);
               const id = await lib.copySetlist(service.id, name, date);
-              go({ page: "service", id, created: true });
+              go({ page: "service", id, created: true, copied: true });
             })
           }
         >

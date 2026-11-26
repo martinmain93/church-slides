@@ -8,8 +8,7 @@ import { LibrarySync, type Api } from "@/library/web/sync";
 import { applySet, type Fields } from "@/core/records";
 import { parseStoredChart } from "@/lib/chords/chart";
 import { textSlides } from "@/lib/serviceItemContent";
-import { nameForDate, newService, nextServiceDate } from "@/lib/setlistName";
-import { groupServices } from "@/web/pages/ServicesPage";
+import { copiedService, groupServices, lastService, nameForDate, newService, nextServiceDate, rowDate } from "@/lib/setlistName";
 import { unknownOrderTags } from "@/web/pages/SongEditor";
 import { matchingLine } from "@/web/pages/SongsPage";
 import { href, parseRoute } from "@/web/route";
@@ -445,18 +444,45 @@ describe("the web app's library", () => {
 });
 
 describe("services' dates and names", () => {
-  it("a new service is for the coming Sunday and never shares a name", () => {
+  it("a new service is for the first free Sunday, and never shares a name", () => {
     const wed = new Date(2026, 10, 25, 9); // Wednesday 25 Nov 2026
     expect(nextServiceDate(wed)).toBe("2026-11-29");
     expect(newService([], wed)).toEqual({ name: "Sunday 29 Nov", date: "2026-11-29" });
-    expect(newService(["Sunday 29 Nov"], wed).name).toBe("Sunday 29 Nov (2)");
-    expect(newService(["sunday 29 nov", "Sunday 29 Nov (2)"], wed).name).toBe("Sunday 29 Nov (3)");
+    // The coming Sunday has one: the next is the Sunday after.
+    expect(newService([{ name: "Sunday 29 Nov", service_date: "2026-11-29" }], wed)).toEqual({ name: "Sunday 6 Dec", date: "2026-12-06" });
+    // An old undated service with that name doesn't take the day, only the name.
+    expect(newService([{ name: "Sunday 29 Nov" }], wed)).toEqual({ name: "Sunday 29 Nov (2)", date: "2026-11-29" });
   });
 
-  it("a name made from the date follows it; a typed one stays", () => {
-    expect(nameForDate("Sunday 29 Nov", "2026-11-29", "2026-12-02", [])).toBe("Wednesday 2 Dec");
-    expect(nameForDate("Sunday 29 Nov (2)", "2026-11-29", "2026-12-06", ["Sunday 6 Dec"])).toBe("Sunday 6 Dec (2)");
-    expect(nameForDate("Carol service", "2026-11-29", "2026-12-20", [])).toBe("Carol service");
+  it("a copy is for the week after the service it copies", () => {
+    const wed = new Date(2026, 10, 25, 9);
+    const dec6 = { name: "Sunday 6 Dec", service_date: "2026-12-06" };
+    expect(copiedService(dec6, [dec6], wed)).toEqual({ name: "Sunday 13 Dec", date: "2026-12-13" });
+    // A typed name is kept (made unique); a past service copies to the coming Sunday.
+    const carols = { name: "Carol service", service_date: "2025-12-14" };
+    expect(copiedService(carols, [carols], wed)).toEqual({ name: "Carol service (2)", date: "2026-11-29" });
+    // Taken weeks are skipped.
+    const dec13 = { name: "Sunday 13 Dec", service_date: "2026-12-13" };
+    expect(copiedService(dec6, [dec6, dec13], wed).date).toBe("2026-12-20");
+  });
+
+  it("a date name follows the date, however it got there; a typed one stays", () => {
+    expect(nameForDate("Sunday 29 Nov", "2026-12-02", [])).toBe("Wednesday 2 Dec");
+    expect(nameForDate("Wednesday 2 Dec", "2026-12-13", [])).toBe("Sunday 13 Dec");
+    expect(nameForDate("Sunday 29 Nov (2)", "2026-12-06", ["Sunday 6 Dec"])).toBe("Sunday 6 Dec (2)");
+    expect(nameForDate("Carol service", "2026-12-20", [])).toBe("Carol service");
+  });
+
+  it("a list shows the date only when the name doesn't already say it", () => {
+    const now = new Date(2026, 10, 25);
+    expect(rowDate({ name: "Sunday 6 Dec", service_date: "2026-12-06" }, now)).toBeNull();
+    expect(rowDate({ name: "Carol service", service_date: "2026-12-20" }, now)).toBe("Sun 20 Dec");
+    expect(rowDate({ name: "Sunday 3 Jan", service_date: "2027-01-03" }, now)).toBe("2027");
+  });
+
+  it("'copy last service' copies the latest one held, not a draft for next month", () => {
+    const row = (id: string, service_date: string) => ({ id, name: id, service_date, created_at: 0, last_used_at: null });
+    expect(lastService([row("next month", "2026-12-27"), row("last week", "2026-11-22"), row("before", "2026-11-15")], "2026-11-25")?.id).toBe("last week");
   });
 
   it("the services list puts coming services first, soonest at the top", () => {
@@ -481,7 +507,7 @@ describe("the web app's pieces", () => {
     const link = href({ page: "song", id: "song_1", key: "A", from: "setlist_9" });
     expect(parseRoute(link)).toEqual({ page: "song", id: "song_1", key: "A", from: "setlist_9" });
     expect(parseRoute("#/songs/%E0")).toMatchObject({ page: "song", id: "%E0" });
-    expect(parseRoute(href({ page: "service", id: "s", created: true }))).toEqual({ page: "service", id: "s", created: true });
+    expect(parseRoute(href({ page: "service", id: "s", created: true }))).toEqual({ page: "service", id: "s", created: true, copied: false });
   });
 
   it("the live socket must be on the account server", () => {

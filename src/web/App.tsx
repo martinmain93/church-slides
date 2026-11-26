@@ -312,7 +312,7 @@ function page(route: Route, perms: { editSongs: boolean; editServices: boolean }
     case "services":
       return <ServicesPage canEdit={perms.editServices} />;
     case "service":
-      return <ServicePage id={route.id} canEdit={perms.editServices} created={!!route.created} />;
+      return <ServicePage id={route.id} canEdit={perms.editServices} created={!!route.created} copied={!!route.copied} />;
     case "account":
       return account;
   }

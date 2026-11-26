@@ -10,7 +10,8 @@ import * as tauri from "@/lib/tauri";
 import { ToastProvider } from "@/lib/toast";
 
 function setlist(i: number, songs: string[] = []): tauri.SetlistRow {
-  return { id: `sl${i}`, name: `Sunday ${i}`, created_at: i, last_used_at: null, song_titles: songs };
+  // Past services, one a day in October 2026: Sunday 7 is the latest.
+  return { id: `sl${i}`, name: `Sunday ${i}`, created_at: i, last_used_at: null, service_date: `2026-10-${10 + i}`, song_titles: songs };
 }
 
 function renderHome() {
@@ -51,20 +52,21 @@ describe("Home setlists", () => {
     vi.restoreAllMocks();
   });
 
-  it("shows six, then all, and searches song titles inside setlists", async () => {
+  it("shows six past services, then all, and searches song titles inside them", async () => {
     const rows = Array.from({ length: 8 }, (_, i) => setlist(i, i === 7 ? ["Way Maker"] : []));
     vi.spyOn(tauri, "listSetlists").mockResolvedValue(rows);
     renderHome();
-    expect(await screen.findByText("Sunday 0")).toBeInTheDocument();
-    expect(screen.queryByText("Sunday 7")).toBeNull();
+    // Latest first: Sunday 7 is the most recent, Sunday 0 the oldest.
+    expect(await screen.findByText("Sunday 7")).toBeInTheDocument();
+    expect(screen.queryByText("Sunday 0")).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: "Show all 8 setlists" }));
-    expect(screen.getByText("Sunday 7")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Show all 8 past services" }));
+    expect(screen.getByText("Sunday 0")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Show fewer" }));
-    fireEvent.change(screen.getByLabelText("Search setlists"), { target: { value: "way maker" } });
+    fireEvent.change(screen.getByLabelText("Search services"), { target: { value: "way maker" } });
     expect(screen.getByText("Sunday 7")).toBeInTheDocument();
-    expect(screen.queryByText("Sunday 0")).toBeNull();
+    expect(screen.queryByText("Sunday 6")).toBeNull();
   });
 
   it("asks before deleting a setlist with songs in it", async () => {

@@ -4,7 +4,8 @@
  * typed (0002, 0020, 0202, 2027…), and each save can rename the service, so
  * saving them all would rename it four times. Saves wait for a pause or for
  * leaving the box, skip dates no service is for, and run one at a time, each
- * told the date the one before it saved.
+ * told the date the one before it saved. Every service has a date, so an
+ * emptied box puts the last one back rather than clearing it.
  */
 
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
@@ -19,10 +20,10 @@ export function plausibleServiceDate(date: string): boolean {
   return !!d && d.getFullYear() >= 2000 && d.getFullYear() <= 2100;
 }
 
-/** `commit(next, previous)` saves the new date (null clears it). */
+/** `commit(next, previous)` saves the new date. */
 export function useServiceDateField(
   saved: string | null | undefined,
-  commit: (next: string | null, previous: string | null) => Promise<void>,
+  commit: (next: string, previous: string | null) => Promise<void>,
 ) {
   const [draft, setDraft] = useState(saved ?? "");
   const savedRef = useRef(saved ?? null);
@@ -44,8 +45,8 @@ export function useServiceDateField(
   const flush = (value: string) => {
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
-    const next = value || null;
-    if (next && !plausibleServiceDate(next)) return;
+    if (!value || !plausibleServiceDate(value)) return;
+    const next = value;
     chain.current = chain.current.then(async () => {
       const previous = savedRef.current;
       if (next === previous) return;
@@ -62,6 +63,14 @@ export function useServiceDateField(
       if (timer.current) clearTimeout(timer.current);
       timer.current = setTimeout(() => flush(v), SETTLE_MS);
     },
-    onBlur: () => flush(draft),
+    onBlur: () => {
+      if (!draft) {
+        // Emptied: put the date back.
+        if (timer.current) clearTimeout(timer.current);
+        setDraft(savedRef.current ?? "");
+        return;
+      }
+      flush(draft);
+    },
   };
 }

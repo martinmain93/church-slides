@@ -8,7 +8,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-function DateBox({ saved, commit }: { saved: string | null; commit: (n: string | null, p: string | null) => Promise<void> }) {
+function DateBox({ saved, commit }: { saved: string | null; commit: (n: string, p: string | null) => Promise<void> }) {
   const field = useServiceDateField(saved, commit);
   return <input type="date" aria-label="date" {...field} />;
 }
@@ -45,6 +45,16 @@ describe("a service's date box", () => {
       ["2026-12-06", "2026-11-29"],
       ["2026-12-13", "2026-12-06"],
     ]);
+  });
+
+  it("puts the date back when the box is emptied: every service has one", () => {
+    const commit = vi.fn(async () => undefined);
+    render(<DateBox saved="2026-11-29" commit={commit} />);
+    const box = screen.getByLabelText("date") as HTMLInputElement;
+    fireEvent.change(box, { target: { value: "" } });
+    fireEvent.blur(box);
+    expect(box.value).toBe("2026-11-29");
+    expect(commit).not.toHaveBeenCalled();
   });
 
   it("knows a date no service is for", () => {
