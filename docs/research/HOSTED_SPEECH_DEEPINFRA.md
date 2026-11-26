@@ -60,3 +60,29 @@ Per recording, 1.7B beat Whisper on 3 of 9 recordings.
 2. **A 10 s window,** and carry the committed text forward as the `prompt`,
    closer to the Mac engine.
 3. **Then re-run the gate,** 1.7B first.
+
+## Streaming bench on public songs (2026-11-26)
+
+`research/spikes/streaming_asr/stream_eval.py` streams six JamendoLyrics
+songs (1,295 hand-timed words) in real time through the app's
+`SlidingWindowWrapper`, with `DI_STREAMS` variants. All four variants ran at
+once. Baselines are from the 2026-11-19 spike, `runs/main6`, timed in Low
+Power Mode, so their delays are pessimistic.
+
+| Stream | WER | Heard | First p50 | Final p50 / p90 |
+|---|---|---|---|---|
+| **DeepInfra Qwen 0.6B, 6 s window** | **0.437** | 77% | 1.99 s | 3.76 / 5.87 s |
+| DeepInfra Qwen 0.6B, 10 s window | 0.548 | 76% | 1.99 s | 4.05 / 7.24 s |
+| DeepInfra Qwen 0.6B, 10 s window + carried prompt | 0.532 | 78% | 2.00 s | 4.14 / 7.01 s |
+| DeepInfra Qwen 1.7B, 10 s window | 0.879 | 28% (timeouts) | 1.69 s | 4.02 / 9.21 s |
+| MLX small.en on the M1 (baseline) | 0.466 | 71% | 2.14 s | 3.55 / 5.34 s |
+| MLX Qwen 0.6B, 6 s window (baseline) | 0.506 | 77% | 1.58 s | 3.39 / 5.09 s |
+| Groq Whisper turbo, paced 3 s (baseline) | 0.524 | 62% | 3.03 s | 3.94 / 5.67 s |
+
+- **DeepInfra 0.6B on 6 s windows hears the most of any streamed setup we've
+  measured,** but its words are about 0.2–0.5 s later than on-device.
+- **A longer window hurts through the sliding window,** and the carried
+  prompt only partly makes up for it.
+- **1.7B on DeepInfra is unusable for live work:** it queues and times out.
+- **So on the gate the words were good.** The loss came from late or dropped
+  audio and from merging by Whisper's rules, not from what was heard.
