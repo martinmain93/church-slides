@@ -760,6 +760,11 @@ class ParticleFilterTunables(BaseModel):
     #: AUTO_PRESENTER_HOSTED_SPEECH_{URL,MODEL,TOKEN} until the app hands
     #: them over (docs/roadmap/HOSTED_SPEECH.md). Not shown.
     asr_hosted: bool = False
+    #: Research: with `backend="whisper"`, stream speech to the streaming Qwen
+    #: engine on a GPU server (`asr.remote_backend`, prototype in
+    #: research/spikes/qwen_gpu), Whisper on the processor as the fallback.
+    #: AUTO_PRESENTER_REMOTE_SPEECH_{URL,TOKEN} until the app hands them over.
+    asr_remote: bool = False
     #: Let a key or tempo change in the music (`music.change_watch`) lower the
     #: bar for a song change the words propose. The kill switch, like
     #: `score_follower`; not shown in the Tunables panel.

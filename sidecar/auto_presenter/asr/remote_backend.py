@@ -10,7 +10,10 @@ Nothing here waits on the network in the audio path: audio goes out through
 a sender thread, words come in on a receiver thread, and the session's
 thread only queues frames and drains words. A dropped connection is retried
 with backoff; while it's down, no words arrive (the fallback to the
-computer's own engine is not built yet).
+computer's own engine, `fallback`, listens until the server answers again:
+the same ladder as `hosted_backend` — a few seconds of silent retrying, then
+the fallback, with backoff on the reconnects. That also covers the minute a
+cold GPU takes to wake.
 """
 
 from __future__ import annotations
@@ -40,14 +43,21 @@ SIDE_WINDOW_SECONDS = 6.0
 #: How long the server may take to wake (a cold GPU) before a connect fails.
 CONNECT_TIMEOUT_S = 120.0
 MAX_BACKOFF_S = 30.0
+#: Seconds without the server before the computer's own engine takes over.
+RETRY_S = 3.0
 
 
 class RemoteStreamingBackend:
     """`ASRBackend` whose words come from a speech server's websocket."""
 
-    def __init__(self, url: str, token: Callable[[], str | None], *, whisper=None) -> None:
+    def __init__(
+        self, url: str, token: Callable[[], str | None], *, whisper=None, fallback=None
+    ) -> None:
         self.url = url.rstrip("/")
         self._token = token
+        #: The computer's own windowed engine (Whisper on the processor), used
+        #: while the server can't be reached.
+        self.fallback = fallback
         #: The session's own Whisper, for the follower (as `QwenStreamingBackend.whisper`).
         self.whisper = whisper
         self.ready_info: dict[str, Any] = {}
@@ -73,13 +83,22 @@ class RemoteStreamingBackend:
         return ws
 
     def warm(self) -> None:
-        """Wake the server (a cold GPU takes up to a minute), then let it go."""
-        t = time.monotonic()
-        ws = self.connect()
-        ws.close()
-        log.info("speech server ready in %.1f s (%s)", time.monotonic() - t, self.ready_info)
-        if self.whisper is not None and hasattr(self.whisper, "warm"):
-            self.whisper.warm()
+        """Start waking the server (a cold GPU takes a minute or more) without
+        waiting for it, and warm the computer's own engines."""
+
+        def wake() -> None:
+            t = time.monotonic()
+            try:
+                self.connect().close()
+                took = time.monotonic() - t
+                log.info("speech server ready in %.1f s (%s)", took, self.ready_info)
+            except Exception as exc:
+                log.warning("speech server didn't wake: %s", exc)
+
+        threading.Thread(target=wake, daemon=True).start()
+        for engine in (self.fallback, self.whisper):
+            if engine is not None and hasattr(engine, "warm"):
+                engine.warm()
 
     def streamer(self, **kwargs: Any) -> RemoteStreamer:
         return RemoteStreamer(self, **kwargs)
@@ -169,6 +188,40 @@ def _pcm(frame: AudioFrame) -> bytes:
     return (np.clip(frame.samples, -1.0, 1.0) * 32767.0).astype("<i2").tobytes()
 
 
+class _Local:
+    """The computer's own windowed engine on its own thread, fed frame by frame."""
+
+    def __init__(self, backend, words: queue.Queue, pass_timer) -> None:
+        from auto_presenter.asr.streaming import SlidingWindowWrapper
+
+        self._frames: queue.Queue = queue.Queue()
+        hooks = {"pass_timer": pass_timer} if pass_timer is not None else {}
+        self._wrapper = SlidingWindowWrapper(
+            backend, emission_observer=lambda ev, at: words.put((ev, at)), **hooks
+        )
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+
+    def _run(self) -> None:
+        def frames():
+            while (f := self._frames.get()) is not None:
+                yield f
+
+        try:
+            for _ in self._wrapper.transcribe(frames()):
+                pass  # words reach the session through the emission observer
+        except Exception:
+            log.exception("the computer's own engine stopped")
+
+    def send(self, frame: AudioFrame) -> None:
+        self._frames.put(frame)
+
+    def stop(self, wait: bool = False) -> None:
+        self._frames.put(None)
+        if wait:
+            self._thread.join(10.0)
+
+
 @dataclass
 class RemoteStreamer:
     """Stands where `QwenStreamer` stands in `AudioSession`, with its hooks."""
@@ -182,9 +235,14 @@ class RemoteStreamer:
     def name(self) -> str:
         return f"streaming({self.backend.name()})"
 
+    #: True while the computer's own engine is listening in the server's place.
+    falling_back: bool = False
+
     def transcribe(self, frames: Iterable[AudioFrame]) -> Iterator[TranscriptEvent]:
         words: queue.Queue = queue.Queue()
         stream: _Stream | None = None
+        down_since: float | None = None
+        local: _Local | None = None
         next_try = 0.0
         backoff = 0.0
         side: list[AudioFrame] = []
@@ -211,6 +269,22 @@ class RemoteStreamer:
                 stream = _Stream(self.backend, words)
             if stream is not None:
                 stream.send(frame)
+            now = time.monotonic()
+            if stream is not None and stream.connected.is_set() and not stream.closed.is_set():
+                down_since = None
+                if local is not None:
+                    log.info("speech server answering; the computer's own engine stops")
+                    local.stop()
+                    local = None
+            else:
+                down_since = now if down_since is None else down_since
+                fallback = self.backend.fallback
+                if local is None and fallback is not None and now - down_since >= RETRY_S:
+                    log.warning("speech server unavailable; the computer's own engine takes over")
+                    local = _Local(fallback, words, self.pass_timer)
+            self.falling_back = local is not None
+            if local is not None:
+                local.send(frame)
 
             if self.side_pass is not None and frame.t_end - last_side_t >= self.side_pass_seconds:
                 last_side_t = frame.t_end
@@ -221,6 +295,8 @@ class RemoteStreamer:
             yield from self._drain(words, latest_t)
         if stream is not None:
             stream.finish()
+        if local is not None:
+            local.stop(wait=True)
         yield from self._drain(words, latest_t)
 
     def _drain(self, words: queue.Queue, now_t: float) -> Iterator[TranscriptEvent]:
@@ -229,6 +305,12 @@ class RemoteStreamer:
                 m = words.get_nowait()
             except queue.Empty:
                 return
+            if isinstance(m, tuple):  # from the computer's own engine
+                event, available_at = m
+                if self.emission_observer is not None:
+                    self.emission_observer(event, available_at)
+                yield event
+                continue
             out = [Word(text=w[0], t_start=w[1], t_end=w[2], confidence=w[3]) for w in m["words"]]
             if not out:
                 continue

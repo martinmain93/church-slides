@@ -923,6 +923,17 @@ async def _start_audio_session(
         backend.min_step_seconds = ASSIST_TRANSCRIBE_EVERY_S if assist else 0.0
         if tun is not None and tun.asr_hosted:
             backend = HostedSpeechBackend(_env_hosted_credentials, fallback=backend)
+        elif (
+            tun is not None and tun.asr_remote and os.environ.get("AUTO_PRESENTER_REMOTE_SPEECH_URL")
+        ):
+            from auto_presenter.asr.remote_backend import RemoteStreamingBackend
+
+            backend = RemoteStreamingBackend(
+                os.environ["AUTO_PRESENTER_REMOTE_SPEECH_URL"],
+                lambda: os.environ.get("AUTO_PRESENTER_REMOTE_SPEECH_TOKEN"),
+                fallback=backend,
+            )
+            backend.warm()  # starts waking the GPU; doesn't wait for it
     elif msg.backend == "mlx":
         if not MLXWhisperBackend.is_available():
             await _send_error(

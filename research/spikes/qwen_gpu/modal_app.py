@@ -63,6 +63,13 @@ image = (
         "regex",
         "fastapi[standard]",
     )
+    # the image's own CUDA libraries are older than the ones MLX's wheels ship:
+    # load MLX's first (keep the image only for its headers)
+    .env({"LD_LIBRARY_PATH": ":".join(
+        f"/usr/local/lib/python3.12/site-packages/nvidia/{d}/lib"
+        for d in ("cublas", "cusolver", "cusparse", "cudnn", "cuda_runtime", "cuda_nvrtc",
+                  "nvjitlink", "cufft", "curand", "nccl", "cuda_cupti")
+    )})
     .run_function(_download)  # weights baked into the image: no download at start
     .env({"HF_HUB_OFFLINE": "1", "AUTO_PRESENTER_QWEN_NO_PROBS": os.environ.get("NO_PROBS", "0")})
     .add_local_dir(SIDECAR, remote_path="/root/auto_presenter")
@@ -77,7 +84,7 @@ app = modal.App("church-slides-speech", image=image)
     scaledown_window=20 * 60,  # a service's quiet stretches never cold-start it
     timeout=4 * 60 * 60,  # one websocket can last a whole service
     secrets=[modal.Secret.from_name("church-slides-speech")],
-    region="us",
+    # region="us" left the container waiting for an L4 (2026-11-26); unpinned schedules at once
 )
 @modal.concurrent(max_inputs=16)
 class Speech:
