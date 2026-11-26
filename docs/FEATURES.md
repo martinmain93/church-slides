@@ -6,7 +6,7 @@ history.
 
 ## Running a service
 
-- **Present** a service from one setlist workspace: songs on the left, every
+- **Present** a service from one workspace: songs on the left, every
   slide in the middle, library and scripture on the right. The same layout
   is used before and during the service.
 - **Audience, band and leader screens.** The app assigns displays by itself;
@@ -44,6 +44,10 @@ computers present by hand.
 
 - **Songs** in a plain text format with section tags and a slide order.
   ([SONG_FORMAT](SONG_FORMAT.md), [PHASE_1](done/PHASE_1.md))
+- **Split a slide in two** with the scissors on a long slide: at the end of
+  a sentence nearest the middle, keeping line pairs together (songs with
+  chords only at line breaks), with undo. Slide cards are a true-scale
+  picture of the screen and say when a slide is too long for it.
 - **Import** from ProPresenter, OpenLP, FreeShow, OpenSong, and from song
   files: ChordPro, OnSong, OpenLyrics, SongSelect, PDF chord and lead sheets.
 - **Chord editor** with Suggest and charting by voice; a different key for
@@ -72,14 +76,22 @@ computers present by hand.
   with "Fits next" suggestions by key and tempo.
 - **Online band room** through the church's own Cloudflare relay, for
   networks that keep devices apart.
-- **Share a setlist or a whole library** with another computer on the same
+- **Share a service or a whole library** with another computer on the same
   network.
 - **The web app** (preview, `app.churchslides.app`): an organization's songs
   with chords in the order they're sung, song editing (words, order,
-  credits) and service planning (dates, drag to reorder, readings and text
-  slides) from any device, synced with every slides computer. Services have
-  a date on the desktop too.
+  credits) and service planning (dates, drag to reorder, Bible passages
+  checked as they're typed, text slides, a song's key and order for one
+  service, undo) from any device, synced with every slides computer. Band
+  members read the service, its notices and the next song. It follows the
+  device's light or dark setting and can be added to a home screen.
   ([WEB_AND_MOBILE](roadmap/WEB_AND_MOBILE.md))
+- **Services have a date**, on the desktop and the web: a new one is for the
+  first free Sunday, a copy for the week after, and both list services
+  coming up first, then past ones.
+- **AI through the organization's plan**: a computer signed in to an
+  organization can use its AI for spoken requests, finding verses and chord
+  suggestions, with no key of its own.
 
 ## Behind the scenes
 

@@ -160,7 +160,5 @@ once a church relies on it, formats only change with a migration.
 - Deploying `app.churchslides.app` (Cloudflare static site); the server
   must accept the web app's client metadata document in production.
 - The team page (members, invites) and the chord editor.
-- Checking a reading's reference as it's typed (to discuss).
-- Undo after removing an item.
 - Several tabs share one library without coordinating (each keeps its own
   copy in memory); one tab syncing for all is the fix.
