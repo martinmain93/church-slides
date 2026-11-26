@@ -259,6 +259,10 @@ def _whisper_load_lock(model_size: str) -> threading.Lock:
         return _whisper_load_locks.setdefault(model_size, threading.Lock())
 
 
+def _env(name: str) -> str | None:
+    return os.environ.get(name) or None
+
+
 def _env_hosted_credentials() -> HostedCredentials | None:
     """Research only (`asr_hosted`): online speech's endpoint, model and token
     from the environment, until the app hands over a server-issued key."""
@@ -923,9 +927,7 @@ async def _start_audio_session(
         backend.min_step_seconds = ASSIST_TRANSCRIBE_EVERY_S if assist else 0.0
         if tun is not None and tun.asr_hosted:
             backend = HostedSpeechBackend(_env_hosted_credentials, fallback=backend)
-        elif (
-            tun is not None and tun.asr_remote and os.environ.get("AUTO_PRESENTER_REMOTE_SPEECH_URL")
-        ):
+        elif tun is not None and tun.asr_remote and _env("AUTO_PRESENTER_REMOTE_SPEECH_URL"):
             from auto_presenter.asr.remote_backend import RemoteStreamingBackend
 
             backend = RemoteStreamingBackend(
