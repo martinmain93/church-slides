@@ -148,6 +148,19 @@ change. `modal_app.py` now takes 4 per container, and Modal starts more
 containers beyond that. Batching steps across streams is the obvious way to
 raise this.
 
+**With the next-line check on (2026-11-27, A10):** the same song, with each
+stream asking for phones (`REMOTE_PHONES=1`):
+
+| Streams | Final words p50 / p90 | WER | Phones late p50 / p90 | A check |
+|---|---|---|---|---|
+| 1 | 1.72 / 4.81 s | 0.220 | 0.09 / 0.15 s | 18 ms |
+| 4 (one container) | 1.67–1.84 / 2.9–4.2 s | 0.19–0.23 | 0.11–0.12 / 0.18 s | 39 ms |
+| 6 (Modal split them 4 + 2) | 1.71–1.92 / 2.9–4.7 s | 0.18–0.23 | 0.10–0.12 / 0.18 s | 23–39 ms |
+
+The check doesn't lower the 4 streams per GPU: a check is 18–39 ms every
+0.25 s, beside steps that take far longer. Beyond 4, Modal starts a second
+container, as configured, so the cost estimate below stands.
+
 ## Cost, rough
 
 - **Price:** an L4 on Modal is about $0.80/h, unpinned.
@@ -158,9 +171,7 @@ raise this.
 
 ## Not yet done
 
-- **Measuring cost with the check:** the check adds an audio-tower pass
-  every 0.25 s per stream. The 4-streams-per-GPU figure above was measured
-  without it.
+- **Measuring cost with the check:** done (above), 4 per GPU holds.
 - **Talk-only negatives** (the speech-negatives bench) on this path.
 - **The lead time across a switch:** it follows the measured delay, but
   it isn't checked how fast it settles when the server drops and Whisper

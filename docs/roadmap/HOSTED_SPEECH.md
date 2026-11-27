@@ -1,13 +1,22 @@
 # Hosted live speech for computers without Apple silicon
 
-Status: **design, awaiting approval** (2026-11-25).
+Status: **prototype measured, moving to production** (2026-11-27).
 
 On Apple silicon, live AI hears the room with Qwen3-ASR on the computer's
-GPU. That's our most accurate engine. Other computers (Windows, Intel Macs)
-run faster-whisper on the processor, which is clearly behind: 0.295
-wrong-slide on the real-time gate. Qwen on the processor didn't close the
-gap (0.323, `docs/research/QWEN3_ASR_CPU.md`). So these computers get the
-same model, run for them online.
+GPU. Other computers (Windows, Intel Macs) run Whisper small.en on the
+processor, which is clearly behind (0.295 wrong-slide on the real-time gate).
+So these computers get the Mac's own engine, run for them on a rented GPU.
+
+The prototype is measured in `docs/research/HOSTED_SPEECH_GPU.md`:
+
+| Speech | Wrong-slide | Perceived |
+|---|---|---|
+| Whisper small.en on the processor (today) | 0.295 | 0.182 |
+| **Qwen on our speech server, check on the server** | **0.243** | **0.144** |
+| The Mac's own Qwen | 0.249 | 0.174 |
+
+That's better on all 9 church recordings. DeepInfra (per call, 0.352) is
+dropped.
 
 ## User story
 
@@ -23,117 +32,126 @@ same model, run for them online.
 - **Computers without Apple silicon**, signed in to an organization whose
   plan includes hosted speech. Apple silicon always stays on the computer.
 - **The server decides the plan,** never the app (CONTRIBUTING.md,
-  principle 5). The app asks for a speech key. A `402 not_on_plan` answer
-  means "not for this organization", and the app quietly uses the
-  processor path, with no upgrade prompt.
-- **Pilot:** free for every organization. Signing up needs Google sign-in
-  and the pilot passcode, as today.
+  principle 5). No speech in the key answer means "not for this
+  organization", and the app quietly uses the processor path, with no
+  upgrade prompt.
+- **Pilot:** free for every organization, with the daily allowance the AI
+  gateway already has (6 hours of audio).
 - **Default on.** Once the operator has agreed, hosted is what live AI uses
   on these computers. Settings → AI can turn it off.
 
 ## The one-time screen
 
-This screen is shown the first time live AI would start with hosted speech
-available on this computer, and never again once answered.
+Shown the first time live AI would start with hosted speech available on
+this computer, and never again once answered.
 
 > **Listen online?**
 > On this computer, the AI follows songs best online. While the AI is on,
-> the service's audio is sent in short pieces to DeepInfra to be turned
-> into words. Nothing is kept, and we never receive the audio.
+> the service's audio is sent to our speech server to be turned into words.
+> Nothing is kept.
 > [Use online] [Keep it on this computer]
 
-- **"Keep it on this computer"** uses the processor path (or no live AI, if
-  the computer can't keep up).
-- **Either answer can be changed later** in Settings → AI.
+Either answer can be changed later in Settings → AI.
 
 ## How it works
 
 ```
-app ──sign-in token──▶ our server ──API key──▶ DeepInfra: mint scoped JWT
- │                         ◀── { base_url, model, token, expires_at }
- └─engine──Bearer JWT, 2 s steps──▶ DeepInfra /v1/openai/audio/transcriptions
+app ──sign-in──▶ api.churchslides.app  POST /v1/orgs/:id/ai/key
+ │                 ◀── { key, base_url, …, speech: { url, token, expires_at } }
+ └─engine──wss, 0.1 s audio frames──▶ speech server (Modal GPU)
+          ◀── words (Qwen3-ASR streaming) + next-line phones every 0.25 s
 ```
 
-1. **Key.** `POST /v1/orgs/:orgId/ai/speech-key` (role `run_live`). The
-   server checks membership and plan, then calls DeepInfra's
-   `POST /v1/scoped-jwt` with `models: ["Qwen/Qwen3-ASR-…"]`,
-   `expires_delta: 120` and a small `spending_limit`. It returns
-   `{ base_url, model, token, expires_at }`. The server's DeepInfra key
-   never leaves the server.
-2. **Refresh.** The app asks for a new key every 60 s, and holds the old
-   one until the new one arrives. Leaving the organization, or the plan
-   ending, stops speech within two minutes.
-3. **Audio goes straight to DeepInfra,** not through our server. This takes
-   one hop out of every 2 s step, which matters for a church far from a
-   Cloudflare region. DeepInfra lists the Qwen3-ASR models as zero
-   retention.
-4. **The protocol stays vendor-neutral** (server PLAN.md, decision 4). The
-   key answer is a generic OpenAI-compatible transcription endpoint plus a
-   bearer token. The app has no DeepInfra-specific code, and another server
-   could point it at its own endpoint. Discovery adds the capability
-   `speech`.
-5. **Engine:** a hosted backend behind the `ASRBackend` interface, like the
-   deprecated Groq one. It sends the sliding window every step and asks for
-   word timestamps (`timestamp_granularities=word`, needed by the
-   follower). The key reaches the engine over the existing local socket and
-   is held in memory only.
-
-The existing AI gateway (`/ai/v1`, Groq / Workers AI behind signed `csa_`
-keys) stays for chat. Speech moves off it.
+1. **One key answer.** The existing AI key (`hosted_ai.rs`, renewed every
+   5 minutes, 15-minute life, role `run_live`) gains a `speech` field: the
+   speech server's URL and a token for it. No second key flow.
+2. **The token** is HMAC-signed with a secret the Worker and the speech
+   server share, and carries the organization id and an expiry. The speech
+   server checks it on connect and needs no database.
+3. **Audio goes straight to the speech server,** not through the Worker.
+4. **The app's engine** uses `asr/remote_backend.py` with Whisper on the
+   processor as the fallback, and the Qwen next-line check fed by the
+   server's phones (`next_line.RemotePhones`, `qwen_tuning()`).
+5. **The protocol is public** (`docs/server-protocol/`, a new "Speech"
+   section): another server could run its own speech server.
 
 ## When it fails
 
-The service never stops, and nothing shows an error to the room.
+The service never stops, and nothing shows an error to the room. Built and
+tested in the prototype:
 
-1. **A failed step is retried silently** for a few seconds (about 3 s).
-2. **If the computer can run the processor path,** the AI switches to it
-   silently, with a small status pill for the operator only. It keeps trying
-   online in the background, and switches back when calls succeed again.
-3. **Absolute failure** (nothing online, no processor path) **blanks the
-   screen**, then retries online with backoff: 2 s, 4 s, 8 s and so on,
-   capped at 60 s, with a little random spread. When a call succeeds, live AI
-   carries on from the room's current position.
+1. **No answer for 3 s:** Whisper on the processor takes over silently. The
+   app reconnects with backoff and switches back.
+2. **No processor path** (a computer too slow for it): the screen blanks,
+   and the app retries with backoff, as for any absolute failure.
+3. **A broken server** (steps failing) exits after 8 failures in a row, so
+   Modal replaces it, rather than answering without words.
 
-Reading of "silent fall-back" plus "blank on absolute failure": blanking
-only happens when the processor path can't take over.
+## Production plan
 
-## Privacy and terms
+Decided 2026-11-27: the speech server lives in **this public repo**, and
+runs in the **existing Modal workspace** with separate staging and
+production environments.
 
-Both pages are updated in the same change as the feature:
+### 1. Measure what's left (in progress)
 
-- **`site/privacy.html`:** the summary line "Audio … is never sent to us"
-  stays true. A new section, *Live AI online*, covers:
-  - what is sent: the service's audio, in short pieces, only while live AI
-    is on and only after the operator agreed;
-  - where it goes: DeepInfra, which turns it into words and keeps nothing,
-    named as a service provider;
-  - what we keep: the account, and that a speech key was issued, never the
-    audio or the words;
-  - how to turn it off: Settings → AI.
-- **`site/terms.html`:** no change expected. To be checked.
+- **GPU load with the check on:** done. 4 streams per GPU still hold
+  (final words p50 1.7–1.8 s, phones 0.11 s late, a check 39 ms with 4 at
+  once); beyond 4, Modal starts another container.
+- **Talk-only false moves** (speech-negatives bench, public recordings).
+- **Lead time across a switch:** the lead follows the median delay of the
+  last 200 words, so after a switch it may lag about a minute behind.
 
-## Before building: measure
+### 2. Speech server out of research
 
-The gate is the real-time eval, played through DeepInfra from this Mac:
+- `speech-server/` at the repo root, from `research/spikes/qwen_gpu/`:
+  `app.py` (Modal), `server.py` (websocket), `serve_local.py`, tests for
+  the token check, the protocol and the watchdog.
+- **Pinned image:** exact versions of MLX (CUDA), the models by revision,
+  the phone head by hash. The engine code is copied from `sidecar/` at
+  build, so a deploy is tied to one app commit.
+- **Environments:** `modal deploy --env staging|production`. The token
+  secret is a Modal Secret per environment, never a file.
+- **Deploy from the Mac** (`scripts/deploy_speech.sh staging|production`),
+  like the release pipeline, with no CI minutes.
+- **Logs** say connections, GPU, step failures and timings, never words or
+  audio.
+- **Spend:** a workspace spend limit in Modal's dashboard (yours to set),
+  and `max_containers` in the app.
 
-- **The models:** Qwen3-ASR 0.6B vs 1.7B vs whisper-large-v3-turbo.
-- **The bar:** wrong-slide against the processor path (0.295) and the MLX
-  path. Also the round-trip latency at p50 and p90, since a slow p90 makes
-  slides late.
-- **What's needed:** a DeepInfra account and API key with the `inference`
-  and `account_scoped_jwt` scopes. The church recordings stay on the Mac.
-  This sends their audio to DeepInfra (zero retention), which needs your OK
-  as a one-off for the eval.
+### 3. Server (church-slides-server)
 
-## Prerequisites and order
+- `SPEECH_URL` and `SPEECH_TOKEN_SECRET` per environment; `/ai/key` adds
+  `speech` when the plan includes it.
+- Discovery capability `speech`.
+- Allowance: speech minutes counted per key renewal against the daily
+  audio allowance.
+- Tests: roles, plan, expiry, a token the speech server accepts.
 
-1. **Measure** (above). Pick the model.
-2. **Server:** the `speech-key` endpoint, the `speech` capability, and the
-   DeepInfra key as a Worker secret. Tests for roles, plan and expiry.
-3. **App:**
-   - hosted backend and key refresh;
-   - the one-time screen and the Settings → AI switch;
-   - the fallback and backoff;
-   - privacy page and CHANGELOG.
-4. **Ship sign-in in released builds.** Account features are
-   development-only today, and this needs them in the pilot build.
+### 4. App
+
+- `hosted_ai.rs` passes `speech` through to `hosted_ai.json`; the engine
+  picks `asr_remote` from it on computers without Apple silicon, in place of
+  the research tunable and environment variables.
+- The connection opens when live AI starts (this also wakes the GPU, under
+  10 s). Whisper covers the first seconds.
+- The one-time screen, the Settings → AI switch, a small status pill for
+  the operator while Whisper stands in.
+- **Check on Windows**, the computers this is for: a real service played
+  through the app, then a dropped network.
+- Remove the DeepInfra code (`asr/hosted_backend.py`, `asr_hosted`).
+
+### 5. Privacy, terms and release
+
+- **`site/privacy.html` changes meaning:** it says today that live audio
+  never leaves the computer. Hosted speech sends it to a server we run (on
+  Modal, in the United States), which turns it into words and keeps
+  neither. Name Modal as a service provider. `site/terms.html`: check.
+- CHANGELOG line; `docs/FEATURES.md`; move this file to `docs/done/`.
+- Release with the server change first, so older apps simply see no
+  `speech`.
+
+### Later
+
+- **Batching steps** across streams, to raise 4 streams per GPU.
+- **Regions** beyond us-east, if churches far away show late words.

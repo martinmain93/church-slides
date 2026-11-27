@@ -427,6 +427,15 @@ async def run_clip(clip: Clip, providers: list[str], keys: dict, variants: list[
         for k in range(int(os.environ.get("REMOTE_COPIES", "1"))):
             lab = label if k == 0 else f"{label}_{k}"
             be_k = be if k == 0 else RemoteStreamingBackend(os.environ["REMOTE_SPEECH_URL"], lambda: token)
+            if os.environ.get("REMOTE_PHONES"):
+                # Ask for the next-line check's phones too, as the app does,
+                # and log how late each tick arrives (room clock - t_end).
+                plog = (outdir / f"{lab}.phones.jsonl").open("w")
+
+                def on_phones(t_end, logits, ms, plog=plog):
+                    plog.write(json.dumps({"late": time.monotonic() - t0 - t_end, "ms": ms}) + "\n")
+
+                be_k.on_phones = on_phones
             threads.append(threading.Thread(target=run_wrapper, args=(lab, be_k, clip, t0, outdir / f"{lab}.jsonl")))
     if "mlx" in providers:
         from auto_presenter.asr.mlx_backend import MLXWhisperBackend
