@@ -42,7 +42,7 @@ export interface LibrarySource {
   deleteSong(id: string): Promise<void>;
   /** The song's chord chart, or null when it has none. */
   getChart(songId: string): Promise<SongChart | null>;
-  /** Song id → its chart's written key, for every song with chords. */
+  /** Song id → its chart's written key, for every song with a chart. */
   listChartKeys(): Promise<Record<string, string | null>>;
 
   listSetlists(): Promise<SetlistRow[]>;

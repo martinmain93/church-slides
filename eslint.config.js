@@ -69,9 +69,27 @@ export default tseslint.config(
     },
   },
   // The web app and its library run in a browser: nothing from Tauri, and
-  // nothing from the desktop's library either.
+  // nothing from the desktop's library either. That holds for the desktop
+  // views and helpers it shares too (the slide cards and what they use):
+  // add a file here when the web app starts importing it.
   {
-    files: ["src/web/**/*.{ts,tsx}", "src/library/web/**/*.{ts,tsx}", "src/lib/account/**/*.ts", "web/**/*.{ts,tsx}"],
+    files: [
+      "src/web/**/*.{ts,tsx}",
+      "src/library/web/**/*.{ts,tsx}",
+      "src/lib/account/**/*.ts",
+      "web/**/*.{ts,tsx}",
+      "src/components/KeyBadge.tsx",
+      "src/components/band/ChordLyrics.tsx",
+      "src/components/library/ChordPickerPopover.tsx",
+      "src/components/library/ProjectorSlideCard.tsx",
+      "src/components/library/SongPreview.tsx",
+      "src/components/presentation/MiniSlide.tsx",
+      "src/components/presentation/StageSurface.tsx",
+      "src/components/ui/textarea.tsx",
+      "src/lib/chords/{chart,chord,editorText,keyColor}.ts",
+      "src/lib/chords/import/text.ts",
+      "src/lib/{containerUnits,deleteSongText,look,parseSong,serviceItemContent,setlistName,slideSequence,slideSplit,useServiceDateField,utils}.ts",
+    ],
     rules: {
       "no-restricted-imports": [
         "error",

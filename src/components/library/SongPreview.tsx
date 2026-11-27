@@ -70,8 +70,8 @@ interface Props {
   chart?: ChordChart | null;
   /** The song has chords, shown or not: a split then keeps to line breaks. */
   hasChords?: boolean;
-  /** Called just before a slide is split, so the editor can offer Undo. */
-  onBeforeSplit?: () => void;
+  /** Called just before a slide is split or deleted, so the editor can offer Undo. */
+  onBeforeChange?: (change: "split" | "delete") => void;
   /** Key used for the quick diatonic chord palette and Nashville numbers. */
   chartKey?: string | null;
   /** Whether chords should be spelled with flats (true) or sharps (false). */
@@ -229,7 +229,7 @@ export function SongPreview({
   slideOrder,
   chart,
   hasChords = false,
-  onBeforeSplit,
+  onBeforeChange,
   chartKey,
   preferFlats,
   displayMode = "letters",
@@ -697,7 +697,7 @@ export function SongPreview({
     }));
     const nextList = splitAt(currentList, idx, undefined, { midLine: !hasChords });
     if (nextList === currentList) return;
-    onBeforeSplit?.();
+    onBeforeChange?.("split");
     if (editingSlideIdx === idx) setEditingSlideIdx(null);
     commitSlidesMutation(nextList);
     setSelectedSlideIdx(idx);
@@ -710,6 +710,7 @@ export function SongPreview({
       lyrics: s.lyrics,
     }));
     const nextList = currentList.filter((_, i) => i !== idx);
+    if (slides[idx]?.lyrics !== NEW_SLIDE_STAND_IN) onBeforeChange?.("delete");
     if (editingSlideIdx === idx) setEditingSlideIdx(null);
     commitSlidesMutation(nextList);
     if (selectedSlideIdx !== null) {
@@ -746,7 +747,7 @@ export function SongPreview({
               <Plus className="size-5 text-primary" />
               <span className="font-medium text-foreground">Add first slide</span>
               <span className="text-[11px] text-muted-foreground">
-                Or click &ldquo;Raw text&rdquo; above to paste a full song
+                Or use &ldquo;Edit as text&rdquo; to paste a whole song
               </span>
             </span>
           </button>
@@ -864,7 +865,8 @@ export function SongPreview({
                   type="button"
                   data-testid="add-slide-card-btn"
                   onClick={handleAddSlide}
-                  className="relative aspect-video w-full overflow-hidden rounded-md border border-dashed border-border text-xs text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground"
+                  // One column (a phone): a slim row, not a whole empty slide.
+                  className="relative h-12 w-full overflow-hidden rounded-md border border-dashed border-border text-xs text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground sm:aspect-video sm:h-auto"
                 >
                   <span className="absolute inset-0 flex items-center justify-center gap-1.5">
                     <Plus className="size-4" />

@@ -46,7 +46,7 @@ export function ServicesPage({ canEdit }: { canEdit: boolean }) {
         <Empty>
           No services yet.{" "}
           {canEdit
-            ? "Plan one here and it's ready on the slides computer. The slides computer's own services come with its songs (Settings → Account there, “Use this computer’s songs”)."
+            ? "Plan one here and it's ready on the slides computer. When the organization's owner brings in their slides computer's songs, its services come too."
             : ""}
         </Empty>
       ) : (

@@ -70,7 +70,7 @@ export function PageHeader({
 }) {
   return (
     <header className="sticky top-0 z-10 border-b border-border bg-background pt-[env(safe-area-inset-top)]">
-      <div className={cn("flex min-h-14 items-center gap-1 py-1.5 pr-2", back ? "pl-1" : "pl-4")}>
+      <div className={cn("flex min-h-14 items-center gap-1 py-1.5 pr-3", back ? "pl-1" : "pl-4")}>
         {back && (
           <a href={back} className={iconButtonClass} aria-label="Back">
             <ChevronLeft className="size-5" />

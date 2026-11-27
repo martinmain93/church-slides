@@ -10,7 +10,7 @@
  */
 
 import { type ParsedSlide } from "@/lib/parseSong";
-import { itemKind, type ItemKind } from "@/lib/serviceItems";
+import { itemKind, type ItemKind } from "@/lib/serviceItemContent";
 import { parseSlidesOverride, resolveSlideSequence } from "@/lib/slideSequence";
 import type { SetlistDetail, SongRow } from "@/lib/tauri";
 

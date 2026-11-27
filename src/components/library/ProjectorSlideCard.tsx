@@ -3,10 +3,10 @@
  * AI take leaves on the cards it changed.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Copy, GripVertical, Pencil, Scissors, Sparkles, Trash2 } from "lucide-react";
+import { Copy, GripVertical, MoreHorizontal, Pencil, Scissors, Sparkles, Trash2 } from "lucide-react";
 
 import { sectionLabel, sectionLabelClass, type ParsedSection, type SectionType } from "@/lib/parseSong";
 import type { SongSuggestion } from "@/lib/chords/suggestions";
@@ -82,26 +82,35 @@ export function ProjectorSlideCard({
     id: slide.id,
     disabled: !editable,
   });
-  const [sectionMenuOpen, setSectionMenuOpen] = useState(false);
-  const badgeRef = useRef<HTMLDivElement | null>(null);
+  const [menu, setMenu] = useState<"section" | "more" | null>(null);
+  const cardRef = useRef<HTMLDivElement | null>(null);
 
+  // A menu closes on Escape or a tap anywhere outside the card and its menus.
   useEffect(() => {
-    if (!sectionMenuOpen) return;
-    function onDown(e: MouseEvent) {
-      if (badgeRef.current && !badgeRef.current.contains(e.target as Node)) {
-        setSectionMenuOpen(false);
-      }
+    if (!menu) return;
+    function onDown(e: PointerEvent) {
+      if (cardRef.current && !cardRef.current.contains(e.target as Node)) setMenu(null);
     }
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
-  }, [sectionMenuOpen]);
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setMenu(null);
+    }
+    document.addEventListener("pointerdown", onDown);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onDown);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [menu]);
 
   const dndTransform = CSS.Transform.toString(transform);
   const style: React.CSSProperties = {
-    ...stageThumbnailStyle(look),
     ...(dndTransform ? { transform: dndTransform } : {}),
     ...(transition ? { transition } : {}),
     opacity: isDragging ? 0.6 : 1,
+  };
+  const setRefs = (el: HTMLDivElement | null) => {
+    setNodeRef(el);
+    cardRef.current = el;
   };
 
   const lineCount = Math.max(1, editingDraft.split("\n").length);
@@ -111,35 +120,65 @@ export function ProjectorSlideCard({
   // A true-scale 16:9 picture of the screen; only the box being typed in
   // grows, so nothing typed is ever hidden.
   const expanded = editing;
-  const contentPos = expanded ? "relative col-start-1 row-start-1 py-9" : "absolute inset-0 py-5";
+  // Clear of the corner buttons, which are bigger on a touch screen.
+  const contentPos = expanded
+    ? "relative col-start-1 row-start-1 py-9 [@media(pointer:coarse)]:pt-14"
+    : "absolute inset-0 py-5";
+
+  // Fit the box to its words again once the card knows its font size (it's
+  // measured after the first paint), so long lines wrap into view rather
+  // than behind a scrollbar.
+  const box = useRef<HTMLTextAreaElement | null>(null);
+  useLayoutEffect(() => {
+    if (editing) growToFit(box.current);
+  }, [editing, editingDraft, mini.text.fontSize]);
+
+  // The corner buttons show on the selected card (and on hover, with a
+  // mouse). Hidden, they take no taps: one stray tap mustn't delete a slide.
+  const showActions = selected || editing;
+  const draft = editing ? editingDraft : slide.lyrics;
 
   return (
     <div
-      ref={setNodeRef}
+      ref={setRefs}
       style={style}
       data-testid="preview-slide"
       data-selected={selected ? "true" : undefined}
       data-expanded={expanded ? "true" : undefined}
-      className={`group relative w-full overflow-hidden rounded-md border shadow-xs transition-[border-color,box-shadow] duration-250 ease-out ${
-        expanded ? "grid" : "aspect-video"
+      className="group relative w-full"
+    >
+    <div
+      style={stageThumbnailStyle(look)}
+      className={`relative w-full overflow-hidden rounded-md border shadow-xs transition-[border-color,box-shadow] duration-250 ease-out ${
+        // One column, the card's width: never as wide as the words in it.
+        expanded ? "grid grid-cols-1" : "aspect-video"
       } ${
         selected || editing
           ? "border-primary ring-2 ring-primary"
-          : "border-border hover:border-primary/50 hover:ring-1 hover:ring-primary/50"
+          : "border-border dark:border-white/25 [@media(hover:hover)]:hover:border-primary/50 [@media(hover:hover)]:hover:ring-1 [@media(hover:hover)]:hover:ring-primary/50"
       }`}
     >
       {expanded && <div aria-hidden className="col-start-1 row-start-1 aspect-video w-full" />}
-      {/* Top-left section badge (clickable when editable to change section type/number) */}
-      <div ref={badgeRef} className="absolute left-2.5 top-2 z-30">
+      {/* Keeps the labels and buttons readable over a slide full of words. */}
+      {editable && (
+        <div
+          aria-hidden
+          className={`pointer-events-none absolute inset-x-0 top-0 z-20 h-12 bg-gradient-to-b from-black/60 to-transparent ${REVEAL} ${showActions ? SHOWN : ""}`}
+        />
+      )}
+      {/* Top-left section badge (tappable when editable, to change the section) */}
+      <div className="absolute left-2 top-2 z-30">
         {editable ? (
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
-              setSectionMenuOpen((v) => !v);
+              setMenu((m) => (m === "section" ? null : "section"));
             }}
-            title="Click to change section label"
-            className={`truncate rounded bg-black/65 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider transition-colors hover:bg-black/85 ${sectionLabelClass(slide.section.type)}`}
+            title="Change section"
+            aria-label={`Section: ${sectionLabel(slide.section)}. Change section`}
+            aria-expanded={menu === "section"}
+            className={`truncate rounded bg-black/65 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider transition-colors hover:bg-black/85 [@media(pointer:coarse)]:px-2.5 [@media(pointer:coarse)]:py-1.5 [@media(pointer:coarse)]:text-[11px] ${sectionLabelClass(slide.section.type)}`}
           >
             {sectionLabel(slide.section)}
           </button>
@@ -150,77 +189,37 @@ export function ProjectorSlideCard({
             {sectionLabel(slide.section)}
           </span>
         )}
-        {sectionMenuOpen && (
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="mt-1 flex w-36 flex-col gap-0.5 rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-xl"
-          >
-            {SECTION_CHOICES.map((choice) => (
-              <div key={choice.type} className="flex items-center justify-between gap-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    onChangeSection({ type: choice.type, number: 1 });
-                    setSectionMenuOpen(false);
-                  }}
-                  className="flex-1 rounded px-2 py-1 text-left text-[11px] hover:bg-accent"
-                >
-                  {choice.label}
-                </button>
-                {(choice.type === "verse" || choice.type === "chorus" || choice.type === "bridge") && (
-                  <div className="flex items-center gap-0.5 pr-1">
-                    {[1, 2, 3, 4].map((num) => (
-                      <button
-                        key={num}
-                        type="button"
-                        onClick={() => {
-                          onChangeSection({ type: choice.type, number: num });
-                          setSectionMenuOpen(false);
-                        }}
-                        className="rounded px-1 py-0.5 font-mono text-[10px] text-muted-foreground hover:bg-accent hover:text-foreground"
-                      >
-                        {num}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
       </div>
 
       {/* Slide actions, in the same order as a service's slide cards: Edit,
-          Split, then the rest. Shown on hover, and always on the open card
-          (a touch screen has no hover). */}
+          Split, then the rest behind "⋯", and the drag handle. */}
       {editable && (
-        <div
-          className={`absolute right-2 top-2 z-30 flex items-center gap-1 transition-opacity duration-200 ease-out group-hover:opacity-100 focus-within:opacity-100 ${
-            selected || editing ? "opacity-100" : "opacity-0"
-          }`}
-        >
-          <CardAction label="Edit slide text" onClick={onStartEdit}>
-            <Pencil className="size-3.5 shrink-0" />
-          </CardAction>
+        <div className={`absolute right-2 top-2 z-30 flex items-center gap-1 ${REVEAL} ${showActions ? SHOWN : ""}`}>
+          {!editing && (
+            <CardAction label="Edit slide text" onClick={onStartEdit}>
+              <Pencil className="size-3.5 shrink-0" />
+            </CardAction>
+          )}
           {onSplit &&
-            (offerSplit(editing ? editingDraft : slide.lyrics, { midLine: splitMidLine }) ||
+            (offerSplit(draft, { midLine: splitMidLine }) ||
               (overflows && canSplit(slide.lyrics, { midLine: splitMidLine }))) && (
             <CardAction
               label="Split slide in two"
               onClick={onSplit}
               // A crowded slide asks for it.
-              tone={overflows || isCrowded(editing ? editingDraft : slide.lyrics) ? "suggest" : "plain"}
+              tone={overflows || isCrowded(draft) ? "suggest" : "plain"}
               // Clicking it while typing: the text box's blur mustn't eat the click.
               onMouseDown={(e) => e.preventDefault()}
             >
               <Scissors className="size-3.5 shrink-0" />
             </CardAction>
           )}
-          <CardAction label="Duplicate slide" onClick={onDuplicate}>
-            <Copy className="size-3.5 shrink-0" />
-          </CardAction>
-          <CardAction label="Delete slide" onClick={onDelete} tone="danger">
-            <Trash2 className="size-3.5 shrink-0" />
+          <CardAction
+            label="More slide actions"
+            onClick={() => setMenu((m) => (m === "more" ? null : "more"))}
+            onMouseDown={(e) => e.preventDefault()}
+          >
+            <MoreHorizontal className="size-3.5 shrink-0" />
           </CardAction>
           <button
             {...attributes}
@@ -228,7 +227,8 @@ export function ProjectorSlideCard({
             onClick={(e) => e.stopPropagation()}
             aria-label="Drag to reorder slide"
             title="Drag to reorder slide"
-            className={cn(CARD_ACTION, "cursor-grab hover:border-white/40 hover:bg-zinc-700 active:cursor-grabbing")}
+            // touch-none: on a phone, dragging the handle moves the slide, not the page.
+            className={cn(CARD_ACTION, "cursor-grab touch-none [@media(hover:hover)]:hover:border-white/40 [@media(hover:hover)]:hover:bg-zinc-700 active:cursor-grabbing")}
           >
             <GripVertical className="size-3.5 shrink-0" />
           </button>
@@ -243,7 +243,7 @@ export function ProjectorSlideCard({
           <div ref={mini.ref} style={mini.container} className="w-full">
           <Textarea
             autoFocus
-            ref={growToFit}
+            ref={box}
             rows={lineCount}
             value={editingDraft}
             placeholder="New slide lyrics…"
@@ -269,18 +269,36 @@ export function ProjectorSlideCard({
         <button
           type="button"
           onClick={(e) => {
-            if (editable) {
+            // The first tap selects (showing its buttons); a tap on the
+            // selected card, or a double-click, opens its words.
+            if (editable && selected) {
               onStartEdit();
             } else {
               e.currentTarget.blur();
               onSelect();
             }
           }}
-          aria-label="Select slide"
+          onDoubleClick={editable ? onStartEdit : undefined}
+          aria-label={editable && selected ? "Edit slide text" : "Select slide"}
           className="absolute inset-0 cursor-pointer overflow-hidden text-center"
         >
-          <MiniSlide lyrics={slide.lyrics} look={look} empty="Empty slide — click to edit" onOverflow={setOverflows} />
+          <MiniSlide lyrics={slide.lyrics} look={look} empty="Empty slide" onOverflow={setOverflows} />
         </button>
+      )}
+
+      {/* While typing, the words are measured on a hidden true-scale screen,
+          so "Too long" stays honest as they grow. */}
+      {editing && (
+        <>
+          <div aria-hidden className="invisible absolute inset-x-0 top-0 aspect-video">
+            <MiniSlide lyrics={editingDraft} look={look} empty="" onOverflow={setOverflows} />
+          </div>
+          {overflows && (
+            <span className="pointer-events-none absolute bottom-1.5 left-1/2 z-30 -translate-x-1/2 rounded bg-amber-500/90 px-1.5 py-0.5 font-sans text-[10px] font-semibold text-zinc-950">
+              Too long for the screen
+            </span>
+          )}
+        </>
       )}
 
       {/* Bottom Ghost Suggestion Pill on 16:9 Slide Card */}
@@ -319,21 +337,125 @@ export function ProjectorSlideCard({
         </div>
       )}
     </div>
+
+      {/* The menus sit outside the clipped card, so none of them is cut off. */}
+      {menu === "section" && (
+        <div
+          role="menu"
+          onClick={(e) => e.stopPropagation()}
+          className="absolute left-2 top-9 z-50 flex w-max min-w-48 flex-col gap-0.5 rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-xl"
+        >
+          {SECTION_CHOICES.map((choice) => (
+            <div key={choice.type} className="flex items-center justify-between gap-1">
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  onChangeSection({ type: choice.type, number: 1 });
+                  setMenu(null);
+                }}
+                className="min-h-8 flex-1 rounded px-2 text-left text-xs hover:bg-accent [@media(pointer:coarse)]:min-h-10 [@media(pointer:coarse)]:text-sm"
+              >
+                {choice.label}
+              </button>
+              {NUMBERED.has(choice.type) && (
+                <div className="flex items-center">
+                  {[1, 2, 3, 4].map((num) => (
+                    <button
+                      key={num}
+                      type="button"
+                      role="menuitem"
+                      aria-label={`${choice.label} ${num}`}
+                      onClick={() => {
+                        onChangeSection({ type: choice.type, number: num });
+                        setMenu(null);
+                      }}
+                      className="flex size-7 items-center justify-center rounded font-mono text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground [@media(pointer:coarse)]:size-9 [@media(pointer:coarse)]:text-xs"
+                    >
+                      {num}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      {menu === "more" && (
+        <div
+          role="menu"
+          onClick={(e) => e.stopPropagation()}
+          className="absolute right-2 top-10 z-50 min-w-36 rounded-md border border-border bg-popover p-1 text-sm text-popover-foreground shadow-xl [@media(pointer:coarse)]:top-14"
+        >
+          <MenuItem
+            label="Duplicate"
+            icon={<Copy className="size-3.5" />}
+            onClick={() => {
+              setMenu(null);
+              onDuplicate();
+            }}
+          />
+          <MenuItem
+            label="Delete slide"
+            destructive
+            icon={<Trash2 className="size-3.5" />}
+            onClick={() => {
+              setMenu(null);
+              onDelete();
+            }}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+const NUMBERED = new Set<SectionType>(["verse", "chorus", "bridge"]);
+
+/** Hidden corner chrome: see-through and untappable until it's shown. */
+const REVEAL =
+  "invisible opacity-0 transition-[opacity,visibility] duration-200 ease-out group-focus-within:visible group-focus-within:opacity-100 [@media(hover:hover)]:group-hover:visible [@media(hover:hover)]:group-hover:opacity-100";
+const SHOWN = "!visible !opacity-100";
+
+function MenuItem({
+  label,
+  icon,
+  onClick,
+  destructive,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  onClick: () => void;
+  destructive?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      onClick={onClick}
+      className={`flex min-h-8 w-full items-center gap-2 rounded-sm px-2 text-left hover:bg-accent [@media(pointer:coarse)]:min-h-11 ${
+        destructive ? "text-destructive" : ""
+      }`}
+    >
+      {icon}
+      {label}
+    </button>
   );
 }
 
 const CARD_ACTION =
-  "flex size-7 items-center justify-center rounded-md border border-white/15 bg-zinc-900/90 text-zinc-100 shadow-sm outline-none transition-colors duration-150 focus-visible:ring-1 focus-visible:ring-white/40";
+  "flex size-7 [@media(pointer:coarse)]:size-10 items-center justify-center rounded-md border border-white/15 bg-zinc-900/90 text-zinc-100 shadow-sm outline-none transition-colors duration-150 focus-visible:ring-1 focus-visible:ring-white/40";
 
+// Hover only where there is one: on a phone a tapped button would stay lit.
 const TONE = {
-  plain: "hover:border-white/40 hover:bg-zinc-700",
-  suggest: "border-amber-400/70 text-amber-300 hover:border-amber-400 hover:bg-amber-500 hover:text-zinc-950",
-  danger: "hover:border-destructive hover:bg-destructive hover:text-destructive-foreground",
+  plain: "[@media(hover:hover)]:hover:border-white/40 [@media(hover:hover)]:hover:bg-zinc-700",
+  suggest:
+    "border-amber-400/70 text-amber-300 [@media(hover:hover)]:hover:border-amber-400 [@media(hover:hover)]:hover:bg-amber-500 [@media(hover:hover)]:hover:text-zinc-950",
 };
 
-/** One of a slide card's corner buttons. Neutral, except Delete (red) and a
- * split the slide is asking for (amber). */
-export function CardAction({
+/** One of a slide card's corner buttons. Neutral, except a split the slide
+ * is asking for (amber). */
+function CardAction({
   label,
   onClick,
   onMouseDown,

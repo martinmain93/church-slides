@@ -52,9 +52,9 @@ export function SongEditor({ id }: { id: string | null }) {
   const [look, setLook] = useState<DisplayLook>(DEFAULT_LOOK);
   // A new song is usually pasted in; an existing one is changed slide by slide.
   const [asText, setAsText] = useState(!id);
-  /** The words before the last split, while it can still be undone. */
-  const [beforeSplit, setBeforeSplit] = useState<string | null>(null);
-  const splitting = useRef(false);
+  /** The words before the last split or deleted slide, while it can be undone. */
+  const [undo, setUndo] = useState<{ change: "split" | "delete"; body: string } | null>(null);
+  const undoable = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [titleError, setTitleError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -80,8 +80,11 @@ export function SongEditor({ id }: { id: string | null }) {
     })();
   }, [id, lib]);
 
+  // The organization's look, kept current as other computers change it.
   useEffect(() => {
-    lib.getLook().then(setLook, () => undefined);
+    const read = () => lib.getLook().then(setLook, () => undefined);
+    void read();
+    return lib.onChange(() => void read());
   }, [lib]);
 
   const dirty = !!form && !saving && !same(form, opened ? formOf(opened) : BLANK);
@@ -96,16 +99,17 @@ export function SongEditor({ id }: { id: string | null }) {
     if (k === "title") setTitleError(null);
   };
 
-  /** A change made on the slides. Any change but a split ends its Undo. */
+  /** A change made on the slides. Any other change ends the last one's Undo. */
   const changeBody = (body: string) => {
-    if (!splitting.current) setBeforeSplit(null);
-    splitting.current = false;
+    if (!undoable.current) setUndo(null);
+    undoable.current = false;
     setForm((f) => (f ? { ...f, body_text: body } : f));
   };
-  const undoSplit = () => {
-    if (beforeSplit === null) return;
-    setForm((f) => (f ? { ...f, body_text: beforeSplit } : f));
-    setBeforeSplit(null);
+  const undoChange = () => {
+    if (!undo) return;
+    const { body } = undo;
+    setForm((f) => (f ? { ...f, body_text: body } : f));
+    setUndo(null);
   };
 
   const back = id ? href({ page: "song", id, key: null }) : href({ page: "songs" });
@@ -194,19 +198,20 @@ export function SongEditor({ id }: { id: string | null }) {
           <section className="space-y-1.5" aria-label="Words">
             <div className="flex items-center gap-2">
               <h2 className="min-w-0 flex-1 text-sm font-medium">Words</h2>
-              {beforeSplit !== null && !asText && (
-                <QuietButton className="h-9 px-3" onClick={undoSplit} data-testid="undo-split">
-                  Undo split
+              {undo && !asText && (
+                <QuietButton className="h-9 px-3" onClick={undoChange} data-testid="undo-change">
+                  {undo.change === "split" ? "Undo split" : "Undo delete"}
                 </QuietButton>
               )}
-              <QuietButton className="h-9 px-3" 
+              <QuietButton
+                className="h-9 px-3"
                 onClick={() => {
                   setAsText((t) => !t);
-                  setBeforeSplit(null);
+                  setUndo(null);
                 }}
                 data-testid="words-as-text"
               >
-                {asText ? "Show slides" : "Edit as text"}
+                {asText ? "Edit as slides" : "Edit as text"}
               </QuietButton>
             </div>
             {asText ? (
@@ -224,9 +229,9 @@ export function SongEditor({ id }: { id: string | null }) {
                 body={form.body_text}
                 look={look}
                 hasChords={hasChords}
-                onBeforeSplit={() => {
-                  splitting.current = true;
-                  setBeforeSplit(form.body_text);
+                onBeforeChange={(change) => {
+                  undoable.current = true;
+                  setUndo({ change, body: form.body_text });
                 }}
                 onChangeBody={changeBody}
               />
@@ -234,8 +239,8 @@ export function SongEditor({ id }: { id: string | null }) {
             <p className="text-xs leading-relaxed text-muted-foreground">
               {asText
                 ? "A line like [Verse 1] starts a section; a blank line starts a new slide."
-                : "Tap a slide to change it. A long one gets scissors to split it in two."}
-              {hasChart && " The chords stay with the song."}
+                : "Tap a slide to pick it, and again to edit it. A long one gets scissors to split it."}
+              {hasChart && " Chords are kept and follow the new words."}
             </p>
           </section>
           <Field
