@@ -666,6 +666,70 @@ class PhoneListener:
         self._stop.set()
 
 
+class RemotePhones:
+    """`PhoneListener`'s place when a speech server runs the check's model on
+    its own audio (`asr.remote_backend`, `next_line_server`): the server
+    pushes each tick's phone logits, and this hands them to `on_logits` on
+    a thread of its own. Only the newest tick waits, as in `PhoneListener`.
+    Nothing arrives while the computer's own engine stands in for the
+    server, so the check simply waits."""
+
+    def __init__(self, on_logits) -> None:
+        import queue
+        import threading
+
+        self._on_logits = on_logits
+        self._q: queue.Queue = queue.Queue(maxsize=1)
+        self._stop = threading.Event()
+        self.paused = False
+        self.ms: list[float] = []  # the server's per-check milliseconds
+        self.skipped = 0
+        self.checks = 0
+        self._thread = threading.Thread(target=self._run, name="next-line-remote", daemon=True)
+        self._thread.start()
+
+    def feed(self, samples: np.ndarray, t_end: float) -> None:
+        """The audio is the server's to read: nothing to do here."""
+
+    def push(self, t_end: float, logits: np.ndarray, ms: float | None = None) -> None:
+        import queue
+
+        if self.paused or self._stop.is_set():
+            return
+        if ms is not None:
+            self.ms = [*self.ms[-59:], ms]
+        try:
+            self._q.put_nowait((t_end, logits))
+        except queue.Full:
+            try:
+                self._q.get_nowait()
+                self.skipped += 1
+            except queue.Empty:
+                pass
+            try:
+                self._q.put_nowait((t_end, logits))
+            except queue.Full:
+                self.skipped += 1
+
+    def _run(self) -> None:
+        import queue
+
+        while not self._stop.is_set():
+            try:
+                t_end, logits = self._q.get(timeout=0.5)
+            except queue.Empty:
+                continue
+            try:
+                self._on_logits(t_end, logits)
+            except Exception:
+                log.exception("next-line check failed; off for this session")
+                return
+            self.checks += 1
+
+    def stop(self) -> None:
+        self._stop.set()
+
+
 def load_head(name: str = MODEL_FILE) -> PhoneHead | None:
     p = model_dir() / name
     if not p.is_file():

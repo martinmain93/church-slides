@@ -265,8 +265,20 @@ def start_next_line_check(followers: LiveFollowers, backend: object) -> None:
     without it."""
     from auto_presenter.asr.mlx_backend import MLXWhisperBackend
     from auto_presenter.asr.qwen_backend import QwenStreamingBackend
+    from auto_presenter.asr.remote_backend import RemoteStreamingBackend
     from auto_presenter.follower import next_line
 
+    if isinstance(backend, RemoteStreamingBackend):
+        # the speech server runs Qwen's audio tower and the Qwen phone model
+        # on its own audio and pushes the phones; while the computer's own
+        # engine stands in, none arrive and the check waits
+        followers.band_playing = lambda: _state.band.playing
+        followers.start_next_line(None, None, next_line.qwen_tuning(), remote=backend)
+        log.info(
+            "next-line check on for %d songs (Qwen phones, from the speech server)",
+            len(followers.songs),
+        )
+        return
     if isinstance(backend, QwenStreamingBackend):
         head = next_line.load_head(next_line.QWEN_MODEL_FILE)
         if head is None:

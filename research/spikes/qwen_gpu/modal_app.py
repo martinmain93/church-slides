@@ -11,13 +11,17 @@ the same words back that the Mac's engine would emit
     modal app stop church-slides-speech                     # stop paying
 
 Wire protocol (version 0):
-  client -> server  text  {"type": "start", "t0": <audio seconds of the first sample>}
+  client -> server  text  {"type": "start", "t0": <audio seconds of the first sample>,
+                           "phones": <bool: also send the next-line check's phones>}
                     bytes 16 kHz mono int16 little-endian PCM, contiguous
                     text  {"type": "end"}   finish: flush the last words
   server -> client  text  {"type": "ready", "load_s": ..., "gpu": ...}
                     text  {"type": "words", "final": bool, "segment_id": int,
                            "ends_segment": bool, "pass_s": float,
                            "words": [[text, t_start, t_end, confidence], ...]}
+                    text  {"type": "phones", "t_end": <audio s>, "shape": [frames, phones],
+                           "logits": <base64 float16>, "ms": <server ms for this check>}
+                          every 0.25 s of audio (`follower.next_line`, Qwen head)
 
 Auth: `?token=<payload>.<hmac>` signed with the SPEECH_TOKEN_SECRET Modal
 secret (HMAC-SHA256 over the payload, `{"exp": <unix s>}` base64url). Our
@@ -38,6 +42,12 @@ HERE = Path(__file__).resolve().parent
 # in the container this file sits at /root/modal_app.py: only paths built locally matter
 SIDECAR = HERE.parents[2] / "sidecar" / "auto_presenter" if len(HERE.parents) > 2 else HERE
 GPU = os.environ.get("SPEECH_GPU", "L4")
+#: The Qwen next-line phone model (scripts/setup_next_line_model.py installs it)
+PHONE_HEAD = Path(os.environ.get(
+    "PHONE_HEAD",
+    Path.home() / "Library/Application Support/com.churchslides.app/models/next_line"
+    / "next_line_head_qwen.npz",
+))
 WARM_AUDIO = Path(os.environ.get(
     "WARM_AUDIO", Path.home() / "Development/auto-presenter-research/work/hosted_speech/warm_hymn.npy"
 ))
@@ -53,9 +63,26 @@ def _download() -> None:
         snapshot_download(repo)
 
 
+def _kernel_dirs() -> None:
+    """Point MLX's and the driver's kernel caches at this GPU architecture's
+    own folder, before MLX loads. The cache is keyed by kernel name only, so
+    an L4's (8.9) kernels fail to load on an A10 (8.6): 2026-11-26, "Failed
+    to load compiled gather_int32_uint32_1 kernel" on every step."""
+    import subprocess
+
+    cap = subprocess.run(
+        ["nvidia-smi", "--query-gpu=compute_cap", "--format=csv,noheader"],
+        capture_output=True, text=True,
+    ).stdout.strip().splitlines()[0].replace(".", "")
+    os.environ["MLX_PTX_CACHE_DIR"] = f"/root/kernels/sm{cap}/mlx"
+    os.environ["CUDA_CACHE_PATH"] = f"/root/kernels/sm{cap}/nv"
+
+
 def _compile_kernels() -> None:
     """Stream 40 s of a public-domain hymn through the engine at build time, so
-    every kernel a service needs is compiled before any church connects."""
+    every kernel a service needs is compiled before any church connects. Run
+    once per GPU architecture the app may be given (`gpu=[...]`)."""
+    _kernel_dirs()
     import time
 
     import numpy as np
@@ -72,6 +99,23 @@ def _compile_kernels() -> None:
         for i in range(0, len(pcm), 1600)
     ]
     words = [w.text for e in b.streamer().transcribe(frames) for w in e.words if e.is_final]
+    from auto_presenter.follower import next_line
+
+    encode = next_line.qwen_encoder(b)
+    head = next_line.PhoneHead.load(Path("/root/spike/next_line_head_qwen.npz"))
+    n = int(next_line.WINDOW_S * 16000)
+    for i in range(n, len(pcm), 4000):
+        head(encode(pcm[i - n : i]))
+    # gathers the hymn may not reach (2026-11-26: "Failed to load compiled
+    # gather_int32_uint32_1 kernel" on church audio, every step after): every
+    # value/index dtype pair, by index and by take, compiled here
+    import mlx.core as mx
+
+    for vt in (mx.int32, mx.uint32, mx.int64, mx.float16, mx.float32, mx.bfloat16):
+        x = mx.arange(64).astype(vt).reshape(8, 8)
+        for it in (mx.int32, mx.uint32, mx.int64):
+            i = mx.array([1, 3]).astype(it)
+            mx.eval(x.reshape(-1)[i], x[i], mx.take(x, i, axis=1), mx.take(x.reshape(-1), i))
     print(f"compiled kernels in {time.monotonic() - t:.1f}s; heard {len(words)} words")
 
 
@@ -99,16 +143,17 @@ image = (
     .env({
         "HF_HUB_OFFLINE": "1",
         "AUTO_PRESENTER_QWEN_NO_PROBS": os.environ.get("NO_PROBS", "0"),
-        # MLX's compiled kernels (PTX) and the driver's (SASS) live in the image:
-        # compiled once at build, on the same GPU type (`_compile_kernels`)
-        "MLX_PTX_CACHE_DIR": "/root/kernels/mlx",
-        "CUDA_CACHE_PATH": "/root/kernels/nv",
+        # MLX's compiled kernels (PTX) and the driver's (SASS) live in the image,
+        # one folder per GPU architecture (`_kernel_dirs`), compiled at build
         "CUDA_CACHE_MAXSIZE": "4294967296",
     })
     .add_local_dir(SIDECAR, remote_path="/root/auto_presenter", copy=True)
     # 40 s of a LibriVox (public-domain) hymn, kept outside the repo
     .add_local_file(WARM_AUDIO, remote_path="/root/spike/warm_hymn.npy", copy=True)
-    .run_function(_compile_kernels, gpu=GPU)
+    .add_local_file(PHONE_HEAD, remote_path="/root/spike/next_line_head_qwen.npz", copy=True)
+    # L4 and L40S are both 8.9; A10 is 8.6
+    .run_function(_compile_kernels, gpu="L4")
+    .run_function(_compile_kernels, gpu="A10")
     .add_local_file(HERE / "speech_server.py", remote_path="/root/spike/speech_server.py")
 )
 
@@ -117,7 +162,8 @@ app = modal.App("church-slides-speech", image=image)
 
 @app.cls(
     # L4 first; when Modal has none free (2026-11-26: queued minutes for one),
-    # take the next type rather than wait. PTX kernels carry across types.
+    # take the next type rather than wait. Kernels are compiled for each
+    # architecture here (`_kernel_dirs`): they don't carry across.
     gpu=[GPU, "A10", "L40S"],
     scaledown_window=20 * 60,  # a service's quiet stretches never cold-start it
     timeout=4 * 60 * 60,  # one websocket can last a whole service
@@ -133,11 +179,20 @@ class Speech:
         import time
 
         t = time.monotonic()
+        _kernel_dirs()
         from auto_presenter.asr.qwen_backend import QwenStreamingBackend
 
         self.backend = QwenStreamingBackend(None)
         self.backend.warm()  # loads both models and runs one step (compiles kernels)
         self.load_s = time.monotonic() - t
+        import subprocess
+
+        # the GPU Modal actually gave us (any of `gpu=[...]`), not the first asked for
+        self.gpu = subprocess.run(
+            ["nvidia-smi", "--query-gpu=name,compute_cap", "--format=csv,noheader"],
+            capture_output=True, text=True,
+        ).stdout.strip() or GPU
+        print(f"loaded in {self.load_s:.1f}s on {self.gpu}", flush=True)
 
     @modal.asgi_app()
     def web(self):
@@ -146,8 +201,12 @@ class Speech:
         sys.path.insert(0, "/root/spike")
         from speech_server import make_api
 
+        from auto_presenter.follower import next_line
+
+        head = next_line.PhoneHead.load(Path("/root/spike/next_line_head_qwen.npz"))
         return make_api(
-            self.backend, secret=os.environ["SPEECH_TOKEN_SECRET"], gpu=GPU, load_s=self.load_s
+            self.backend, secret=os.environ["SPEECH_TOKEN_SECRET"], gpu=self.gpu, load_s=self.load_s,
+            phone_head=head,
         )
 
 

@@ -61,6 +61,10 @@ class RemoteStreamingBackend:
         #: The session's own Whisper, for the follower (as `QwenStreamingBackend.whisper`).
         self.whisper = whisper
         self.ready_info: dict[str, Any] = {}
+        #: The next-line check's phones, when the follower runs it on the
+        #: server: `(t_end, logits[T, P], server_ms)` per tick, on the
+        #: receiver thread (`next_line.RemotePhones.push` queues them).
+        self.on_phones: Callable[..., None] | None = None
 
     def name(self) -> str:
         return "remote-qwen3-asr"
@@ -73,7 +77,9 @@ class RemoteStreamingBackend:
             raise ConnectionError("no speech token")
         ws = connect(
             f"{self.url}/stream?token={token}",
-            open_timeout=CONNECT_TIMEOUT_S, max_size=2**22, compression=None,
+            open_timeout=CONNECT_TIMEOUT_S,
+            max_size=2**22,
+            compression=None,
         )
         ready = json.loads(ws.recv(timeout=CONNECT_TIMEOUT_S))
         if ready.get("type") != "ready":
@@ -140,7 +146,15 @@ class _Stream:
             self.connected.set()
         try:
             t0 = pending[0].t_start if pending else None
-            self.ws.send(json.dumps({"type": "start", "t0": t0 if t0 is not None else 0.0}))
+            self.ws.send(
+                json.dumps(
+                    {
+                        "type": "start",
+                        "t0": t0 if t0 is not None else 0.0,
+                        "phones": self.backend.on_phones is not None,
+                    }
+                )
+            )
             for f in pending:
                 self.ws.send(_pcm(f))
             threading.Thread(target=self._receiver, daemon=True).start()
@@ -157,6 +171,8 @@ class _Stream:
                 m = json.loads(raw)
                 if m.get("type") == "words":
                     self.words.put(m)
+                elif m.get("type") == "phones" and (on := self.backend.on_phones) is not None:
+                    on(float(m["t_end"]), _logits(m), m.get("ms"))
         except Exception as exc:
             log.warning("speech stream closed: %s", exc)
         finally:
@@ -182,6 +198,14 @@ class _Stream:
         except Exception:
             pass
         self.closed.set()
+
+
+def _logits(m: dict) -> np.ndarray:
+    """A "phones" message's logits: base64 float16, `shape` [frames, phones]."""
+    import base64
+
+    raw = np.frombuffer(base64.b64decode(m["logits"]), dtype="<f2")
+    return raw.reshape(m["shape"]).astype(np.float32)
 
 
 def _pcm(frame: AudioFrame) -> bytes:
@@ -315,7 +339,9 @@ class RemoteStreamer:
             if not out:
                 continue
             event = TranscriptEvent(
-                words=out, is_final=m["final"], segment_id=m["segment_id"],
+                words=out,
+                is_final=m["final"],
+                segment_id=m["segment_id"],
                 ends_segment=m["ends_segment"],
             )
             if self.emission_observer is not None:

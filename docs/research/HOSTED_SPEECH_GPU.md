@@ -76,38 +76,61 @@ setlist opens.
 ## Real-time gate (9 church recordings, 2026-11-26)
 
 `run_follower_eval.py`, nosheet, real time. The processor path's follower
-(ONNX base.en scorer, `score_follower_cpu`) with `asr_remote` streaming to the
-L4. Whisper small.en on the processor is the fallback. On mains power with
-Low Power Mode off, at 772c602.
+(ONNX base.en scorer, `score_follower_cpu`) with `asr_remote` streaming to
+Modal. Whisper small.en on the processor is the fallback. On mains power with
+Low Power Mode off.
 
 | Speech | Wrong-slide | Perceived | Anticipation | Engine CPU |
 |---|---|---|---|---|
 | Whisper small.en on the processor (baseline) | 0.295 | 0.182 | +190 ms | 114% of a core |
-| **Qwen streaming on Modal L4** | **0.292** | 0.196 | +739 ms | 78% |
+| **Qwen on Modal, with the next-line check on the server** | **0.243** | **0.144** | +966 ms | 82% |
+| Qwen on Modal, no check (772c602) | 0.292 | 0.196 | +739 ms | 78% |
 | DeepInfra Qwen 1.7B (per call) | 0.320 | — | — | — |
 | DeepInfra Qwen 0.6B (per call) | 0.352 | 0.246 | +470 ms | 81% |
+| *For reference: the Mac's own Qwen (2026-11-21)* | *0.249* | *0.174* | *+734 ms* | — |
 
-Per recording, Modal against the baseline: 0.312/0.325, 0.227/0.204,
-0.485/0.513, 0.270/0.233, 0.264/0.297, 0.320/0.300, 0.191/0.193, 0.472/0.434,
-0.090/0.154. No audio was dropped, and the server failed no steps.
+Wrong-slide per recording (with check / no check / baseline):
 
-- **A tie on accuracy, not a win, because the next-line check is missing.**
-  The server already runs the Mac's Qwen tuning (2026-11-21,
-  `QWEN3_ASR_IMPROVEMENTS.md`): attention word times and the 0.5 flush
-  filter are `QwenStreamingBackend` defaults. What the processor path lacks
-  is the next-line check, which needs Qwen's audio tower on a GPU. On the
-  Mac, turning it off took Qwen from about 0.24–0.27 to 0.299 (quick set).
-  The baseline here has no check either.
-- **What it does buy:** the best hosted result so far (DeepInfra was 0.320
-  at best). It switches slides about 0.5 s earlier. It also uses about a
-  third less of the computer's processor, which matters on the slow
-  machines it's meant for.
-- **One fault, not reproduced.** The first attempt ran on a container left
-  over from the cold-start tests. Almost every step there failed with
-  "Failed to load compiled gather_int32_uint32_1 kernel" (a kernel the build
-  hadn't compiled), and the run was stopped. A fresh container, a
-  `probe_gather` run and the full gate all ran clean. If it comes back, the
-  server should restart its container when steps keep failing.
+| Recording | With check | No check | Baseline |
+|---|---|---|---|
+| 20260818-213104 | 0.228 | 0.312 | 0.325 |
+| 20260818-213617 | 0.170 | 0.227 | 0.204 |
+| 20260818-213825 | 0.436 | 0.485 | 0.513 |
+| 20260818-214054 | 0.169 | 0.270 | 0.233 |
+| 20260818-214759 | 0.273 | 0.264 | 0.297 |
+| 20260818-215943 | 0.244 | 0.320 | 0.300 |
+| 20260903-115044 | 0.147 | 0.191 | 0.193 |
+| 20261002-185523 | 0.422 | 0.472 | 0.434 |
+| 20261006-225539 | 0.098 | 0.090 | 0.154 |
+
+- **The check is the win.** With it, the hosted path beats the processor
+  baseline on all 9 recordings and matches the Mac's own Qwen (0.243 vs
+  0.249). No audio was dropped, and the server failed no steps.
+- **How it runs:** the server runs Qwen's audio tower and the Qwen phone
+  model (`next_line_head_qwen.npz`) on its own audio, every 0.25 s of audio
+  over the last 2.5 s, as the Mac does. It pushes the phone logits back
+  (`"phones"`, about 5 KB/s). The app's check uses `next_line.qwen_tuning()`
+  (`next_line.RemotePhones`). A check costs 17–21 ms on an A10.
+- **While Whisper stands in,** no phones arrive and the check waits. That's
+  the processor path's behaviour, which has no check.
+- **Recording 213617 was rerun on its own.** In the full run, a leftover
+  engine from an earlier stopped run was still holding the eval's port
+  (8794), so that recording ran on old code. The no-check run's 213617 hit
+  the same leftover. That engine had the same client code, so its number
+  stands.
+
+### The kernel fault: the wrong GPU's kernels
+
+Twice, a container failed almost every step with "Failed to load compiled
+gather_int32_uint32_1 kernel". `/health` reported "L4" because it printed
+the first GPU asked for, but those containers had been given an **A10**
+(compute 8.6). The kernels had been compiled at build on an L4 (8.9), and
+MLX's cache is keyed by kernel name only. Fixes:
+- **One kernel cache per architecture** (`_kernel_dirs`), compiled at build
+  on an L4 and on an A10. L40S is also 8.9.
+- **`/health` reports the real GPU** (`nvidia-smi`).
+- **The container exits after 8 failed steps in a row**, so Modal replaces
+  it. A server that answers without words keeps the app off its fallback.
 
 ## Streams per GPU
 
@@ -135,12 +158,13 @@ raise this.
 
 ## Not yet done
 
-- **The Qwen next-line check on the server:** its phone model reads Qwen's
-  audio tower, which only the server has. Send its phones back and use
-  `next_line.qwen_tuning()` while the server answers; with Whisper as the
-  fallback, run without a check, as the processor path does today.
-- **A health check on the server:** restart the container when steps keep
-  failing (the kernel fault above).
+- **Measuring cost with the check:** the check adds an audio-tower pass
+  every 0.25 s per stream. The 4-streams-per-GPU figure above was measured
+  without it.
+- **Talk-only negatives** (the speech-negatives bench) on this path.
+- **The lead time across a switch:** it follows the measured delay, but
+  it isn't checked how fast it settles when the server drops and Whisper
+  takes over, or the reverse.
 - **Batching steps** across streams on one GPU.
 - **Waking in the app:** under 10 s, so the GPU is woken when the AI starts,
   with no warm-up message. Whisper covers the first seconds, and any wait

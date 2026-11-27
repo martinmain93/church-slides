@@ -42,6 +42,7 @@ import time
 from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
+from typing import Any
 
 import numpy as np
 
@@ -269,7 +270,7 @@ class LiveFollowers:
         self._detached = False
         self._learn_thread: threading.Thread | None = None
         #: The next-line check's thread (`start_next_line`), when it runs.
-        self.listener: next_line.PhoneListener | None = None
+        self.listener: next_line.PhoneListener | next_line.RemotePhones | None = None
         #: Whether a band is playing (`music.band`), read on the capture
         #: thread; the check moves the screen only while it says yes. Talk
         #: has phones enough to read as any line: the check alone moved the
@@ -380,15 +381,25 @@ class LiveFollowers:
     def start_next_line(
         self,
         encode,
-        head: next_line.PhoneHead,
+        head: next_line.PhoneHead | None,
         tuning: next_line.Tuning = next_line.WHISPER_TUNING,
+        *,
+        remote: Any = None,
     ) -> None:
         """Run the next-line check for every followed song: `encode` is the
         encoder `head` was trained on (`next_line.mlx_encoder` for Whisper's,
-        `qwen_encoder` for Qwen3-ASR's), `tuning` its decision constants."""
+        `qwen_encoder` for Qwen3-ASR's), `tuning` its decision constants.
+        With `remote` (a `RemoteStreamingBackend`), the speech server runs
+        encoder and head and pushes the phones (`next_line.RemotePhones`)."""
         with self._lock:
             for sf in self.songs.values():
                 sf.check = next_line.NextLineCheck(sf.ref.slide_words, tuning)
+        if remote is not None:
+            listener = next_line.RemotePhones(self._on_phones)
+            remote.on_phones = listener.push
+            self.listener = listener
+            return
+        assert head is not None
         self.listener = next_line.PhoneListener(encode, head, self._on_phones)
 
     def _on_phones(self, t_end: float, logits: np.ndarray) -> None:
