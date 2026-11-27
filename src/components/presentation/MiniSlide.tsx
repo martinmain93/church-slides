@@ -13,7 +13,7 @@ import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode }
 
 import { inkStyle } from "@/components/presentation/StageSurface";
 import { useContainerUnits } from "@/lib/containerUnits";
-import { SIZE_SCALE, type DisplayLook } from "@/lib/displayLook";
+import { SIZE_SCALE, type DisplayLook } from "@/lib/look";
 
 // At 1920 wide: the text box is 1920 − 2×48 = 1824 wide; the font is
 // min(5% of 1824, 80px) = 80px; the words wrap at 90% of the text box.

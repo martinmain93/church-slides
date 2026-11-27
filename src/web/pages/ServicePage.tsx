@@ -454,7 +454,7 @@ function ItemSheet({
       const again =
         item.kind === "song" && item.song_id
           ? await lib.addSong(serviceId, item.song_id)
-          : await lib.addServiceItem(serviceId, item.kind as "scripture" | "text", JSON.parse(item.content ?? "{}") as object, null);
+          : await lib.addServiceItem(serviceId, item.kind as "scripture" | "text", JSON.parse(item.content ?? "{}") as object);
       if (item.song_key) await lib.setItemKey(serviceId, again, item.song_key);
       if (item.slides_override !== null) await lib.setItemSlides(serviceId, again, item.slides_override);
       await lib.reorderItems(serviceId, order.map((id) => (id === item.id ? again : id)));
