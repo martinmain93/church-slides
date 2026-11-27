@@ -1,0 +1,20 @@
+/* The web app's own touches on the shared styles. */
+
+/* One focus ring everywhere, for the keyboard only: amber, 2px, 2px off. */
+.web-app :focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+.web-app input:focus-visible,
+.web-app textarea:focus-visible,
+.web-app select:focus-visible {
+  outline: none; /* fields show the ring as a box-shadow already */
+}
+
+/* Room for the notch and rounded corners when added to a home screen. */
+/* The larger of the notch and a screen's own side padding (`--web-pad-x`):
+   a plain env() here would wipe out a page's p-6 on every phone. */
+.web-app {
+  padding-left: max(env(safe-area-inset-left), var(--web-pad-x, 0px));
+  padding-right: max(env(safe-area-inset-right), var(--web-pad-x, 0px));
+}

@@ -1,7 +1,7 @@
 {
   "name": "auto-presenter",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.3.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -17,6 +17,9 @@
     "sidecar:build": "uv run --project sidecar python scripts/build_sidecar.py",
     "tauri:build:no-ai": "tauri build",
     "build:relay": "node scripts/build_relay.mjs",
+    "web:dev": "vite --config web/vite.web.config.ts",
+    "web:build": "vite build --config web/vite.web.config.ts",
+    "web:deploy": "pnpm --package=wrangler@4.157.0 dlx wrangler deploy --config web/wrangler.jsonc",
     "relay:dev": "node scripts/build_relay.mjs && wrangler dev --config relay/wrangler.toml"
   },
   "dependencies": {

@@ -133,7 +133,8 @@ jobs:
         # Listed as polyfilled in the config, because the rule can't see the
         # guards: AudioContext (both uses fall back to webkitAudioContext),
         # MediaRecorder and OfflineAudioContext (voice charting checks for
-        # MediaRecorder before recording; see startVoiceRecording).
+        # MediaRecorder before recording; see startVoiceRecording), and
+        # navigator.locks (browser sign-in runs without it; see withLock).
         # ESLint 8 runs from its own folder: in the repo it would find the
         # flat eslint.config.js, and an eslintrc config resolves its parser
         # from the config's folder, where npx's packages aren't.

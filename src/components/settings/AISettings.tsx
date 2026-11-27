@@ -13,11 +13,31 @@ import {
 } from "@/lib/instructionModels";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { openLink } from "@/lib/tauri";
+import { hostedAiStatus, openLink } from "@/lib/tauri";
 import { useToast } from "@/lib/toast";
 
-/** The Groq key for spoken requests (`api_keys.py`). Shows "saved" once
- * there is one.
+/** Whose AI allowance this computer uses (signed in to an organization),
+ * or null. Read again now and then: the key arrives within a minute of
+ * signing in. */
+export function useOrgAllowance(): string | null {
+  const [allowanceOf, setAllowanceOf] = useState<string | null>(null);
+  useEffect(() => {
+    const read = () =>
+      hostedAiStatus().then(
+        (s) => setAllowanceOf(s.own_groq_key ? null : s.org_name),
+        () => undefined,
+      );
+    void read();
+    const timer = setInterval(read, 15_000);
+    return () => clearInterval(timer);
+  }, []);
+  return allowanceOf;
+}
+
+/** The Groq key for spoken requests (`api_keys.py`): a field until there is
+ * one. Signed in to an organization, its AI covers spoken requests, and a
+ * key of your own stays one tap away (it's used instead, as the privacy
+ * page says).
  *
  * @deprecated Groq is deprecated (2026-11-23): its free tier can't carry a
  * service and paid tiers aren't available. Hosted speech is gone; spoken
@@ -26,6 +46,8 @@ export function GroqKeyField() {
   const toast = useToast();
   const models = useInstructionModels();
   const [keyDraft, setKeyDraft] = useState("");
+  const allowanceOf = useOrgAllowance();
+  const [ownKey, setOwnKey] = useState(false);
 
   useEffect(() => {
     if (!models.seen) refreshInstructionModels().catch(() => undefined);
@@ -44,7 +66,19 @@ export function GroqKeyField() {
     }
   }
 
-  if (groqHasKey) return <div className="text-xs text-muted-foreground">Groq key saved.</div>;
+  if (allowanceOf && !ownKey) {
+    return (
+      <button
+        type="button"
+        className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+        onClick={() => setOwnKey(true)}
+      >
+        Use my own Groq key instead
+      </button>
+    );
+  }
+  // The toggle above already says a key is saved.
+  if (groqHasKey && !allowanceOf) return null;
   return (
     <div className="space-y-1 pt-1">
       <form

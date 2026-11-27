@@ -1,0 +1,9 @@
+{
+  "type": "service",
+  "id": "service_01HSAMPLE00000000000",
+  "fields": {
+    "setlist_id": "setlist_01HSAMPLESUNDAY0000000",
+    "started_at": 1731700000000,
+    "songs": ["song_01HSAMPLEAMAZINGGRACE00", "song_01HSAMPLEMINIMAL000000"]
+  }
+}

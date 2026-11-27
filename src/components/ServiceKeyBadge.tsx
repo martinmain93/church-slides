@@ -34,7 +34,7 @@ export function ServiceKeyBadge({
   const title = !shown
     ? "Set the key for this service"
     : changed
-      ? `Key of ${serviceKey} for this service (the song is in ${originalKey}) — click to change`
+      ? `In ${serviceKey} for this service (original key ${originalKey}) — click to change`
       : `Key of ${shown} — click to play it in another key for this service`;
   const [anchor, setAnchor] = useState<DOMRect | null>(null);
   const buttonRef = useRef<HTMLButtonElement | null>(null);

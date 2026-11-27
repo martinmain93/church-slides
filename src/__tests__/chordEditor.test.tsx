@@ -262,11 +262,11 @@ describe("interactive word-click chord placement in SongPreview", () => {
 
     const projectorCards = screen.getAllByTestId("preview-slide");
     expect(projectorCards).toHaveLength(2);
-    expect(projectorCards[0]!.className).toContain("aspect-video");
+    expect(projectorCards[0]!.querySelector(".aspect-video")).not.toBeNull();
 
-    // Duplicate the first slide in 16:9 Projector mode
-    const dupBtns = screen.getAllByRole("button", { name: /duplicate slide/i });
-    fireEvent.click(dupBtns[0]!);
+    // Duplicate the first slide in 16:9 Projector mode (behind its "⋯" menu)
+    fireEvent.click(screen.getAllByRole("button", { name: /more slide actions/i })[0]!);
+    fireEvent.click(screen.getByRole("menuitem", { name: /duplicate/i }));
     expect(onChangeBody).toHaveBeenCalledWith(
       expect.stringContaining("[verse 1]\n\nAmazing grace\n\nAmazing grace"),
     );
@@ -528,7 +528,7 @@ describe("SongEditor Suggest & Cursor-Tab Next-Edit Workflow", () => {
     });
   });
 
-  it("suggests 16:9 slide breath splits and OCR hyphenation cleanup", async () => {
+  it("suggests OCR hyphenation cleanup, and leaves splitting to the slide's scissors", async () => {
     render(
       <ToastProvider>
         <ConfirmProvider>
@@ -552,14 +552,16 @@ describe("SongEditor Suggest & Cursor-Tab Next-Edit Workflow", () => {
 
     fireEvent.click(screen.getByTestId("suggest-btn"));
     expect(screen.getByTestId("suggestion-review-bar")).toBeInTheDocument();
-    expect(screen.getByTestId("ghost-slide-split-line")).toBeInTheDocument();
+    // One way to split a slide: the scissors on it, not a suggestion too.
+    expect(screen.queryByTestId("ghost-slide-split-line")).toBeNull();
 
-    // Accept all -> cleans "Morn-ing" to "Morning" and splits the 4-line slide into two 2-line slides
-    fireEvent.click(screen.getByTestId("accept-all-suggestions-btn"));
+    // Accept the cleanup -> "Morn-ing" becomes "Morning"; the slide stays whole
+    fireEvent.click(screen.getByTestId("projector-ghost-suggestion-btn"));
 
     await waitFor(() => {
-      expect(screen.getAllByTestId("preview-slide").length).toBe(2);
+      expect((screen.getByTestId("song-body") as HTMLTextAreaElement).value).toContain("Morning light");
     });
+    expect(screen.getAllByTestId("preview-slide").length).toBe(1);
     const val = (screen.getByTestId("song-body") as HTMLTextAreaElement).value;
     expect(val).toContain("Morning light upon the hills");
     expect(val).not.toContain("Wor-thy");

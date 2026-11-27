@@ -1,33 +1,12 @@
 import { invoke } from "@/lib/invoke";
 import type { ScriptureSettings } from "@/lib/scripture/settings";
 import { withServiceItems } from "@/lib/serviceItems";
+import type { NewSongInput, ReadingRow, SetlistDetail, SetlistRow, SongRow } from "@/core/library";
 
-export interface SongRow {
-  id: string;
-  title: string;
-  body_text: string;
-  ccli: string | null;
-  author: string | null;
-  copyright: string | null;
-  default_tempo_wps: number | null;
-  /** Compact section-reference spec defining the default play order, e.g.
-   * "V1, V2, C, V3, C, B, C". Null/empty = each section once, document order. */
-  slide_order: string | null;
-  created_at: number;
-  updated_at: number;
-}
+export type { NewSongInput, ReadingRow, SetlistDetail, SetlistItemRow, SetlistItemWithSong, SetlistRow, SongRow } from "@/core/library";
 
-export interface NewSongInput {
-  title: string;
-  body_text: string;
-  ccli?: string | null;
-  author?: string | null;
-  copyright?: string | null;
-  default_tempo_wps?: number | null;
-  slide_order?: string | null;
-}
-
-export type SortKey = "alphabetical" | "recently_edited" | "popular";
+import type { SongSort } from "@/core/library";
+export type SortKey = SongSort;
 
 export interface AppSettings {
   default_tempo_wps: number;
@@ -64,56 +43,6 @@ export interface ImportSummary {
   schema_version: number;
   songs_imported: number;
   songs_replaced: number;
-}
-
-export interface SetlistRow {
-  id: string;
-  name: string;
-  created_at: number;
-  last_used_at: number | null;
-  /** Item names in order (song titles, passage references, text titles) —
-   * set by `listSetlists` only. */
-  song_titles?: string[];
-  /** How many of `song_titles` are songs. */
-  song_count?: number;
-}
-
-export interface SetlistItemRow {
-  id: string;
-  setlist_id: string;
-  /** A song, a Bible passage, or one-off text — see `serviceItems.ts`. */
-  kind: "song" | "scripture" | "text";
-  song_id: string | null;
-  position: number;
-  /** JSON array of slides edited for this setlist only, or null to use the
-   * library song's body + slide_order. See `slideSequence.parseSlidesOverride`. */
-  slides_override: string | null;
-  /** A scripture or text item's content (JSON); null for a song. */
-  content?: string | null;
-  /** This item's own display look (JSON, `displayLook.ts`), or null for the
-   * default style. Older builds leave it out. */
-  look?: string | null;
-  /** The key the song is played in for this service ("Bb", "Em"), or null
-   * for its chart's own key. Older builds leave it out. */
-  song_key?: string | null;
-}
-
-export interface SetlistItemWithSong extends SetlistItemRow {
-  /** The library song — or, for a scripture or text item, the song-shaped
-   * stand-in `getSetlist` gives it (`serviceItems.withServiceItems`). */
-  song: SongRow | null;
-}
-
-export interface ReadingRow {
-  id: string;
-  title: string;
-  body_text: string;
-  created_at: number;
-  updated_at: number;
-}
-
-export interface SetlistDetail extends SetlistRow {
-  items: SetlistItemWithSong[];
 }
 
 // --- Sidecar ---------------------------------------------------------------
@@ -291,6 +220,12 @@ export async function songRevision(songId: string, revision: number): Promise<So
   return r.revision;
 }
 
+/** Whose AI allowance this computer's AI uses, when signed in to an
+ * organization; a Groq key of the person's own is used instead. */
+export async function hostedAiStatus(): Promise<{ org_name: string | null; own_groq_key: boolean }> {
+  return invoke("hosted_ai_status");
+}
+
 /** How the open organization library's sync stands. Shown only when
  * something's waiting or wrong. */
 export interface LibrarySyncStatus {
@@ -326,8 +261,13 @@ export async function getSetlist(id: string): Promise<SetlistDetail | null> {
   return detail ? withServiceItems(detail) : null;
 }
 
-export async function createSetlist(name: string): Promise<string> {
-  return invoke<string>("create_setlist", { name });
+export async function createSetlist(name: string, serviceDate: string | null = null): Promise<string> {
+  return invoke<string>("create_setlist", { name, serviceDate });
+}
+
+/** Change the day a service is for (`YYYY-MM-DD`, or null for none). */
+export async function updateSetlistDate(id: string, serviceDate: string | null): Promise<void> {
+  await invoke<void>("update_setlist_date", { id, serviceDate });
 }
 
 export async function updateSetlistName(id: string, name: string): Promise<void> {
@@ -368,8 +308,8 @@ export async function setSetlistItemContent(
 }
 
 /** A new setlist holding a copy of another's items ("Copy last service"). */
-export async function duplicateSetlist(sourceId: string, name: string): Promise<string> {
-  return invoke<string>("duplicate_setlist", { sourceId, name });
+export async function duplicateSetlist(sourceId: string, name: string, serviceDate: string | null = null): Promise<string> {
+  return invoke<string>("duplicate_setlist", { sourceId, name, serviceDate });
 }
 
 export async function listReadings(): Promise<ReadingRow[]> {

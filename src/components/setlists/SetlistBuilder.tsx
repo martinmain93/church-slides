@@ -17,6 +17,7 @@ import { CSS } from "@dnd-kit/utilities";
 import {
   ArrowLeft,
   BookOpen,
+  CalendarPlus,
   Check,
   Music,
   Palette,
@@ -29,23 +30,8 @@ import {
   X,
 } from "lucide-react";
 
-import {
-  addServiceItem,
-  addSetlistItem,
-  deleteSetlist,
-  getSetlist,
-  listChartKeys,
-  listReadings,
-  listSongsSorted,
-  removeSetlistItem,
-  reorderSetlist,
-  setSetlistItemKey,
-  updateSetlistName,
-  type SetlistDetail,
-  type ReadingRow,
-  type SetlistItemWithSong,
-  type SongRow,
-} from "@/lib/tauri";
+import { nameForDate } from "@/lib/setlistName";
+import { useServiceDateField } from "@/lib/useServiceDateField";
 import {
   itemCountLabel,
   itemKind,
@@ -81,6 +67,8 @@ import { useConfirm } from "@/lib/confirm";
 import { useToast } from "@/lib/toast";
 import { isTypingTarget, slideAfterArrow } from "@/lib/slideKeys";
 import { cn } from "@/lib/utils";
+import type { ReadingRow, SetlistDetail, SetlistItemWithSong, SongRow } from "@/core/library";
+import { useLibrary } from "@/library/context";
 
 /** How many of the most-used songs the search panel offers before any typing. */
 const SUGGESTED_SONGS = 30;
@@ -121,6 +109,7 @@ export function SetlistBuilder({
   justCreated = false,
   onEditSong,
 }: Props) {
+  const library = useLibrary();
   const toast = useToast();
   const confirm = useConfirm();
   // So the band and the leader can get their devices connected before the
@@ -190,17 +179,17 @@ export function SetlistBuilder({
 
   useEffect(() => {
     let cancelled = false;
-    listSongsSorted("popular")
+    library.listSongs("popular")
       .then((rows) => {
         if (!cancelled) setSuggested(rows.slice(0, SUGGESTED_SONGS));
       })
       .catch(() => undefined);
-    listChartKeys()
+    library.listChartKeys()
       .then((keys) => {
         if (!cancelled) setChartKeys(keys);
       })
       .catch(() => undefined);
-    listReadings()
+    library.listReadings()
       .then((rows) => {
         if (!cancelled) setReadings(rows);
       })
@@ -208,13 +197,15 @@ export function SetlistBuilder({
     return () => {
       cancelled = true;
     };
-  }, [reloadKey]);
+  }, [library, reloadKey]);
 
   const nameSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const nameDirty = useRef(false);
   // Unlike `nameDirty`, never reset by the autosave: a name typed on this
   // visit means the setlist is wanted, even with no songs in it yet.
   const renamed = useRef(false);
+  /** The name as last saved, for putting back an emptied box. */
+  const savedName = useRef("");
   const everHadSongs = useRef(false);
   if (detail && detail.items.length > 0) everHadSongs.current = true;
 
@@ -226,15 +217,16 @@ export function SetlistBuilder({
   useEffect(() => {
     let cancelled = false;
     setDetail(null);
-    getSetlist(setlistId)
+    library.getSetlist(setlistId)
       .then((d) => {
         if (cancelled) return;
         if (!d) {
-          setError("Setlist not found.");
+          setError("This service was deleted.");
           return;
         }
         setDetail(d);
         setName(d.name);
+        savedName.current = d.name;
         if (d.items.length > 0) {
           setActiveItemId(d.items[0]!.id);
           setSelectedSlide({ itemId: d.items[0]!.id, slideIdx: 0 });
@@ -252,7 +244,8 @@ export function SetlistBuilder({
     return () => {
       cancelled = true;
     };
-  }, [setlistId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `refresh` changes with the view; loading once per service is enough.
+  }, [library, setlistId]);
 
   useEffect(() => {
     if (!detail || detail.items.length === 0) return;
@@ -311,10 +304,39 @@ export function SetlistBuilder({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [name]);
 
+  /** A new date; a name still made from the old date follows it. */
+  const nameNow = useRef(name);
+  nameNow.current = name;
+  async function changeDate(date: string) {
+    // Picking a date means this service is wanted, even with nothing in it yet.
+    renamed.current = true;
+    try {
+      await library.setServiceDate(setlistId, date);
+      setDetail((d) => (d ? { ...d, service_date: date } : d));
+      const current = nameNow.current;
+      const others = (await library.listSetlists()).filter((s) => s.id !== setlistId).map((s) => s.name);
+      const next = nameForDate(current.trim(), date, others);
+      if (next !== current) {
+        nameNow.current = next;
+        setName(next);
+        await library.renameSetlist(setlistId, next);
+        savedName.current = next;
+      }
+    } catch (err) {
+      toast.error(`Couldn't change the date: ${err instanceof Error ? err.message : err}`);
+      throw err;
+    }
+  }
+  const dateField = useServiceDateField(detail?.service_date, changeDate);
+  const [addingDate, setAddingDate] = useState(false);
+
   async function persistName() {
     if (!detail || !nameDirty.current) return;
     try {
-      await updateSetlistName(setlistId, name.trim() || "Untitled");
+      // An emptied name isn't saved; leaving the box puts the last one back.
+      if (!name.trim()) return;
+      await library.renameSetlist(setlistId, name.trim());
+      savedName.current = name.trim();
       nameDirty.current = false;
     } catch (err) {
       toast.error(`Rename failed: ${err instanceof Error ? err.message : err}`);
@@ -328,7 +350,7 @@ export function SetlistBuilder({
   onLeave.current = () => {
     if (leftByButton.current) return;
     if (shouldDiscardOnBack({ justCreated, renamed: renamed.current, hadSongs: everHadSongs.current })) {
-      void deleteSetlist(setlistId).catch(() => undefined);
+      void library.deleteSetlist(setlistId).catch(() => undefined);
     } else if (nameDirty.current) {
       void persistName();
     }
@@ -347,13 +369,13 @@ export function SetlistBuilder({
   }, []);
 
   async function refresh() {
-    const d = await getSetlist(setlistId);
+    const d = await library.getSetlist(setlistId);
     if (d) setDetail(d);
   }
 
   async function handleAdd(song: SongRow) {
     try {
-      await addSetlistItem(setlistId, song.id);
+      await library.addSong(setlistId, song.id);
       setSearchQuery("");
       await refresh();
     } catch (err) {
@@ -371,12 +393,12 @@ export function SetlistBuilder({
 
   async function addImported(message: string, songIds: string[]) {
     try {
-      const fresh = await getSetlist(setlistId);
+      const fresh = await library.getSetlist(setlistId);
       const inService = new Set((fresh ?? detail)?.items.map((i) => i.song_id) ?? []);
       const toAdd = songIds.filter((id) => !inService.has(id));
-      for (const id of toAdd) await addSetlistItem(setlistId, id);
+      for (const id of toAdd) await library.addSong(setlistId, id);
       await refresh();
-      listChartKeys().then(setChartKeys).catch(() => undefined);
+      library.listChartKeys().then(setChartKeys).catch(() => undefined);
       const already = songIds.length - toAdd.length;
       toast.success(
         [
@@ -401,7 +423,7 @@ export function SetlistBuilder({
     let first: string | null = null;
     try {
       for (const a of adds) {
-        const id = await addServiceItem(setlistId, a.kind, a.content, {
+        const id = await library.addServiceItem(setlistId, a.kind, a.content, {
           slidesOverride: a.slidesOverride ?? null,
           afterItemId: after,
         });
@@ -435,7 +457,7 @@ export function SetlistBuilder({
   async function handleKeyChange(item: SetlistItemWithSong, key: string | null) {
     setDetail((d) => d && { ...d, items: d.items.map((it) => (it.id === item.id ? { ...it, song_key: key } : it)) });
     try {
-      await setSetlistItemKey(setlistId, item.id, key);
+      await library.setItemKey(setlistId, item.id, key);
     } catch (err) {
       toast.error(`Couldn't change the key: ${err instanceof Error ? err.message : err}`);
       await refresh();
@@ -444,7 +466,7 @@ export function SetlistBuilder({
 
   async function handleRemove(itemId: string) {
     try {
-      await removeSetlistItem(setlistId, itemId);
+      await library.removeItem(setlistId, itemId);
       await refresh();
     } catch (err) {
       toast.error(`Remove failed: ${err instanceof Error ? err.message : err}`);
@@ -453,14 +475,14 @@ export function SetlistBuilder({
 
   async function handleDelete() {
     const ok = await confirm({
-      title: `Delete "${name || "this setlist"}"?`,
-      message: "This can't be undone. (The songs themselves stay in your library.)",
+      title: `Delete "${name || "this service"}"?`,
+      message: "It goes from every device. Its songs stay in the library.",
       confirmLabel: "Delete",
       variant: "destructive",
     });
     if (!ok) return;
     try {
-      await deleteSetlist(setlistId);
+      await library.deleteSetlist(setlistId);
       onClose();
     } catch (err) {
       toast.error(`Delete failed: ${err instanceof Error ? err.message : err}`);
@@ -485,7 +507,7 @@ export function SetlistBuilder({
     scrollToSong(draggedId);
 
     try {
-      await reorderSetlist(
+      await library.reorderItems(
         setlistId,
         reordered.map((i) => i.id),
       );
@@ -527,7 +549,7 @@ export function SetlistBuilder({
     // "New setlist" then straight back out leaves nothing worth keeping, so
     // Home doesn't fill with empty drafts.
     if (shouldDiscardOnBack({ justCreated, renamed: renamed.current, hadSongs: everHadSongs.current })) {
-      await deleteSetlist(setlistId).catch(() => undefined);
+      await library.deleteSetlist(setlistId).catch(() => undefined);
     } else if (nameDirty.current) {
       await persistName();
     }
@@ -578,10 +600,34 @@ export function SetlistBuilder({
               nameDirty.current = true;
               renamed.current = true;
             }}
-            onBlur={persistName}
-            placeholder="Untitled setlist"
+            onBlur={() => {
+              if (!name.trim()) {
+                setName(savedName.current);
+                nameDirty.current = false;
+                return;
+              }
+              void persistName();
+            }}
+            placeholder="Untitled service"
             className="h-9 max-w-md text-base font-semibold"
           />
+          {detail.service_date || addingDate ? (
+            <Input
+              type="date"
+              {...dateField}
+              autoFocus={addingDate && !detail.service_date}
+              aria-label="Service date"
+              title="The day this service is for"
+              className="h-9 w-auto shrink-0 text-sm"
+            />
+          ) : (
+            // Made before services had dates. An empty date box shows today's
+            // date greyed out in WebKit, which reads as "this is today".
+            <Button variant="outline" size="sm" className="h-9 shrink-0" onClick={() => setAddingDate(true)}>
+              <CalendarPlus className="size-4" />
+              Add date
+            </Button>
+          )}
           <span className="shrink-0 whitespace-nowrap text-xs text-muted-foreground">
             {itemCountLabel(detail.items)}
           </span>
@@ -624,7 +670,7 @@ export function SetlistBuilder({
             </MenuItem>
             <MenuSeparator />
             <MenuItem icon={<Trash2 />} onSelect={() => void handleDelete()} destructive>
-              Delete setlist
+              Delete service
             </MenuItem>
           </Menu>
         </div>
@@ -643,7 +689,7 @@ export function SetlistBuilder({
         <div className="flex h-full min-h-0 flex-col bg-muted/20">
           <div className="flex items-center justify-between border-b border-border px-3 py-2">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Setlist
+              Service
             </span>
             <span className="text-[11px] tabular-nums text-muted-foreground">
               {detail.items.length}
@@ -711,7 +757,7 @@ export function SetlistBuilder({
         >
           {detail.items.length === 0 ? (
             <div className="flex h-full items-center justify-center px-8 text-center text-sm text-muted-foreground">
-              Search for songs on the right and click to add them to this setlist.
+              Search for songs on the right and click to add them to this service.
               Bible passages and text slides are added from the right too.
             </div>
           ) : (
@@ -721,6 +767,7 @@ export function SetlistBuilder({
                 item={it}
                 number={idx + 1}
                 chartKey={it.song_id ? (chartKeys[it.song_id] ?? null) : null}
+                hasChords={!!it.song_id && it.song_id in chartKeys}
                 onKeyChange={(key) => void handleKeyChange(it, key)}
                 selectedSlideIdx={
                   selectedSlide?.itemId === it.id ? selectedSlide.slideIdx : null
@@ -776,7 +823,7 @@ export function SetlistBuilder({
                       : "border-transparent text-muted-foreground hover:text-foreground",
                   )}
                 >
-                  {id === "songs" ? "Songs" : "Scripture"}
+                  {id === "songs" ? "Songs" : "Bible"}
                 </button>
               ))}
               {narrow && detail.items.length > 0 && (
@@ -849,8 +896,8 @@ export function SetlistBuilder({
                           <KeyBadge songKey={songKey} className="size-5 text-[10px]" />
                         )}
                         {alreadyIn ? (
-                          <span title="In the setlist — click to add it again (a reprise)">
-                            <Check aria-label="In the setlist" className="size-4 shrink-0 text-primary" />
+                          <span title="In the service — click to add it again (a reprise)">
+                            <Check aria-label="In the service" className="size-4 shrink-0 text-primary" />
                           </span>
                         ) : (
                           <Plus className="size-4 shrink-0 text-muted-foreground transition-colors group-hover:text-foreground" />
@@ -988,8 +1035,8 @@ function SortableRailItem({
         <button
           type="button"
           onClick={onRemove}
-          title="Remove from setlist"
-          aria-label="Remove from setlist"
+          title="Remove from service"
+          aria-label="Remove from service"
           className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-destructive focus-visible:opacity-100 group-hover:opacity-100"
         >
           <X className="size-3.5" />

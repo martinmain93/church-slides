@@ -116,7 +116,7 @@ export function DisplayLookDialog({
         </h2>
         <p className="mb-4 text-xs text-muted-foreground">
           {override?.description ??
-            "Applies to all setlists on this computer — slides and scrolling lyrics alike."}
+            "Applies to all services on this computer — slides and scrolling lyrics alike."}
         </p>
         <DisplayLookControls
           override={override}

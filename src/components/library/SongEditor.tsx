@@ -17,6 +17,8 @@ import {
 import {
   createSong,
   deleteSong,
+  getSetlist,
+  listSetlists,
   deleteSongChart,
   getSong,
   getSongCharts,
@@ -37,6 +39,8 @@ import { parseSong, sectionLabel, sectionLabelClass, type ParsedSection } from "
 import { formatSlideOrder, parseSlideOrder } from "@/lib/slideSequence";
 import { useConfirm } from "@/lib/confirm";
 import { useToast } from "@/lib/toast";
+import { useDisplayLook } from "@/lib/displayLook";
+import { deleteSongMessage } from "@/lib/deleteSongText";
 import {
   alignSlides,
   chartHasChords,
@@ -117,6 +121,7 @@ const TIME_SIGNATURES = ["4/4", "3/4", "6/8", "12/8", "2/4", "2/2", "5/4", "9/8"
 
 export function SongEditor({ songId, onClose, backLabel = "Library" }: Props) {
   const toast = useToast();
+  const look = useDisplayLook();
   const confirm = useConfirm();
   // Earlier words are kept for an organization's library (its server keeps them).
   const [inOrgLibrary, setInOrgLibrary] = useState(false);
@@ -333,10 +338,15 @@ export function SongEditor({ songId, onClose, backLabel = "Library" }: Props) {
       onClose(null);
       return;
     }
+    const songId = idRef.current;
+    const usedBy: string[] = [];
+    for (const sl of await listSetlists().catch(() => [])) {
+      const detail = await getSetlist(sl.id).catch(() => null);
+      if (detail?.items.some((i) => i.song_id === songId)) usedBy.push(sl.name);
+    }
     const ok = await confirm({
       title: `Delete "${title || "this song"}"?`,
-      message:
-        "This can't be undone. If the song is in any setlists, it will be removed from them too.",
+      message: deleteSongMessage(usedBy),
       confirmLabel: "Delete",
       variant: "destructive",
     });
@@ -1264,7 +1274,7 @@ export function SongEditor({ songId, onClose, backLabel = "Library" }: Props) {
               size="sm"
               data-testid="undo-suggestion-btn"
               onClick={handleRestoreUndoSnapshot}
-              title="Undo last accepted suggestion"
+              title="Undo the last change (a split, a deleted slide or an accepted suggestion)"
               className="h-8 gap-1 text-xs text-muted-foreground hover:text-foreground"
             >
               <Undo2 className="size-3.5" />
@@ -1337,11 +1347,11 @@ export function SongEditor({ songId, onClose, backLabel = "Library" }: Props) {
             size="sm"
             data-testid="toggle-raw-text"
             onClick={toggleRawTextMode}
-            title="Edit song & chords as raw text (chords above lyrics or [G] inline)"
+            title="Edit the song and its chords as text (chords above the words, or [G] inline)"
             className="h-8 gap-1.5 text-xs"
           >
             <Code2 className="size-3.5" />
-            Raw text
+            {rawTextMode ? "Edit as slides" : "Edit as text"}
           </Button>
         </div>
       </div>
@@ -1433,8 +1443,11 @@ export function SongEditor({ songId, onClose, backLabel = "Library" }: Props) {
             />
             <SongPreview
               body={body}
+              look={look}
               slideOrder={slideOrder}
               chart={showChords ? chart : null}
+              hasChords={!!chart && chartHasChords(chart)}
+              onBeforeChange={() => setUndoSnapshot(captureUndoSnapshot())}
               chartKey={chart?.key ?? null}
               preferFlats={preferFlats}
               displayMode={displayMode}

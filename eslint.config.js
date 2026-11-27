@@ -12,6 +12,7 @@ export default tseslint.config(
       "build/**",
       "site/**",
       "relay/**",
+      "web/dist/**",
       "stats/**",
       "src-tauri/**",
       "sidecar/**",
@@ -34,6 +35,73 @@ export default tseslint.config(
       "react-hooks/rules-of-hooks": "error",
       "react-hooks/exhaustive-deps": "warn",
       "@typescript-eslint/no-unused-vars": "off",
+    },
+  },
+  // Layers (docs/roadmap/WEB_AND_MOBILE.md): `core` is shared by every
+  // client, so it imports no UI or platform; the library interface imports no
+  // platform. Each platform's implementation lives beside it.
+  {
+    files: ["src/core/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            { group: ["react", "react-dom", "react/*"], message: "src/core has no UI: it's shared by every client." },
+            { group: ["@tauri-apps/*"], message: "src/core runs on every platform, not only the desktop." },
+            { group: ["@/lib/*", "@/components/*", "@/library/*"], message: "src/core imports only from src/core." },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ["src/library/source.ts", "src/library/context.tsx"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            { group: ["@tauri-apps/*", "@/lib/tauri", "@/lib/invoke"], message: "Platform code goes in its own implementation (desktop.ts)." },
+          ],
+        },
+      ],
+    },
+  },
+  // The web app and its library run in a browser: nothing from Tauri, and
+  // nothing from the desktop's library either. That holds for the desktop
+  // views and helpers it shares too (the slide cards and what they use):
+  // add a file here when the web app starts importing it.
+  {
+    files: [
+      "src/web/**/*.{ts,tsx}",
+      "src/library/web/**/*.{ts,tsx}",
+      "src/lib/account/**/*.ts",
+      "web/**/*.{ts,tsx}",
+      "src/components/KeyBadge.tsx",
+      "src/components/band/ChordLyrics.tsx",
+      "src/components/library/ChordPickerPopover.tsx",
+      "src/components/library/ProjectorSlideCard.tsx",
+      "src/components/library/SongPreview.tsx",
+      "src/components/presentation/MiniSlide.tsx",
+      "src/components/presentation/StageSurface.tsx",
+      "src/components/ui/textarea.tsx",
+      "src/lib/chords/{chart,chord,editorText,keyColor}.ts",
+      "src/lib/chords/import/text.ts",
+      "src/lib/{containerUnits,deleteSongText,look,parseSong,serviceItemContent,setlistName,slideSequence,slideSplit,useServiceDateField,utils}.ts",
+    ],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@tauri-apps/*", "@/lib/tauri", "@/lib/invoke", "@/library/desktop", "@/lib/displayLook", "@/lib/serviceItems"],
+              message: "The web app runs in a browser: no Tauri, directly or through desktop modules.",
+            },
+          ],
+        },
+      ],
     },
   },
 );

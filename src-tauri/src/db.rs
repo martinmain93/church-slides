@@ -27,6 +27,7 @@ const MIGRATIONS: &[(i32, &str)] = &[
     (11, include_str!("../migrations/011_setlist_item_look.sql")),
     (12, include_str!("../migrations/012_setlist_item_key.sql")),
     (13, include_str!("../migrations/013_library_look.sql")),
+    (14, include_str!("../migrations/014_setlist_service_date.sql")),
 ];
 
 /// Thread-safe handle to the SQLite database.
@@ -169,8 +170,8 @@ impl Db {
                  FROM songs s ORDER BY s.updated_at DESC, s.title COLLATE NOCASE"
             }
             SortKey::Popular => {
-                // Setlists land in Phase 2; until then `usage_count` is 0 for
-                // every row and we tie-break alphabetically.
+                // Every time a song is in a service (twice in one counts
+                // twice); ties A to Z. The web app counts the same way.
                 "SELECT s.id, s.title, s.body_text, s.ccli, s.author, s.copyright, \
                         s.default_tempo_wps, s.created_at, s.updated_at, s.slide_order \
                  FROM songs s \

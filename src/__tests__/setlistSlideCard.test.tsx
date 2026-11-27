@@ -9,7 +9,11 @@ import { insertAfter } from "@/lib/presentation/slideEditing";
 
 afterEach(cleanup);
 
-function renderCard(handlers: { onInsertAfter?: () => void; onDuplicate?: () => void; onDelete?: () => void } = {}) {
+function renderCard(
+  handlers: { onInsertAfter?: () => void; onDuplicate?: () => void; onDelete?: () => void; onSplit?: () => void } = {},
+  lyrics = "Amazing grace",
+  selected = false,
+) {
   render(
     <DndContext>
       <SortableContext items={["s1"]}>
@@ -18,9 +22,9 @@ function renderCard(handlers: { onInsertAfter?: () => void; onDuplicate?: () => 
           look={DEFAULT_LOOK}
           sectionLabel="verse 1"
           sectionType="verse"
-          lyrics="Amazing grace"
+          lyrics={lyrics}
           emptyText="(blank)"
-          selected={false}
+          selected={selected}
           editing={false}
           selectLabel="Select slide"
           onSelect={vi.fn()}
@@ -29,6 +33,8 @@ function renderCard(handlers: { onInsertAfter?: () => void; onDuplicate?: () => 
           onInsertAfter={handlers.onInsertAfter ?? vi.fn()}
           onDuplicate={handlers.onDuplicate ?? vi.fn()}
           onDelete={handlers.onDelete ?? vi.fn()}
+          onSplit={handlers.onSplit}
+          growWhenSelected
           data={{ "data-testid": "card" }}
         />
       </SortableContext>
@@ -51,6 +57,31 @@ describe("a setlist slide card", () => {
     fireEvent.click(screen.getByRole("menuitem", { name: "Insert slide" }));
     expect(onInsertAfter).toHaveBeenCalledOnce();
     expect(screen.queryByRole("menu")).toBeNull();
+  });
+});
+
+describe("splitting a setlist slide", () => {
+  it("shows a split button that splits the slide", () => {
+    const onSplit = vi.fn();
+    renderCard({ onSplit }, "Amazing grace how sweet the sound\nThat saved a wretch like me\nI once was lost but now am found");
+    fireEvent.click(screen.getByRole("button", { name: "Split slide in two" }));
+    expect(onSplit).toHaveBeenCalledOnce();
+  });
+
+  it("hides it for a slide of one word, or an ordinary two-line one", () => {
+    renderCard({ onSplit: vi.fn() }, "Hallelujah");
+    expect(screen.queryByRole("button", { name: "Split slide in two" })).toBeNull();
+    cleanup();
+    renderCard({ onSplit: vi.fn() }, "Amazing grace\nHow sweet the sound");
+    expect(screen.queryByRole("button", { name: "Split slide in two" })).toBeNull();
+  });
+});
+
+describe("a setlist slide's picture", () => {
+  it("stays a 16:9 picture of the screen when selected: only typing grows it", () => {
+    renderCard({}, "Amazing grace", true);
+    expect(document.querySelector("[data-expanded]")).toBeNull();
+    expect(screen.getByTestId("mini-slide-words")).toHaveTextContent("Amazing grace");
   });
 });
 

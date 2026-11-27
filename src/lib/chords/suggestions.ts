@@ -524,51 +524,6 @@ function computeChordSpellcheckSuggestions(
 }
 
 /**
- * 3. Slide Split Suggestions (16:9 Projector Readability):
- *    Finds slides with >= 4 lines (or > 140 characters across >= 3 lines) and proposes
- *    splitting them at the best musical/grammatical breath boundary (typically halfway,
- *    preferring lines ending with punctuation `,` `;` `.` `!` `?`).
- */
-function computeSlideSplitSuggestions(
-  slides: { section: ParsedSection; lyrics: string }[],
-): SongSuggestion[] {
-  const out: SongSuggestion[] = [];
-
-  slides.forEach((slide, slideIdx) => {
-    const lines = slide.lyrics.split("\n").map((l) => l.trimEnd());
-    if (lines.length < 4) return;
-
-    const mid = Math.floor(lines.length / 2) - 1;
-    let bestSplitIdx = mid;
-    let bestScore = -Infinity;
-
-    for (let i = 1; i < lines.length - 1; i++) {
-      const line = lines[i]!.trim();
-      // Prefer balanced halves (e.g. 2+2 for 4 lines, 2+2 or 3+3 for 6 lines)
-      const balancePenalty = Math.abs(i - mid) * 2;
-      const endsWithPunct = /[,;.!?—–-]$/.test(line) ? 3 : 0;
-      const evenSplitBonus = (i + 1) % 2 === 0 ? 1.5 : 0;
-      const score = endsWithPunct + evenSplitBonus - balancePenalty;
-      if (score > bestScore) {
-        bestScore = score;
-        bestSplitIdx = i;
-      }
-    }
-
-    out.push({
-      id: `slide-split-${slideIdx}-${bestSplitIdx}`,
-      category: "slide-split",
-      label: `Split ${sectionLabel(slide.section)} (${lines.length} lines → ${bestSplitIdx + 1} + ${lines.length - (bestSplitIdx + 1)})`,
-      reason: `${lines.length}-line slide is crowded on 16:9 projectors; split at breath mark after line ${bestSplitIdx + 1}`,
-      slideIdx,
-      splitAfterLineIdx: bestSplitIdx,
-    });
-  });
-
-  return out;
-}
-
-/**
  * 4. Lyric Cleanup & Cross-Section Lyric Ripple Suggestions:
  *    - Detects leftover PDF/notation syllable hyphens inside words (e.g. `"Wor-thy"`, `"sur-ren-der"`, `"Ho-ly"`).
  *    - Detects excessive trailing punctuation on slide lines (`"Praise the Lord,,,"` or trailing commas on final lines).
@@ -843,10 +798,6 @@ export function computeSongSuggestions(params: {
       });
     }
 
-    if (lastEdit.kind === "slide-split") {
-      return computeSlideSplitSuggestions(slides);
-    }
-
     if (lastEdit.kind === "lyric") {
       return computeLyricCleanupSuggestions(slides, lastEdit);
     }
@@ -876,7 +827,6 @@ export function computeSongSuggestions(params: {
     );
   }
 
-  all.push(...computeSlideSplitSuggestions(slides));
   all.push(...computeLyricCleanupSuggestions(slides, lastEdit));
 
   const arr = computeArrangementSuggestion(body, slideOrder);

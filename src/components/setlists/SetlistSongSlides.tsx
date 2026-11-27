@@ -23,7 +23,7 @@ import {
   arrayMove,
   rectSortingStrategy,
 } from "@dnd-kit/sortable";
-import { BookOpen, Palette, Pencil, Plus, RotateCcw, Save, Trash2, Type } from "lucide-react";
+import { BookOpen, Palette, Pencil, Plus, RotateCcw, Save, Trash2, Type, Undo2 } from "lucide-react";
 
 import { sectionLabel, type ParsedSection } from "@/lib/parseSong";
 import { DisplayLookDialog } from "@/components/presentation/DisplayLookDialog";
@@ -58,6 +58,7 @@ import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/lib/confirm";
 import { useToast } from "@/lib/toast";
 import { SetlistSlideCard } from "@/components/setlists/SetlistSlideCard";
+import { splitAt } from "@/lib/slideSplit";
 
 const PERSIST_DEBOUNCE_MS = 600;
 
@@ -70,6 +71,8 @@ interface Props {
   item: SetlistItemWithSong;
   number?: number;
   chartKey?: string | null;
+  /** The song has a chord chart: a split then keeps to line breaks. */
+  hasChords?: boolean;
   /** Change the song's key for this service; without it the key only shows. */
   onKeyChange?: (key: string | null) => void;
   selectedSlideIdx?: number | null;
@@ -109,6 +112,7 @@ export function SetlistSongSlides({
   item,
   number,
   chartKey,
+  hasChords = false,
   onKeyChange,
   selectedSlideIdx,
   onSelectSlide,
@@ -203,7 +207,11 @@ export function SetlistSongSlides({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function mutate(next: EditableSlide[]) {
+  // The slides just before the last split, for "Undo split" until the next change.
+  const [beforeSplit, setBeforeSplit] = useState<EditableSlide[] | null>(null);
+
+  function mutate(next: EditableSlide[], keepUndo = false) {
+    if (!keepUndo) setBeforeSplit(null);
     dirtyRef.current = true;
     setHasOverride(true);
     setSlides(next);
@@ -227,6 +235,24 @@ export function SetlistSongSlides({
     const copy: EditableSlide = { ...slides[idx]!, uid: nextUid() };
     mutate([...slides.slice(0, idx + 1), copy, ...slides.slice(idx + 1)]);
     selectIndex(idx + 1);
+  }
+
+  /** Cut the slide in two near its middle; the first half stays selected. */
+  function handleSplit(uid: string) {
+    const idx = slides.findIndex((s) => s.uid === uid);
+    if (idx < 0) return;
+    const next = splitAt(
+      slides,
+      idx,
+      (slide, lyrics) => ({ uid: nextUid(), section: { ...slide.section }, lyrics }),
+      { midLine: !hasChords },
+    );
+    if (next === slides) return;
+    if (editingUid === uid) setEditingUid(null);
+    mutate(next, true);
+    setBeforeSplit(slides);
+    setLocalSelectedIdx(idx);
+    onSelectSlide?.(idx);
   }
 
   /** A blank slide in the same section straight after `uid`, selected and open for typing. */
@@ -337,6 +363,16 @@ export function SetlistSongSlides({
   }
 
   async function handleReset() {
+    const ok = await confirm({
+      title: kind === "scripture" ? "Go back to the passage's text?" : "Use the library version?",
+      message:
+        kind === "scripture"
+          ? "Every edit to this passage in this service goes."
+          : "Every edit to this song's slides in this service goes. The library song isn't changed.",
+      confirmLabel: kind === "scripture" ? "Go back" : "Use library version",
+    });
+    if (!ok) return;
+    setBeforeSplit(null);
     if (persistTimer.current) clearTimeout(persistTimer.current);
     pendingRef.current = false;
     try {
@@ -415,7 +451,7 @@ export function SetlistSongSlides({
         {kind === "scripture" && (
           <>
             <BookOpen className="size-4 self-center text-sky-400" aria-hidden />
-            <h3 className="text-xl font-bold tracking-tight">{scripture?.reference ?? "Scripture"}</h3>
+            <h3 className="text-xl font-bold tracking-tight">{scripture?.reference ?? "Bible passage"}</h3>
             {scripture?.abbreviation && !scripture.own_text && (
               <span className="text-sm text-muted-foreground">{scripture.abbreviation}</span>
             )}
@@ -441,10 +477,25 @@ export function SetlistSongSlides({
         )}
 
         <div className="ml-auto flex items-center gap-1.5 self-center">
+          {beforeSplit && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                mutate(beforeSplit);
+                setBeforeSplit(null);
+              }}
+              title="Put the slide back as it was before the split"
+              className="h-7 gap-1 px-2 text-xs"
+            >
+              <Undo2 className="size-3.5" />
+              Undo split
+            </Button>
+          )}
           {editsShowAsOverride && (
             <>
               <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-400">
-                Edited for this setlist
+                Edited for this service
               </span>
               <Button
                 variant="ghost"
@@ -453,12 +504,12 @@ export function SetlistSongSlides({
                 title={
                   kind === "scripture"
                     ? "Discard these edits and go back to the passage's text"
-                    : "Discard setlist edits and use the library song"
+                    : "Discard this service's edits and use the library song"
                 }
                 className="h-7 gap-1 px-2 text-xs"
               >
                 <RotateCcw className="size-3.5" />
-                Undo edits
+                {kind === "scripture" ? "Use passage text" : "Use library version"}
               </Button>
               {kind === "song" && (
                 <Button
@@ -515,7 +566,7 @@ export function SetlistSongSlides({
           <button
             type="button"
             onClick={() => setStyling(true)}
-            title={ownLook ? "Look for this setlist (its own)" : "Give this a look of its own in this setlist"}
+            title={ownLook ? "Its own look in this service" : "Give this a look of its own in this service"}
             aria-label="Style"
             data-own-style={ownLook ? "true" : undefined}
             className={`rounded p-1 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover/song:opacity-100 ${
@@ -528,8 +579,8 @@ export function SetlistSongSlides({
             <button
               type="button"
               onClick={onRemoveSong}
-              title="Remove from setlist"
-              aria-label="Remove from setlist"
+              title="Remove from service"
+              aria-label="Remove from service"
               className="rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:text-destructive focus-visible:opacity-100 group-hover/song:opacity-100"
             >
               <Trash2 className="size-3.5" />
@@ -543,7 +594,7 @@ export function SetlistSongSlides({
           onClose={() => setStyling(false)}
           override={{
             title: `Look for “${item.song?.title ?? "this item"}”`,
-            description: "Only in this setlist. Everything else keeps its look.",
+            description: "Only in this service. Everything else keeps its look.",
             value: look,
             onChange: (next) => void saveOwnLook(next),
             onUseDefault: parseLook(ownLook)
@@ -589,8 +640,11 @@ export function SetlistSongSlides({
                 onChangeLyrics={(lyrics) => handleEdit(slide.uid, lyrics)}
                 onInsertAfter={() => handleInsertAfter(slide.uid)}
                 onDuplicate={() => handleDuplicate(slide.uid)}
+                onSplit={() => handleSplit(slide.uid)}
+                splitMidLine={!hasChords}
                 onDelete={() => handleDelete(slide.uid)}
                 deleteOnKey
+                growWhenSelected
                 data={{
                   "data-testid": "setlist-slide-card",
                   "data-slide-uid": slide.uid,

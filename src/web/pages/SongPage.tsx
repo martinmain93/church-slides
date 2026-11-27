@@ -1,0 +1,229 @@
+import { useMemo, useState } from "react";
+import { ChevronRight, Pencil } from "lucide-react";
+
+import type { SongChart } from "@/core/library";
+import { ChordLyrics } from "@/components/band/ChordLyrics";
+import { KeyBadge } from "@/components/KeyBadge";
+import { alignSlides, chartHasChords, parseStoredChart, transposeLines, type ChordChart } from "@/lib/chords/chart";
+import { semitonesToKey } from "@/lib/chords/chord";
+import { sectionLabel } from "@/lib/parseSong";
+import { parseSlidesOverride, resolveSlideSequence } from "@/lib/slideSequence";
+import { href } from "@/web/route";
+import { Empty, ErrorLine, PageHeader, iconButtonClass, useLibraryData, useTitle } from "@/web/ui";
+import { cn } from "@/lib/utils";
+
+/** The key a song's chart is written in: the key stored with it, or the
+ * chart's own. One rule for every page. */
+export function writtenKeyOf(stored: SongChart | null | undefined): string | null {
+  if (!stored) return null;
+  return stored.original_key ?? parseStoredChart(stored.chart_json)?.key ?? null;
+}
+
+/** The words of a song in the order they're sung (its Order, else each
+ * section once), with the chords over them when it has a chart. `playKey`
+ * transposes them (a service's key for the song). */
+export function SongWords({
+  body,
+  order,
+  slidesOverride = null,
+  chart,
+  writtenKey,
+  playKey,
+  showChords,
+}: {
+  body: string;
+  order: string | null;
+  /** The service's own slides for this song (its order for that service). */
+  slidesOverride?: string | null;
+  chart: ChordChart | null;
+  writtenKey: string | null;
+  playKey: string | null;
+  showChords: boolean;
+}) {
+  const sections = useMemo(() => {
+    const own = parseSlidesOverride(slidesOverride);
+    const slides = own
+      ? own.map((s, i) => ({ ...s, order_in_section: i > 0 && sameSection(own[i - 1]!.section, s.section) ? 1 : 0 }))
+      : resolveSlideSequence(body, order);
+    const aligned = chart && showChords ? alignSlides(chart, slides) : null;
+    const shift = writtenKey && playKey ? semitonesToKey(writtenKey, playKey) : 0;
+    const out: { label: string; stanzas: { text: string; chords: { pos: number; chord: string }[] }[][] }[] = [];
+    let lastSection: string | null = null;
+    slides.forEach((slide, i) => {
+      const label = sectionLabel(slide.section);
+      const lines = aligned?.[i]?.matched
+        ? transposeLines(aligned[i]!.lines, shift, playKey)
+        : slide.lyrics.split("\n").map((text) => ({ text, chords: [] }));
+      // A section's slides stay together; a repeat (the chorus again) starts anew.
+      const sectionKey = `${slide.section.type}${slide.section.number}`;
+      const last = out[out.length - 1];
+      if (last && lastSection === sectionKey && slide.order_in_section > 0) last.stanzas.push(lines);
+      else out.push({ label, stanzas: [lines] });
+      lastSection = sectionKey;
+    });
+    return out;
+  }, [body, order, slidesOverride, chart, writtenKey, playKey, showChords]);
+
+  if (sections.length === 0) return <Empty>This song has no words yet.</Empty>;
+  return (
+    <div className="space-y-6 md:space-y-8" data-testid="song-words">
+      {sections.map((s, si) => (
+        <section key={si} aria-label={s.label}>
+          <h2 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground md:text-sm">{s.label}</h2>
+          <div className="space-y-3 text-base leading-relaxed md:text-xl md:leading-relaxed">
+            {s.stanzas.map((lines, li) => (
+              <div key={li}>
+                {lines.map((l, i) => (
+                  <ChordLyrics key={i} text={l.text} chords={l.chords} showChords={showChords} chordClassName="font-semibold text-sky-700 dark:text-sky-400" />
+                ))}
+              </div>
+            ))}
+          </div>
+        </section>
+      ))}
+    </div>
+  );
+}
+
+const CHORDS_KEY = "church-slides.web.chords";
+
+function useShowChords(): [boolean, (v: boolean) => void] {
+  const [show, setShow] = useState(() => {
+    try {
+      return localStorage.getItem(CHORDS_KEY) !== "off";
+    } catch {
+      return true;
+    }
+  });
+  return [
+    show,
+    (v) => {
+      setShow(v);
+      try {
+        localStorage.setItem(CHORDS_KEY, v ? "on" : "off");
+      } catch {
+        // Storage off: remembered for this visit only.
+      }
+    },
+  ];
+}
+
+export function SongPage({
+  id,
+  playKey,
+  canEdit,
+  back,
+  from = null,
+  itemId = null,
+}: {
+  id: string;
+  playKey: string | null;
+  canEdit: boolean;
+  back: string;
+  /** The service it was opened from, and which of its items. */
+  from?: string | null;
+  itemId?: string | null;
+}) {
+  const { data, error } = useLibraryData(
+    async (lib) => {
+      const song = await lib.getSong(id);
+      const stored = song ? await lib.getChart(id) : null;
+      const service = from ? await lib.getSetlist(from) : null;
+      const at = service?.items.findIndex((i) => i.id === itemId) ?? -1;
+      const item = at >= 0 ? service!.items[at]! : null;
+      // The next song in the service: what the band turns to.
+      const next = service && at >= 0 ? (service.items.slice(at + 1).find((i) => i.kind === "song" && i.song) ?? null) : null;
+      return { song, chart: parseStoredChart(stored?.chart_json), writtenKey: writtenKeyOf(stored), item, next };
+    },
+    [id, from, itemId],
+  );
+  const [showChords, setShowChords] = useShowChords();
+  useTitle(data?.song?.title ?? "Song");
+
+  if (!data) return <PageHeader title="" back={back} />;
+  const { song, chart, writtenKey, item, next } = data;
+  if (!song) {
+    return (
+      <>
+        <PageHeader title="Song" back={back} />
+        <Empty>This song was deleted.</Empty>
+      </>
+    );
+  }
+  const hasChords = !!chart && chartHasChords(chart);
+  const shownKey = playKey ?? writtenKey;
+  const facts = [song.author, song.ccli ? `CCLI ${song.ccli}` : null, chart?.tempo ? `${chart.tempo} bpm` : null, chart?.time ?? null].filter(Boolean);
+
+  return (
+    <>
+      <PageHeader
+        title={song.title}
+        back={back}
+        wrap
+        action={
+          <>
+            {hasChords && (
+              <button
+                type="button"
+                className={cn(
+                  "h-11 rounded-md border px-3 text-sm font-medium",
+                  showChords ? "border-sky-400/50 bg-sky-400/10 text-sky-700 dark:text-sky-300" : "border-border text-muted-foreground hover:text-foreground",
+                )}
+                onClick={() => setShowChords(!showChords)}
+                aria-pressed={showChords}
+                data-testid="toggle-chords"
+              >
+                Chords
+              </button>
+            )}
+            {canEdit && (
+              <a href={href({ page: "edit-song", id })} className={iconButtonClass} aria-label="Edit song" title="Edit" data-testid="edit-song">
+                <Pencil className="size-5" />
+              </a>
+            )}
+          </>
+        }
+      />
+      {error && <ErrorLine>{error}</ErrorLine>}
+      <div className="space-y-5 px-4 py-4">
+        {(shownKey || facts.length > 0 || song.copyright) && (
+          <div className="flex items-start gap-3">
+            {shownKey && <KeyBadge songKey={shownKey} className="mt-0.5" />}
+            <div className="min-w-0 flex-1 space-y-0.5 text-sm leading-relaxed text-muted-foreground">
+              {shownKey && !(playKey && writtenKey && playKey !== writtenKey) && <div className="text-foreground">Key {shownKey}</div>}
+              {facts.length > 0 && <div>{facts.join(" · ")}</div>}
+              {playKey && writtenKey && playKey !== writtenKey && (
+                <div>
+                  In {playKey} for this service (original key {writtenKey})
+                </div>
+              )}
+              {song.copyright && <div className="text-xs">{song.copyright}</div>}
+            </div>
+          </div>
+        )}
+        <SongWords
+          body={song.body_text}
+          order={song.slide_order}
+          slidesOverride={item?.slides_override ?? null}
+          chart={chart}
+          writtenKey={writtenKey}
+          playKey={playKey}
+          showChords={hasChords && showChords}
+        />
+        {next?.song_id && from && (
+          <a
+            href={href({ page: "song", id: next.song_id, key: next.song_key ?? null, from, item: next.id })}
+            className="flex min-h-14 items-center gap-2 rounded-md border border-border px-4 text-sm hover:bg-muted/50"
+            data-testid="next-song"
+          >
+            <span className="text-muted-foreground">Next:</span>
+            <span className="min-w-0 flex-1 truncate font-medium">{next.song?.title}</span>
+            <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+          </a>
+        )}
+      </div>
+    </>
+  );
+}
+
+const sameSection = (a: { type: string; number: number }, b: { type: string; number: number }) => a.type === b.type && a.number === b.number;

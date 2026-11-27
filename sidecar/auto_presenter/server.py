@@ -26,6 +26,7 @@ from pydantic import TypeAdapter, ValidationError
 from websockets.asyncio.server import ServerConnection
 
 from auto_presenter import server_assist
+from auto_presenter.api_keys import hosted_gateway
 from auto_presenter.api_keys import (
     get_key as get_instruction_api_key,
 )
@@ -965,13 +966,15 @@ async def _start_audio_session(
             log.warning("mlx-whisper warm failed (first live pass will retry): %s", exc)
         backend = await _maybe_qwen_backend(backend, msg.tunables or _state.tunables)
     elif msg.backend == "groq":  # deprecated (2026-11-23): the app no longer asks for it
-        api_key = get_instruction_api_key("groq")
-        if not api_key:
+        # A Groq key of their own, else the organization's AI allowance.
+        own = get_instruction_api_key("groq")
+        where = ("https://api.groq.com/openai/v1", own) if own else hosted_gateway()
+        if where is None:
             await _send_error(
-                ws, msg.id, "groq backend needs an API key — add one from the debug panel"
+                ws, msg.id, "online speech needs a Groq API key, or signing in to an organization"
             )
             return
-        backend = GroqWhisperBackend(api_key=api_key, model=msg.model_size)
+        backend = GroqWhisperBackend(api_key=where[1], base_url=where[0], model=msg.model_size)
     else:
         backend = make_mock_backend()
     _state.session_asr_backend = msg.backend

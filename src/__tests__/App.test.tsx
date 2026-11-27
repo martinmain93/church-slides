@@ -197,7 +197,7 @@ describe("App", () => {
     );
   });
 
-  it("Home -> New setlist opens a setlist builder", async () => {
+  it("Home -> New service opens the service builder", async () => {
     vi.spyOn(tauri, "createSetlist").mockResolvedValue("setlist_new");
     vi.spyOn(tauri, "getSetlist").mockResolvedValue({
       id: "setlist_new",
@@ -208,9 +208,9 @@ describe("App", () => {
     });
     render(<App />);
     await screen.findByRole("heading", { name: "Home" });
-    // Two "New setlist" buttons render when the list is empty: the section
+    // Two "New service" buttons render when the list is empty: the section
     // action and the empty-state CTA. Either should work; click the first.
-    const buttons = await screen.findAllByRole("button", { name: /new setlist/i });
+    const buttons = await screen.findAllByRole("button", { name: /new service/i });
     fireEvent.click(buttons[0]!);
     await waitFor(() => {
       expect(screen.getByDisplayValue("New setlist")).toBeInTheDocument();
@@ -219,6 +219,6 @@ describe("App", () => {
     // Global sidebar is collapsed inside the unified setlist workspace
     expect(screen.queryByRole("button", { name: /^library$/i })).toBeNull();
     // Named for the coming Sunday, so the home list can tell setlists apart.
-    expect(tauri.createSetlist).toHaveBeenCalledWith(expect.stringMatching(/^Sunday \d+ \w+$/));
+    expect(tauri.createSetlist).toHaveBeenCalledWith(expect.stringMatching(/^Sunday \d+ \w+$/), expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/));
   });
 });

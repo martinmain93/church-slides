@@ -1,0 +1,10 @@
+{
+  "type": "reading",
+  "id": "reading_01HSAMPLE00000000000",
+  "fields": {
+    "title": "Psalm 23",
+    "body_text": "The Lord is my shepherd;\nI shall not want.",
+    "created_at": 1731000000000,
+    "updated_at": 1731000000000
+  }
+}

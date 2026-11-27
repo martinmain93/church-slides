@@ -56,7 +56,7 @@ const SCRIPTURE_COLS: &[&str] = &[
     "id", "reference", "translation", "section_key", "anchor_lyric", "every_repeat", "position", "source", "strength", "note",
 ];
 const REFERENCE_COLS: &[&str] = &["id", "kind", "source_name", "data_json", "summary_json", "created_at", "updated_at"];
-const SETLIST_COLS: &[&str] = &["name", "created_at", "last_used_at"];
+const SETLIST_COLS: &[&str] = &["name", "service_date", "created_at", "last_used_at"];
 const ITEM_COLS: &[&str] = &["id", "kind", "song_id", "position", "slides_override", "content", "look", "song_key"];
 const READING_COLS: &[&str] = &["title", "body_text", "created_at", "updated_at"];
 const SERVICE_COLS: &[&str] = &["setlist_id", "started_at"];

@@ -1,0 +1,17 @@
+// The web app at app.churchslides.app: the built static site (web/dist),
+// served by Cloudflare as a Worker with static assets, like the account
+// server at api.churchslides.app. `_headers` in web/public sets the security
+// policy and caching.
+//
+//   pnpm web:build && pnpm web:deploy
+{
+  "name": "church-slides-web",
+  "compatibility_date": "2026-11-26",
+  "assets": {
+    "directory": "./dist",
+    // One page; the app's routes are in the address's #fragment.
+    "not_found_handling": "single-page-application"
+  },
+  "routes": [{ "pattern": "app.churchslides.app", "custom_domain": true }],
+  "workers_dev": false
+}

@@ -27,10 +27,11 @@ import {
 import { diatonicChordItemsForKey, resolveChordInput } from "@/lib/chords/editorText";
 import type { SongSuggestion } from "@/lib/chords/suggestions";
 import { ChordLyrics } from "@/components/band/ChordLyrics";
-import { useDisplayLook } from "@/lib/displayLook";
+import { DEFAULT_LOOK, type DisplayLook } from "@/lib/look";
 import { Textarea } from "@/components/ui/textarea";
 import { ChordPickerPopover } from "@/components/library/ChordPickerPopover";
 import { AiChangeGlow, ProjectorSlideCard } from "@/components/library/ProjectorSlideCard";
+import { splitAt } from "@/lib/slideSplit";
 
 export type SetWordChordHandler = (
   slideLyrics: string,
@@ -61,10 +62,16 @@ export type ChordDisplayMode = "letters" | "numbers";
 
 interface Props {
   body: string;
+  /** How the slides look on the screen; the cards are drawn in it. */
+  look?: DisplayLook;
   /** Optional default slide order; repeated sections show repeated slides. */
   slideOrder?: string | null;
   /** When set, draw its chords above the lyrics (the band's view). */
   chart?: ChordChart | null;
+  /** The song has chords, shown or not: a split then keeps to line breaks. */
+  hasChords?: boolean;
+  /** Called just before a slide is split or deleted, so the editor can offer Undo. */
+  onBeforeChange?: (change: "split" | "delete") => void;
   /** Key used for the quick diatonic chord palette and Nashville numbers. */
   chartKey?: string | null;
   /** Whether chords should be spelled with flats (true) or sharps (false). */
@@ -218,8 +225,11 @@ const INSTRUMENTAL_LABELS = ["Intro", "Turnaround", "Interlude", "Instrumental",
 
 export function SongPreview({
   body,
+  look = DEFAULT_LOOK,
   slideOrder,
   chart,
+  hasChords = false,
+  onBeforeChange,
   chartKey,
   preferFlats,
   displayMode = "letters",
@@ -262,7 +272,6 @@ export function SongPreview({
 
   const interactive = Boolean(onSetWordChord);
   const isChordMode = interactive || Boolean(chart);
-  const look = useDisplayLook();
 
   const effectiveKey = chartKey || chart?.key || "G";
   const paletteItems = useMemo(
@@ -680,6 +689,20 @@ export function SongPreview({
     setSelectedSlideIdx(idx + 1);
   }
 
+  function handleSplitSlide(idx: number) {
+    if (!onChangeBody || slides[idx]?.lyrics === NEW_SLIDE_STAND_IN) return;
+    const currentList: OverrideSlide[] = slides.map((s) => ({
+      section: s.section,
+      lyrics: s.lyrics,
+    }));
+    const nextList = splitAt(currentList, idx, undefined, { midLine: !hasChords });
+    if (nextList === currentList) return;
+    onBeforeChange?.("split");
+    if (editingSlideIdx === idx) setEditingSlideIdx(null);
+    commitSlidesMutation(nextList);
+    setSelectedSlideIdx(idx);
+  }
+
   function handleDeleteSlide(idx: number) {
     if (!onChangeBody) return;
     const currentList: OverrideSlide[] = slides.map((s) => ({
@@ -687,6 +710,7 @@ export function SongPreview({
       lyrics: s.lyrics,
     }));
     const nextList = currentList.filter((_, i) => i !== idx);
+    if (slides[idx]?.lyrics !== NEW_SLIDE_STAND_IN) onBeforeChange?.("delete");
     if (editingSlideIdx === idx) setEditingSlideIdx(null);
     commitSlidesMutation(nextList);
     if (selectedSlideIdx !== null) {
@@ -723,7 +747,7 @@ export function SongPreview({
               <Plus className="size-5 text-primary" />
               <span className="font-medium text-foreground">Add first slide</span>
               <span className="text-[11px] text-muted-foreground">
-                Or click &ldquo;Raw text&rdquo; above to paste a full song
+                Or use &ldquo;Edit as text&rdquo; to paste a whole song
               </span>
             </span>
           </button>
@@ -828,6 +852,8 @@ export function SongPreview({
                     }}
                     onChangeSection={(sec) => handleUpdateSlideSection(i, sec)}
                     onDuplicate={() => handleDuplicateSlide(i)}
+                    onSplit={() => handleSplitSlide(i)}
+                    splitMidLine={!hasChords}
                     onDelete={() => handleDeleteSlide(i)}
                   />
                   {pulsing && aiPulse && <AiChangeGlow key={aiPulse.token} />}
@@ -839,7 +865,8 @@ export function SongPreview({
                   type="button"
                   data-testid="add-slide-card-btn"
                   onClick={handleAddSlide}
-                  className="relative aspect-video w-full overflow-hidden rounded-md border border-dashed border-border text-xs text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground"
+                  // One column (a phone): a slim row, not a whole empty slide.
+                  className="relative h-12 w-full overflow-hidden rounded-md border border-dashed border-border text-xs text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground sm:aspect-video sm:h-auto"
                 >
                   <span className="absolute inset-0 flex items-center justify-center gap-1.5">
                     <Plus className="size-4" />

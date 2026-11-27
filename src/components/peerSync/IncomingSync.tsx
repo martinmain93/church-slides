@@ -30,7 +30,7 @@ export function summaryMessage(s: SyncApplySummary): string {
   if (s.songs_replaced) parts.push(`${s.songs_replaced} updated`);
   if (s.songs_reused) parts.push(`${s.songs_reused} already here`);
   if (!s.setlist_id) return `Library copied — ${parts.join(", ") || "no songs"}.`;
-  return `Saved “${s.setlist_name}” — ${parts.join(", ") || "no songs"}. It's in your setlists on Home.`;
+  return `Saved “${s.setlist_name}” — ${parts.join(", ") || "no songs"}. It's in your services on Home.`;
 }
 
 export function IncomingSync({ onImported, onError }: { onImported: (message: string) => void; onError: (message: string) => void }) {
@@ -71,7 +71,7 @@ export function IncomingSync({ onImported, onError }: { onImported: (message: st
           <>
             <div className="flex items-center gap-2 font-semibold">
               <ArrowDownToLine className="size-5" />
-              {current.library ? `${current.from.name} is sending you their library` : `${current.from.name} is sending you a setlist`}
+              {current.library ? `${current.from.name} is sending you their library` : `${current.from.name} is sending you a service`}
             </div>
             <p className="mt-2 text-sm text-muted-foreground">
               {current.library ? "Their whole library" : `“${current.setlist_name}”`} — {current.song_count} song
@@ -112,7 +112,7 @@ export function IncomingSync({ onImported, onError }: { onImported: (message: st
               {current.from.name} wants to copy from this computer
             </div>
             <p className="mt-2 text-sm text-muted-foreground">
-              If you allow it, that computer can see this computer's setlists and copy any of them, or the whole song library, until
+              If you allow it, that computer can see this computer's services and copy any of them, or the whole song library, until
               Church Slides is closed here. Nothing on this computer changes.
             </p>
             <div className="mt-4 flex justify-end gap-2">

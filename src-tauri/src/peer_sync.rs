@@ -65,6 +65,9 @@ const BACKUPS_KEPT: usize = 10;
 pub struct SetlistBundle {
     pub protocol: u32,
     pub setlist_name: String,
+    /// The day the service is for (`YYYY-MM-DD`); older copies send none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub service_date: Option<String>,
     /// Each song once, however many times the set plays it.
     pub songs: Vec<BundleSong>,
     pub items: Vec<BundleItem>,
@@ -173,7 +176,14 @@ pub fn build_bundle(db: &Arc<Db>, setlist_id: &str) -> Result<SetlistBundle> {
     }
     attach_charts(db, &mut songs)?;
     let protocol = if items.iter().any(|i| i.kind != "song") { PROTOCOL_SERVICE_ITEMS } else { 1 };
-    Ok(SetlistBundle { protocol, setlist_name: detail.setlist.name, songs, items, library: false })
+    Ok(SetlistBundle {
+        protocol,
+        setlist_name: detail.setlist.name,
+        service_date: detail.setlist.service_date,
+        songs,
+        items,
+        library: false,
+    })
 }
 
 /// Every song in the library, with its chords; no setlist.
@@ -194,7 +204,14 @@ pub fn build_library_bundle(db: &Arc<Db>) -> Result<SetlistBundle> {
         })
         .collect();
     attach_charts(db, &mut songs)?;
-    Ok(SetlistBundle { protocol: PROTOCOL_LIBRARY, setlist_name: String::new(), songs, items: Vec::new(), library: true })
+    Ok(SetlistBundle {
+        protocol: PROTOCOL_LIBRARY,
+        setlist_name: String::new(),
+        service_date: None,
+        songs,
+        items: Vec::new(),
+        library: true,
+    })
 }
 
 fn attach_charts(db: &Arc<Db>, songs: &mut [BundleSong]) -> Result<()> {
@@ -344,9 +361,11 @@ pub fn apply_bundle(
         tx.commit()?;
         return Ok(summary);
     }
+    // A malformed date from another copy is dropped, not refused: the songs still come.
+    let service_date = setlists::checked_date(bundle.service_date.as_deref()).ok().flatten();
     tx.execute(
-        "INSERT INTO setlists (id, name, created_at) VALUES (?1, ?2, ?3)",
-        params![summary.setlist_id, summary.setlist_name, now],
+        "INSERT INTO setlists (id, name, created_at, service_date) VALUES (?1, ?2, ?3, ?4)",
+        params![summary.setlist_id, summary.setlist_name, now, service_date],
     )?;
     for (pos, it) in bundle.items.iter().enumerate() {
         if it.kind != "song" {
@@ -1199,7 +1218,7 @@ mod tests {
             }],
         )
         .unwrap();
-        let set = setlists::create_setlist(&db, "Sunday").unwrap();
+        let set = setlists::create_setlist(&db, "Sunday", Some("2026-11-29")).unwrap();
         setlists::add_setlist_item(&db, &set, &a).unwrap();
         let item_b = setlists::add_setlist_item(&db, &set, &b).unwrap();
         setlists::add_setlist_item(&db, &set, &a).unwrap();
@@ -1212,6 +1231,7 @@ mod tests {
     fn bundle_carries_each_song_once_with_its_extras() {
         let (_d, _db, b) = sender();
         assert_eq!(b.setlist_name, "Sunday");
+        assert_eq!(b.service_date.as_deref(), Some("2026-11-29"));
         assert_eq!(b.items.len(), 3);
         assert_eq!(b.songs.len(), 2);
         let oceans = b.songs.iter().find(|s| s.title == "Oceans").unwrap();
@@ -1249,6 +1269,7 @@ mod tests {
         assert_eq!(db.list_songs().unwrap().len(), before + 1, "no duplicate Oceans");
         let set = setlists::get_setlist(&db, &s.setlist_id).unwrap().unwrap();
         assert_eq!(set.setlist.name, "Sunday");
+        assert_eq!(set.setlist.service_date.as_deref(), Some("2026-11-29"), "the date comes too");
         let ids: Vec<_> = set.items.iter().map(|i| i.item.song_id.clone().unwrap()).collect();
         assert_eq!(ids[0], mine);
         assert_eq!(ids[2], mine);
@@ -1303,7 +1324,7 @@ mod tests {
     fn scripture_and_text_items_travel_with_their_content() {
         let (_d, sdb) = db();
         let a = song(&sdb, "Oceans", "[v1]\nYou call me out upon the waters");
-        let set = setlists::create_setlist(&sdb, "Sunday").unwrap();
+        let set = setlists::create_setlist(&sdb, "Sunday", None).unwrap();
         setlists::add_setlist_item(&sdb, &set, &a).unwrap();
         let scripture = r#"{"reference":"John 3:16","verses":[{"ref":"John 3:16","text":"For God so loved"}]}"#;
         setlists::add_service_item(&sdb, &set, "scripture", scripture, None, None).unwrap();

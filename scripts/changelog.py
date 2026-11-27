@@ -91,9 +91,19 @@ def _num(v: float | None, unit: str, digits: int = 0) -> str:
     return "–" if v is None else f"{v:.{digits}f}{unit}"
 
 
-def perf_card(perf: dict) -> str:
+#: From 0.3.0 the live AI needs Apple silicon; elsewhere the app keeps it off,
+#: so those builds' "slides on time" measure an engine nobody runs.
+AI_APPLE_SILICON_ONLY = (0, 3, 0)
+
+
+def _version(v: str) -> tuple[int, ...]:
+    return tuple(int(n) for n in re.findall(r"\d+", v)[:3])
+
+
+def perf_card(perf: dict, version: str = "0.0.0") -> str:
     """The release's engine performance, measured by its build on the
     fixture service: a few headline numbers per platform."""
+    ai_only_on_apple_silicon = _version(version) >= AI_APPLE_SILICON_ONLY
     rows = []
     for key, name in PERF_PLATFORMS.items():
         p = perf.get(key)
@@ -105,7 +115,12 @@ def perf_card(perf: dict) -> str:
         # cores and memory.
         parts = (p.get("machine") or "").split(" · ")
         named = [parts[1]] if len(parts) > 1 and "Family" not in parts[1] else []
+        if key == "macos-intel-rosetta":
+            # Built for Intel, but measured on an Apple silicon runner: its chip
+            # name would read as if an Intel Mac were an M1.
+            named = ["tested under Rosetta"]
         machine = html.escape(" · ".join(named + parts[2:4]))
+        ai_off = ai_only_on_apple_silicon and key != "macos-apple-silicon"
         if p.get("error"):
             cells = '<td colspan="5">the test run failed</td>'
         elif p.get("quick"):
@@ -115,11 +130,12 @@ def perf_card(perf: dict) -> str:
             )
         else:
             on_time = p.get("slides_on_time")
+            slides = "AI off" if ai_off else (f"{on_time[0]}/{on_time[1]}" if on_time else "–")
             cells = (
                 f"<td>{_num(s.get('live.cpu_percent_mean'), '%')}</td>"
                 f"<td>{_num(s.get('live.private_mb_peak'), ' MB')}</td>"
                 f"<td>{_num(s.get('live.asr_ms_p95'), ' ms')}</td>"
-                f"<td>{f'{on_time[0]}/{on_time[1]}' if on_time else '–'}</td>"
+                f"<td>{slides}</td>"
                 f"<td>{_num(s.get('soak.speed_x_realtime'), '×', 1)}</td>"
             )
         warns = p.get("warnings") or []
@@ -178,7 +194,7 @@ def render(
         perf_file = perf_dir / tag / "perf.json" if perf_dir else None
         card = ""
         if perf_file and perf_file.exists():
-            card = perf_card(json.loads(perf_file.read_text(encoding="utf-8")))
+            card = perf_card(json.loads(perf_file.read_text(encoding="utf-8")), version)
         blocks.append(
             f'    <section class="release" id="{tag}">\n'
             f'      <div class="release-head"><h2>{version}{latest}</h2>{when}</div>\n'

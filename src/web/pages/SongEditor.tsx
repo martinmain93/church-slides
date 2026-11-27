@@ -1,0 +1,316 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+
+import { SongPreview } from "@/components/library/SongPreview";
+
+import type { NewSongInput, SongRow } from "@/core/library";
+import { useLibrary } from "@/library/context";
+import { chartHasChords, parseStoredChart } from "@/lib/chords/chart";
+import { deleteSongMessage } from "@/lib/deleteSongText";
+import { DEFAULT_LOOK, type DisplayLook } from "@/lib/look";
+import { parseSong } from "@/lib/parseSong";
+import { formatSlideOrder, parseSlideOrder } from "@/lib/slideSequence";
+import { go, goUnguarded, href, useLeaveGuard, type Route } from "@/web/route";
+import { ConfirmSheet, DangerButton, ErrorLine, Field, PageHeader, PrimaryButton, QuietButton, Sheet, errorText, fieldClass, useTitle } from "@/web/ui";
+
+const BLANK: NewSongInput = { title: "", body_text: "", author: "", ccli: "", copyright: "", slide_order: "" };
+
+function formOf(song: SongRow): NewSongInput {
+  return {
+    title: song.title,
+    body_text: song.body_text,
+    author: song.author ?? "",
+    ccli: song.ccli ?? "",
+    copyright: song.copyright ?? "",
+    slide_order: song.slide_order ?? "",
+  };
+}
+
+const same = (a: NewSongInput, b: NewSongInput) =>
+  (Object.keys(BLANK) as (keyof NewSongInput)[]).every((k) => (a[k] ?? "") === (b[k] ?? ""));
+
+/** Tags in an Order that name no section of the words, as typed. */
+export function unknownOrderTags(order: string, body: string): string[] {
+  const have = new Set(parseSong(body).slides.map((s) => `${s.section.type}${s.section.number}`));
+  const tokens = order.split(/[,\s]+/).filter(Boolean);
+  const parsed = parseSlideOrder(order);
+  return tokens.filter((_, i) => {
+    const s = parsed[i];
+    return !s || !have.has(`${s.type}${s.number}`);
+  });
+}
+
+type Ask = { kind: "leave"; to: Route } | { kind: "delete"; usedBy: string[] } | null;
+
+/** Words, order and credits. Chords are edited on the slides computer for
+ * now; they stay with the song and are lined up again with the new words. */
+export function SongEditor({ id }: { id: string | null }) {
+  const lib = useLibrary();
+  const [opened, setOpened] = useState<SongRow | null>(null);
+  const [form, setForm] = useState<NewSongInput | null>(id ? null : BLANK);
+  const [hasChart, setHasChart] = useState(false);
+  const [hasChords, setHasChords] = useState(false);
+  const [look, setLook] = useState<DisplayLook>(DEFAULT_LOOK);
+  // A new song is usually pasted in; an existing one is changed slide by slide.
+  const [asText, setAsText] = useState(!id);
+  /** The words before the last split or deleted slide, while it can be undone. */
+  const [undo, setUndo] = useState<{ change: "split" | "delete"; body: string } | null>(null);
+  const undoable = useRef(false);
+  const [error, setError] = useState<string | null>(null);
+  const [titleError, setTitleError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [ask, setAsk] = useState<Ask>(null);
+  const titleInput = useRef<HTMLInputElement>(null);
+  const orderInput = useRef<HTMLInputElement>(null);
+  useTitle(id ? "Edit song" : "New song");
+
+  useEffect(() => {
+    if (!id) return;
+    void (async () => {
+      const song = await lib.getSong(id);
+      if (!song) {
+        setError("This song was deleted.");
+        return;
+      }
+      setOpened(song);
+      setForm(formOf(song));
+      const stored = await lib.getChart(id);
+      setHasChart(!!stored);
+      const chart = parseStoredChart(stored?.chart_json);
+      setHasChords(!!chart && chartHasChords(chart));
+    })();
+  }, [id, lib]);
+
+  // The organization's look, kept current as other computers change it.
+  useEffect(() => {
+    const read = () => lib.getLook().then(setLook, () => undefined);
+    void read();
+    return lib.onChange(() => void read());
+  }, [lib]);
+
+  const dirty = !!form && !saving && !same(form, opened ? formOf(opened) : BLANK);
+  useLeaveGuard(dirty, (to) => setAsk({ kind: "leave", to }));
+
+  const unknownTags = useMemo(() => (form?.slide_order ? unknownOrderTags(form.slide_order, form.body_text) : []), [form?.slide_order, form?.body_text]);
+  const sections = useMemo(() => (form ? formatSlideOrder(parseSong(form.body_text).section_order) : ""), [form?.body_text]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const set = (k: keyof NewSongInput, clean: (v: string) => string = (v) => v) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const v = clean(e.target.value);
+    setForm((f) => (f ? { ...f, [k]: v } : f));
+    if (k === "title") setTitleError(null);
+  };
+
+  /** A change made on the slides. Any other change ends the last one's Undo. */
+  const changeBody = (body: string) => {
+    if (!undoable.current) setUndo(null);
+    undoable.current = false;
+    setForm((f) => (f ? { ...f, body_text: body } : f));
+  };
+  const undoChange = () => {
+    if (!undo) return;
+    const { body } = undo;
+    setForm((f) => (f ? { ...f, body_text: body } : f));
+    setUndo(null);
+  };
+
+  const back = id ? href({ page: "song", id, key: null }) : href({ page: "songs" });
+
+  /** Save, then go to the song (or to `then`, when saving on the way out). */
+  const save = async (then?: Route) => {
+    if (!form) return;
+    if (!form.title.trim()) {
+      setTitleError("A song needs a title.");
+      titleInput.current?.focus();
+      return;
+    }
+    // An order naming a section the words don't have would be dropped: fix it first.
+    if (unknownTags.length) {
+      orderInput.current?.focus();
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      const input = { ...form, default_tempo_wps: opened?.default_tempo_wps ?? null };
+      if (id) {
+        await lib.updateSong(id, input, opened ?? undefined);
+        if (then) goUnguarded(then);
+        else go({ page: "song", id, key: null }, true);
+      } else {
+        const newId = await lib.createSong(input);
+        if (then) goUnguarded(then);
+        else go({ page: "song", id: newId, key: null }, true);
+      }
+    } catch (err) {
+      setError(errorText(err));
+      setSaving(false);
+    }
+  };
+
+  /** Ask first, saying which services use it (they'd have to drop it first). */
+  const askDelete = async () => {
+    if (!id) return;
+    const usedBy: string[] = [];
+    for (const s of await lib.listSetlists()) {
+      const detail = await lib.getSetlist(s.id);
+      if (detail?.items.some((i) => i.song_id === id)) usedBy.push(s.name || "Untitled service");
+    }
+    setAsk({ kind: "delete", usedBy });
+  };
+
+  const remove = async () => {
+    if (!id) return;
+    setAsk(null);
+    try {
+      setSaving(true);
+      await lib.deleteSong(id);
+      go({ page: "songs" }, true);
+    } catch (err) {
+      setSaving(false);
+      setError(errorText(err));
+    }
+  };
+
+  return (
+    <>
+      <PageHeader
+        title={id ? "Edit song" : "New song"}
+        back={back}
+        action={
+          <PrimaryButton onClick={() => void save()} disabled={!form || saving} data-testid="save-song">
+            Save
+          </PrimaryButton>
+        }
+      />
+      {error && <ErrorLine>{error}</ErrorLine>}
+      {form && (
+        <div className="space-y-5 px-4 py-5">
+          <Field label="Title" error={titleError}>
+            <input
+              ref={titleInput}
+              className={fieldClass}
+              value={form.title}
+              onChange={set("title")}
+              autoFocus={!id}
+              aria-invalid={!!titleError}
+              data-testid="song-title"
+            />
+          </Field>
+          <section className="space-y-1.5" aria-label="Words">
+            <div className="flex items-center gap-2">
+              <h2 className="min-w-0 flex-1 text-sm font-medium">Words</h2>
+              {undo && !asText && (
+                <QuietButton className="h-9 px-3" onClick={undoChange} data-testid="undo-change">
+                  {undo.change === "split" ? "Undo split" : "Undo delete"}
+                </QuietButton>
+              )}
+              <QuietButton
+                className="h-9 px-3"
+                onClick={() => {
+                  setAsText((t) => !t);
+                  setUndo(null);
+                }}
+                data-testid="words-as-text"
+              >
+                {asText ? "Edit as slides" : "Edit as text"}
+              </QuietButton>
+            </div>
+            {asText ? (
+              <textarea
+                className={`${fieldClass} h-auto min-h-[50dvh] py-2 font-mono text-sm leading-relaxed`}
+                value={form.body_text}
+                onChange={set("body_text")}
+                spellCheck={false}
+                placeholder={"[Verse 1]\n…\n\n[Chorus]\n…"}
+                aria-label="Words"
+                data-testid="song-body"
+              />
+            ) : (
+              <SongPreview
+                body={form.body_text}
+                look={look}
+                hasChords={hasChords}
+                onBeforeChange={(change) => {
+                  undoable.current = true;
+                  setUndo({ change, body: form.body_text });
+                }}
+                onChangeBody={changeBody}
+              />
+            )}
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              {asText
+                ? "A line like [Verse 1] starts a section; a blank line starts a new slide."
+                : "Tap a slide to pick it, and again to edit it. A long one gets scissors to split it."}
+              {hasChart && " Chords are kept and follow the new words."}
+            </p>
+          </section>
+          <Field
+            label="Order"
+            error={unknownTags.length ? `Not in the words: ${unknownTags.join(", ")}` : null}
+            hint="Like V1, C, V2, C. Empty: each section once."
+            info={
+              <>
+                V1 is [Verse 1], C is [Chorus], B is [Bridge], P is [Pre-Chorus], T is [Tag].
+                {sections ? ` This song's sections: ${sections}.` : ""}
+              </>
+            }
+          >
+            <input
+              ref={orderInput}
+              className={fieldClass}
+              value={form.slide_order ?? ""}
+              onChange={set("slide_order")}
+              aria-invalid={unknownTags.length > 0}
+              autoCapitalize="characters"
+              data-testid="song-order"
+            />
+          </Field>
+          <Field label="Author">
+            <input className={fieldClass} value={form.author ?? ""} onChange={set("author")} />
+          </Field>
+          <Field label="CCLI">
+            <input className={fieldClass} value={form.ccli ?? ""} onChange={set("ccli", (v) => v.replace(/\D/g, ""))} inputMode="numeric" />
+          </Field>
+          <Field label="Copyright">
+            <input className={fieldClass} value={form.copyright ?? ""} onChange={set("copyright")} />
+          </Field>
+          {id && (
+            <div className="pt-4">
+              <DangerButton onClick={() => void askDelete()} disabled={saving}>
+                Delete song
+              </DangerButton>
+            </div>
+          )}
+        </div>
+      )}
+
+      {ask?.kind === "leave" && (
+        <Sheet title="Save your changes?" onClose={() => setAsk(null)}>
+          <div className="space-y-4">
+            <p className="text-sm leading-relaxed text-muted-foreground">You changed this song but didn&apos;t save it.</p>
+            <div className="flex flex-col gap-2">
+              <PrimaryButton
+                data-autofocus
+                onClick={() => {
+                  const to = ask.to;
+                  setAsk(null);
+                  void save(to);
+                }}
+              >
+                Save
+              </PrimaryButton>
+              <DangerButton onClick={() => goUnguarded(ask.to)}>Discard changes</DangerButton>
+              <QuietButton className="w-full" onClick={() => setAsk(null)}>
+                Keep editing
+              </QuietButton>
+            </div>
+          </div>
+        </Sheet>
+      )}
+      {ask?.kind === "delete" && (
+        <ConfirmSheet title="Delete this song?" action="Delete song" onClose={() => setAsk(null)} onAction={() => void remove()}>
+          {deleteSongMessage(ask.usedBy)}
+        </ConfirmSheet>
+      )}
+    </>
+  );
+}

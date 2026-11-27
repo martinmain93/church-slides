@@ -26,7 +26,7 @@ export const FEATURES = {
    * copying an identical earlier line. The local Suggest rules ship. */
   chordModelSuggestions: import.meta.env.DEV,
   /** Settings → Account: sign in to a Church Slides server
-   * (docs/server-protocol/). Hidden in releases while the server is a
-   * private pilot: a sign-in most people can't complete is clutter. */
-  account: import.meta.env.DEV,
+   * (docs/server-protocol/). Shipped 2026-11-26 with the web app, whose
+   * empty library points people here to upload their songs. */
+  account: true,
 } as const;

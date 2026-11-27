@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SetlistBuilder } from "@/components/setlists/SetlistBuilder";
 import { ConfirmProvider } from "@/lib/confirm";
+import { LibraryProvider } from "@/library/context";
+import { desktopLibrary } from "@/library/desktop";
 import * as tauri from "@/lib/tauri";
 import { ToastProvider } from "@/lib/toast";
 
@@ -21,11 +23,13 @@ const song = (id: string, title: string): tauri.SongRow => ({
 
 function renderBuilder(justCreated: boolean) {
   return render(
+    <LibraryProvider source={desktopLibrary}>
     <ToastProvider>
       <ConfirmProvider>
         <SetlistBuilder setlistId="sl_new" onClose={vi.fn()} onStartService={vi.fn()} justCreated={justCreated} />
       </ConfirmProvider>
-    </ToastProvider>,
+    </ToastProvider>
+    </LibraryProvider>,
   );
 }
 
@@ -75,7 +79,7 @@ describe("setlist builder", () => {
     renderBuilder(false);
     await screen.findByDisplayValue("Sunday 22 Nov");
     fireEvent.click(screen.getAllByRole("button", { name: /songs/i })[0]!);
-    expect(await screen.findByLabelText("In the setlist")).toBeInTheDocument();
+    expect(await screen.findByLabelText("In the service")).toBeInTheDocument();
     expect(screen.getAllByText("Alpha Song").length).toBeGreaterThan(0);
   });
 });

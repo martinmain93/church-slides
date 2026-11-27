@@ -1,0 +1,43 @@
+{
+  "type": "setlist",
+  "id": "setlist_01HSAMPLESUNDAY0000000",
+  "fields": {
+    "name": "Sunday 22 Nov",
+    "service_date": "2026-11-22",
+    "created_at": 1731600000000,
+    "last_used_at": 1731700000000,
+    "items": [
+      {
+        "id": "item_01HSAMPLE0000000000001",
+        "kind": "song",
+        "song_id": "song_01HSAMPLEAMAZINGGRACE00",
+        "position": 0,
+        "song_key": "A",
+        "look": "{\"theme\":\"light\",\"font\":\"serif\",\"size\":\"m\",\"weight\":\"regular\"}"
+      },
+      {
+        "id": "item_01HSAMPLE0000000000002",
+        "kind": "scripture",
+        "position": 1,
+        "content": "{\"reference\":\"John 3:16\",\"translation\":\"web\"}"
+      },
+      {
+        "id": "item_01HSAMPLE0000000000003",
+        "kind": "text",
+        "position": 2,
+        "slides_override": "[{\"section\":{\"type\":\"other\",\"number\":1},\"lyrics\":\"Welcome\"}]",
+        "content": "{\"title\":\"Welcome\"}"
+      },
+      {
+        "id": "item_01HSAMPLE0000000000004",
+        "kind": "song",
+        "song_id": "song_01HSAMPLEMINIMAL000000",
+        "position": 3
+      }
+    ],
+    "refs": [
+      "song:song_01HSAMPLEAMAZINGGRACE00",
+      "song:song_01HSAMPLEMINIMAL000000"
+    ]
+  }
+}
