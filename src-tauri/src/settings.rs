@@ -89,6 +89,13 @@ pub struct Settings {
     /// decide: on when a hosted model's key is on file.
     #[serde(default)]
     pub spoken_requests: Option<bool>,
+
+    /// Listen online: send the service's audio to the organization's speech
+    /// server, on a computer without Apple silicon whose plan has it
+    /// (`hosted_ai.rs`). `None` until the operator is asked, which the app
+    /// does once; off until they say yes.
+    #[serde(default)]
+    pub online_speech: Option<bool>,
 }
 
 fn default_tempo_wps() -> f32 {
@@ -124,6 +131,7 @@ impl Default for Settings {
             report_contact: String::new(),
             share_usage: None,
             spoken_requests: None,
+            online_speech: None,
         }
     }
 }

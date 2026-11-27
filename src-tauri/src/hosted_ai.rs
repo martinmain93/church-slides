@@ -44,6 +44,22 @@ pub struct HostedAi {
     pub key: String,
     /// Unix milliseconds.
     pub expires_at: i64,
+    /// Hosted features the organization's plan has on now ("ai", "speech").
+    #[serde(default)]
+    pub features: Vec<String>,
+    /// Live speech on the organization's speech server, when its plan has it
+    /// and today's allowance isn't used up (the engine's
+    /// `api_keys.hosted_speech`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub speech: Option<HostedSpeech>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct HostedSpeech {
+    pub url: String,
+    pub token: String,
+    /// Unix milliseconds.
+    pub expires_at: i64,
 }
 
 pub fn path(app_data: &Path) -> PathBuf {
@@ -138,9 +154,25 @@ async fn refresh(db: &Db, app_data: &Path) -> anyhow::Result<()> {
     else {
         anyhow::bail!("the server's reply had no key");
     };
-    write(app_data, &HostedAi { org_id, org_name, base_url, key, expires_at })?;
+    let features = resp
+        .get("features")
+        .and_then(Value::as_array)
+        .map(|a| a.iter().filter_map(Value::as_str).map(String::from).collect())
+        .unwrap_or_default();
+    let speech = speech_of(&resp);
+    write(app_data, &HostedAi { org_id, org_name, base_url, key, expires_at, features, speech })?;
     log::info!("AI allowance key renewed");
     Ok(())
+}
+
+/// The answer's `speech`, when it has a usable one.
+fn speech_of(resp: &Value) -> Option<HostedSpeech> {
+    let s = resp.get("speech")?;
+    Some(HostedSpeech {
+        url: s.get("url")?.as_str()?.to_string(),
+        token: s.get("token")?.as_str()?.to_string(),
+        expires_at: s.get("expiresAt")?.as_i64()?,
+    })
 }
 
 /// What the AI settings show: whose allowance this computer uses, if any.
@@ -149,6 +181,8 @@ pub struct HostedAiStatus {
     pub org_name: Option<String>,
     /// A Groq key of the person's own is saved; it's used instead.
     pub own_groq_key: bool,
+    /// The organization's plan has online speech for this computer now.
+    pub speech: bool,
 }
 
 /// Whether the AI engine has a Groq key of the person's own: in its key
@@ -168,10 +202,11 @@ fn own_groq_key(app_data: &Path) -> bool {
 pub fn hosted_ai_status(app: tauri::AppHandle) -> HostedAiStatus {
     use tauri::Manager;
     let Ok(dir) = app.path().app_data_dir() else {
-        return HostedAiStatus { org_name: None, own_groq_key: false };
+        return HostedAiStatus { org_name: None, own_groq_key: false, speech: false };
     };
-    let org_name = read(&dir).filter(|h| h.expires_at > now_ms()).map(|h| h.org_name);
-    HostedAiStatus { org_name, own_groq_key: own_groq_key(&dir) }
+    let hosted = read(&dir).filter(|h| h.expires_at > now_ms());
+    let speech = hosted.as_ref().is_some_and(|h| h.speech.as_ref().is_some_and(|s| s.expires_at > now_ms()));
+    HostedAiStatus { org_name: hosted.map(|h| h.org_name), own_groq_key: own_groq_key(&dir), speech }
 }
 
 #[cfg(test)]
@@ -194,6 +229,18 @@ mod tests {
     }
 
     #[test]
+    fn speech_comes_from_the_key_answer_when_its_all_there() {
+        let full = serde_json::json!({"speech": {"url": "wss://s", "token": "t.s", "expiresAt": 5}});
+        assert_eq!(speech_of(&full), Some(HostedSpeech { url: "wss://s".into(), token: "t.s".into(), expires_at: 5 }));
+        assert_eq!(speech_of(&serde_json::json!({"speech": {"url": "wss://s"}})), None);
+        assert_eq!(speech_of(&serde_json::json!({})), None);
+        // a key file written before speech existed still reads
+        let old: HostedAi =
+            serde_json::from_str(r#"{"org_id":"o","org_name":"O","base_url":"b","key":"k","expires_at":1}"#).unwrap();
+        assert_eq!((old.features.len(), old.speech), (0, None));
+    }
+
+    #[test]
     fn a_missing_route_or_refusal_waits_longer() {
         let refused = |status| anyhow::Error::from(crate::account::ServerRefused { status, message: "No such route.".into() });
         assert!(not_offered(&refused(404)));
@@ -205,7 +252,15 @@ mod tests {
     #[test]
     fn written_for_the_engine_and_forgotten() {
         let dir = tempfile::tempdir().unwrap();
-        let h = HostedAi { org_id: "o".into(), org_name: "O".into(), base_url: "https://x/ai/v1".into(), key: "csa_k".into(), expires_at: 1 };
+        let h = HostedAi {
+            org_id: "o".into(),
+            org_name: "O".into(),
+            base_url: "https://x/ai/v1".into(),
+            key: "csa_k".into(),
+            expires_at: 1,
+            features: vec!["ai".into(), "speech".into()],
+            speech: Some(HostedSpeech { url: "wss://s".into(), token: "t.s".into(), expires_at: 2 }),
+        };
         write(dir.path(), &h).unwrap();
         assert_eq!(read(dir.path()), Some(h));
         #[cfg(unix)]

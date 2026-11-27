@@ -26,7 +26,7 @@ from pydantic import TypeAdapter, ValidationError
 from websockets.asyncio.server import ServerConnection
 
 from auto_presenter import server_assist
-from auto_presenter.api_keys import hosted_gateway
+from auto_presenter.api_keys import hosted_gateway, hosted_speech
 from auto_presenter.api_keys import (
     get_key as get_instruction_api_key,
 )
@@ -889,6 +889,7 @@ async def _start_audio_session(
     # the asyncio loop (and the other WS clients).
     backend: ASRBackend
     loop = asyncio.get_running_loop()
+    _state.remote_speech = None
     if msg.backend == "whisper":
         await _broadcast_state_update(StateUpdate(state="starting"), setlist_id=msg.setlist_id)
 
@@ -937,6 +938,18 @@ async def _start_audio_session(
                 fallback=backend,
             )
             backend.warm()  # starts waking the GPU; doesn't wait for it
+        elif msg.online_speech and (where := hosted_speech()) is not None:
+            from auto_presenter.asr.remote_backend import RemoteStreamingBackend
+
+            # The organization's speech server, with this computer's Whisper
+            # standing in whenever it can't be reached. The token is reread
+            # at each connect: the app renews it every few minutes.
+            backend = RemoteStreamingBackend(
+                where[0], lambda: (hosted_speech() or (None, None))[1], fallback=backend
+            )
+            backend.warm()  # starts waking the GPU; doesn't wait for it
+            log.info("live speech online, %s", where[0])
+        _state.remote_speech = backend if hasattr(backend, "on_phones") else None
     elif msg.backend == "mlx":
         if not MLXWhisperBackend.is_available():
             await _send_error(
@@ -1663,6 +1676,11 @@ async def _broadcast_pipeline_health(health: PipelineHealth) -> None:
             low_power_mode=power.low_power_mode if power else False,
             battery_percent=power.battery_percent if power else None,
             on_battery=power.on_battery if power else False,
+            speech_online=(
+                None
+                if _state.remote_speech is None
+                else not getattr(_state.remote_speech, "falling_back", False)
+            ),
             **_scorer_health(),
         )
     )

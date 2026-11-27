@@ -601,6 +601,12 @@ class StartAudioSessionRequest(_Base):
     #: Act on spoken requests this service: the operator's saved choice, or
     #: None to let the engine decide (on when a hosted model's key is on file).
     spoken_instructions: bool | None = None
+    #: Listen through the organization's online speech server, when the
+    #: operator agreed (Settings → AI) and this computer has a speech token
+    #: from its organization (`api_keys.hosted_speech`). Only on computers
+    #: that would otherwise run Whisper on the processor (`backend="whisper"`),
+    #: which stands in whenever the server can't be reached.
+    online_speech: bool = False
 
 
 class StopAudioSessionRequest(_Base):
@@ -918,6 +924,10 @@ class PipelineHealthMessage(_Base):
     #: (`pipeline.power`): Low Power Mode, or a battery near empty, slows the
     #: engine several-fold even on a fast machine — and even once plugged in.
     low_power_mode: bool = False
+    #: Online speech: None when this session listens on this computer only,
+    #: True while the speech server answers, False while this computer's own
+    #: engine stands in for it.
+    speech_online: bool | None = None
     #: None when not behind, or there is no battery.
     battery_percent: int | None = None
     on_battery: bool = False

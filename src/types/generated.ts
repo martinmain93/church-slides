@@ -775,6 +775,7 @@ export interface PipelineHealthMessage {
   chord_ms_per_s?: number;
   chord_frame_ms_p95?: number;
   low_power_mode?: boolean;
+  speech_online?: boolean | null;
   battery_percent?: number | null;
   on_battery?: boolean;
 }
@@ -1271,6 +1272,7 @@ export interface StartAudioSessionRequest {
   start_item_idx?: number | null;
   start_slide_idx?: number;
   spoken_instructions?: boolean | null;
+  online_speech?: boolean;
 }
 
 export interface StopAudioSessionRequest {

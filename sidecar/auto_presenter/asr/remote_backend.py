@@ -65,6 +65,9 @@ class RemoteStreamingBackend:
         #: server: `(t_end, logits[T, P], server_ms)` per tick, on the
         #: receiver thread (`next_line.RemotePhones.push` queues them).
         self.on_phones: Callable[..., None] | None = None
+        #: True while the computer's own engine is listening in the server's
+        #: place (the streaming session's, for the operator's status pill).
+        self.falling_back = False
 
     def name(self) -> str:
         return "remote-qwen3-asr"
@@ -307,6 +310,7 @@ class RemoteStreamer:
                     log.warning("speech server unavailable; the computer's own engine takes over")
                     local = _Local(fallback, words, self.pass_timer)
             self.falling_back = local is not None
+            self.backend.falling_back = self.falling_back
             if local is not None:
                 local.send(frame)
 

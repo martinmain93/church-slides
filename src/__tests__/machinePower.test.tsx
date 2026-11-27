@@ -88,6 +88,7 @@ const health = (droppedChunks: number, lagSeconds = 0) => ({
   lowPowerMode: false,
   batteryPercent: null as number | null,
   onBattery: false,
+  speechOnline: null,
 });
 
 describe("AIStatusPill on a slow computer", () => {

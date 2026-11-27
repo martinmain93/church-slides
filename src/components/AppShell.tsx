@@ -12,6 +12,7 @@ import { LibraryView } from "@/components/library/LibraryView";
 import { AudioSetupWizard } from "@/components/onboarding/AudioSetupWizard";
 import { BringSongsPrompt } from "@/components/onboarding/BringSongsPrompt";
 import { UsageConsentPrompt, useAppOpenUsage } from "@/components/onboarding/UsageConsentPrompt";
+import { OnlineSpeechPrompt } from "@/components/onboarding/OnlineSpeechPrompt";
 import { FeedbackHost, OPEN_FEEDBACK_EVENT } from "@/components/FeedbackDialog";
 import { OperatorView } from "@/components/presentation/OperatorView";
 import { PresentationView } from "@/components/presentation/PresentationView";
@@ -420,6 +421,9 @@ function Inner() {
       <UsageConsentPrompt
         held={wizardOpen || view.kind === "presentation" || view.kind === "operator"}
         onAskingChange={setConsentAsking}
+      />
+      <OnlineSpeechPrompt
+        held={wizardOpen || consentAsking || view.kind === "presentation" || view.kind === "operator"}
       />
       <BringSongsPrompt
         held={wizardOpen || consentAsking || view.kind === "presentation" || view.kind === "operator"}

@@ -151,9 +151,8 @@ export function useRecordingSession(
       const { aiMode, tunables, position, record } = optsRef.current;
       const prefs = loadAudioInputPrefs();
       const asr = await resolveLiveAsr(prefs);
-      const spokenChoice = await getSettings()
-        .then((s) => s.spoken_requests ?? null)
-        .catch(() => null);
+      const saved = await getSettings().catch(() => null);
+      const spokenChoice = saved?.spoken_requests ?? null;
       if (cancelled) return;
       await c.request(
         {
@@ -178,6 +177,11 @@ export function useRecordingSession(
           // when a hosted model's key is on file). Off where the feature is
           // hidden: nobody there can see it, or switch it off.
           spoken_instructions: FEATURES.spokenInstructions ? spokenChoice : false,
+          // The operator said yes to listening online (asked once, Settings →
+          // AI). Only for Whisper on this computer, which stands in whenever
+          // the speech server can't be reached; the engine also needs a
+          // speech token from the organization's plan.
+          online_speech: asr.backend === "whisper" && saved?.online_speech === true,
         },
         // First-time Whisper start downloads the model before the session
         // can ack; the default 5 s request timeout would reject spuriously.

@@ -31,6 +31,9 @@ export interface AppSettings {
   /** Act on spoken requests during a service: null/absent until chosen, which
    * leaves it to the engine (on when a hosted model's key is on file). */
   spoken_requests?: boolean | null;
+  /** Listen online (the organization's speech server), on a computer without
+   * Apple silicon: null/absent until the operator is asked, then the answer. */
+  online_speech?: boolean | null;
   /** Bible/scripture display. Nested so this interface grows one field
    * however many display options that feature accumulates; absent in settings
    * blobs written before it existed, hence optional. */
@@ -222,7 +225,12 @@ export async function songRevision(songId: string, revision: number): Promise<So
 
 /** Whose AI allowance this computer's AI uses, when signed in to an
  * organization; a Groq key of the person's own is used instead. */
-export async function hostedAiStatus(): Promise<{ org_name: string | null; own_groq_key: boolean }> {
+export async function hostedAiStatus(): Promise<{
+  org_name: string | null;
+  own_groq_key: boolean;
+  /** The organization's plan has online speech for this computer now. */
+  speech?: boolean;
+}> {
   return invoke("hosted_ai_status");
 }
 

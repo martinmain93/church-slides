@@ -464,8 +464,16 @@ only, not for the API:
 ```json
 { "key": "csa_…", "expiresAt": 1731990000000, "baseUrl": "https://…/ai/v1",
   "models": { "chat": ["openai/gpt-oss-20b", "openai/gpt-oss-120b"],
-              "transcription": ["whisper-large-v3-turbo", "whisper-large-v3"] } }
+              "transcription": ["whisper-large-v3-turbo", "whisper-large-v3"] },
+  "features": ["ai", "speech"],
+  "speech": { "url": "wss://…", "token": "…", "expiresAt": 1731990000000 } }
 ```
+
+`features` lists the hosted features the organization's plan has on now:
+`ai` (this gateway), `speech` (live speech, below), and later `agent`. A
+feature that's off is absent, with no reason given; the app falls back
+quietly and shows no prompt. `speech` is present only when the plan has it
+and today's allowance isn't used up.
 
 A key lasts 15 minutes; ask for a new one every few. The server checks the
 person's membership and role when it issues a key, not on each call, so a
@@ -479,9 +487,42 @@ as OpenAI's API, with `Authorization: Bearer csa_…`. Only the listed models;
 no streaming; output tokens and uploads are capped. A call over the day's
 allowance gets `rate_limited` and is not forwarded. The count is kept after
 answering and may lag by up to a minute, so a busy day can run slightly over.
-Nothing sent is stored; the server keeps only counts. Each answer has a
+Nothing sent is stored; the server keeps a record of each call (who, which
+model, tokens or seconds, and its estimated cost), never its content. Each answer has a
 `Server-Timing: upstream;dur=…` header: how long the provider took, so the
 gateway's own cost is the rest.
+
+A call says which feature it's for in `X-Church-Slides-Feature` (`ai` when
+absent; `agent` for the in-app assistant, later). A feature the plan
+doesn't have gets `not_on_plan` (402).
+
+### Live speech
+
+The app streams the service's audio to `speech.url` + `/stream?token=…` and
+gets words back; the protocol is the speech server's
+(`speech-server/README.md`). The token is checked only when a stream
+connects, so the app renews it with the key. The speech server reports each
+stream's usage to the Church Slides server, which can stop a stream whose
+organization is no longer on a plan with speech or is over today's
+allowance (close code 4402); the app's own engine takes over.
+
+### `GET {api}/orgs/{orgId}/usage?from=YYYY-MM-DD&to=YYYY-MM-DD`
+
+For owners and admins (`edit_settings`). The organization's use of hosted
+features per UTC day, feature and meter, with our estimated cost
+(`cost_micro_usd`, millionths of a US dollar), and its plan:
+
+```json
+{ "from": "2026-11-01", "to": "2026-11-27",
+  "plan": { "id": "pilot", "features": ["ai", "speech"],
+            "daily": { "ai.requests": 500, "speech.audio_seconds": 28800 } },
+  "days": [ { "day": "2026-11-23", "feature": "speech", "meter": "audio_seconds", "quantity": 5400 },
+            { "day": "2026-11-23", "feature": "speech", "meter": "cost_micro_usd", "quantity": 210000 } ] }
+```
+
+Meters: `ai`: `requests`, `input_tokens`, `output_tokens`, `audio_seconds`;
+`speech`: `streams`, `audio_seconds`, `wall_seconds`, `gpu_seconds`. Up to
+a year at a time.
 
 ### `GET {api}/orgs/{orgId}/ai/usage`
 

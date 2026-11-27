@@ -101,6 +101,17 @@ export function behindMessage(health: PipelineHealth): string {
   return late + "Other busy apps can slow it down: close the ones you don't need.";
 }
 
+/** Online speech can't be reached and this computer is listening instead:
+ * worth a word to the operator, never a problem (it switches back itself). */
+const OFFLINE_NOTE = (h: PipelineHealth | null) =>
+  h?.speechOnline === false
+    ? "\n\nThe online speech server can't be reached, so this computer is listening instead. It switches back by itself."
+    : "";
+
+function OfflineTag() {
+  return <span className="ml-1 text-[9px] font-normal normal-case opacity-80">on this computer</span>;
+}
+
 export function AIStatusPill({ operator = false }: {
   /** The operator view: clicking opens Assist / Auto / Off instead of
    * switching on and off, and "on" means `operatorOnMode()`. */
@@ -439,7 +450,10 @@ export function AIStatusPill({ operator = false }: {
       return (
         <Pill
           className="border-emerald-500/40 bg-emerald-500/15 text-emerald-100"
-          title="The AI is following the lyrics and changing slides. Click to turn it off and drive the slides yourself."
+          title={
+            "The AI is following the lyrics and changing slides. Click to turn it off and drive the slides yourself." +
+            OFFLINE_NOTE(health)
+          }
           onClick={onPillClick}
           busy={switching}
         >
@@ -448,6 +462,7 @@ export function AIStatusPill({ operator = false }: {
             <span className="relative inline-flex size-1.5 rounded-full bg-emerald-300" />
           </span>
           <span>AI: tracking</span>
+          {health?.speechOnline === false && <OfflineTag />}
         </Pill>
       );
     }
@@ -456,11 +471,15 @@ export function AIStatusPill({ operator = false }: {
     return (
       <Pill
         className="border-emerald-500/30 bg-emerald-500/10 text-emerald-200/90"
-        title="The AI is on, waiting to recognise the lyrics before it changes slides. Click to turn it off."
+        title={
+          "The AI is on, waiting to recognise the lyrics before it changes slides. Click to turn it off." +
+          OFFLINE_NOTE(health)
+        }
         onClick={onPillClick}
         busy={switching}
       >
         AI: ready
+        {health?.speechOnline === false && <OfflineTag />}
       </Pill>
     );
   };

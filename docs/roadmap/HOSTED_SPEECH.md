@@ -119,27 +119,42 @@ production environments.
   timings and failures, never words or audio.
 - **Still yours:** a spend limit in Modal's dashboard.
 
-### 3. Server (church-slides-server)
+### 3. Server (built 2026-11-27, church-slides-server branch `speech-usage`)
 
-- `SPEECH_URL` and `SPEECH_TOKEN_SECRET` per environment; `/ai/key` adds
-  `speech` when the plan includes it.
-- Discovery capability `speech`.
-- Allowance: speech minutes counted per key renewal against the daily
-  audio allowance.
-- Tests: roles, plan, expiry, a token the speech server accepts.
+- **Plans** (`pilot`: ai + speech; `free`: none), the plan an organization
+  is on in D1, with room for billing (source, external reference, dates).
+- **A usage ledger** per organization: one record per gateway call or
+  speech stream (who, how much, provider and model or GPU, estimated cost;
+  never content), daily sums, kept 400 days. `GET /v1/orgs/:id/usage` for
+  owners and admins. Design: the server repo's `docs/PLANS_AND_USAGE.md`.
+- **`/ai/key`** answers `features` and `speech: {url, token, expiresAt}`.
+  The gateway tags calls by feature (`agent` reserved for the in-app
+  assistant).
+- **The speech server reports** each stream every 60 s and at close; the
+  answer is a lease, so an organization off the plan or over its allowance
+  is stopped (4402) and falls back to Whisper.
 
-### 4. App
+### 4. App (built 2026-11-27)
 
-- `hosted_ai.rs` passes `speech` through to `hosted_ai.json`; the engine
-  picks `asr_remote` from it on computers without Apple silicon, in place of
-  the research tunable and environment variables.
-- The connection opens when live AI starts (this also wakes the GPU, under
-  10 s). Whisper covers the first seconds.
-- The one-time screen, the Settings → AI switch, a small status pill for
-  the operator while Whisper stands in.
-- **Check on Windows**, the computers this is for: a real service played
-  through the app, then a dropped network.
-- Remove the DeepInfra code (`asr/hosted_backend.py`, `asr_hosted`).
+- `hosted_ai.rs` keeps `features` and `speech` beside the AI key; the
+  engine reads the token fresh at each connect (`api_keys.hosted_speech`).
+- `start_audio_session.online_speech`: the operator's answer, only where
+  Whisper would listen. The engine streams to the speech server with
+  Whisper standing in.
+- The one-time "Listen online?" question (`OnlineSpeechPrompt`, held during
+  a service), Settings → AI → Listen online, and "on this computer" on the
+  AI pill while Whisper stands in (`pipeline_health.speech_online`).
+- **Not covered yet:** computers too slow for Whisper on the processor
+  (no fallback there, so they'd need the blank-and-retry path), and
+  removing the DeepInfra code.
+
+### Blocking: false moves during talk
+
+The talk-only bench on the hosted path made **4 false moves in 265 min**
+(0.9/h; the Mac's path: 0). The processor-only control on the same
+recordings: 0 on the two finished so far, where hosted made 3. So hosted
+speech causes them: in-song advances while nobody sings. To fix before
+shipping (likely the Qwen next-line check, or Qwen's words, on talk).
 
 ### 5. Privacy, terms and release
 

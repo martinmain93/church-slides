@@ -123,6 +123,29 @@ def hosted_gateway() -> tuple[str, str] | None:
     return base.rstrip("/"), key
 
 
+def hosted_speech() -> tuple[str, str] | None:
+    """(url, token) for the organization's live speech server, while the
+    token is valid: the AI key answer's `speech`, kept beside the gateway key
+    (`src-tauri/src/hosted_ai.rs`). None when the plan has no speech, or this
+    computer isn't signed in. Read fresh each time: the app renews the token
+    every few minutes."""
+    path = os.environ.get(HOSTED_AI_FILE_ENV)
+    if not path:
+        return None
+    try:
+        speech = json.loads(Path(path).read_text()).get("speech")
+    except (OSError, json.JSONDecodeError, AttributeError):
+        return None
+    if not isinstance(speech, dict):
+        return None
+    url, token, expires = speech.get("url"), speech.get("token"), speech.get("expires_at")
+    if not (isinstance(url, str) and isinstance(token, str) and isinstance(expires, (int, float))):
+        return None
+    if expires <= time.time() * 1000:
+        return None
+    return url.rstrip("/"), token
+
+
 def endpoint(provider: str, own_base_url: str) -> tuple[str, str] | None:
     """Where to send a hosted call: (base_url, key).
 

@@ -296,7 +296,8 @@ def make_api(
             await ws.close()
         except Exception:
             pass
-        if reporter is not None:
+        # the app's wake-up connection carries no audio: not a stream to count
+        if reporter is not None and t > t0:
             await asyncio.to_thread(reporter.report, totals(True))
         log.info(
             "stream closed org=%s stream=%s after %.0f s, %.0f s of audio, %.1f GPU s",

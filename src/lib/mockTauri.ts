@@ -439,7 +439,7 @@ export const mockTauri = {
     return false;
   },
   async hosted_ai_status() {
-    return { org_name: null, own_groq_key: false };
+    return { org_name: null, own_groq_key: false, speech: false };
   },
   async library_sync_status() {
     return { org_id: null, state: "off", waiting: 0, message: null };

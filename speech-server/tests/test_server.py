@@ -227,3 +227,11 @@ def test_reports_are_signed_as_the_server_checks():
         urllib.request.urlopen = real
     assert ok is True
     assert sent["sig"] == tokens.sign(SECRET, sent["body"].decode())
+
+
+def test_a_wake_up_with_no_audio_isnt_reported():
+    got = Reports()
+    c = client(reporter=server.UsageReporter(SECRET, None, post=got), report_every_s=3600)
+    with c.websocket_connect(f"/stream?token={tokens.mint(SECRET, 60, 'org_5')}") as ws:
+        ws.receive_text()
+    assert got.got == []

@@ -41,6 +41,9 @@ export interface PipelineHealth {
   /** null when not behind, or the computer has no battery. */
   batteryPercent: number | null;
   onBattery: boolean;
+  /** Online speech: null when this session listens on this computer only,
+   * true while the speech server answers, false while this computer stands in. */
+  speechOnline: boolean | null;
 }
 
 // Module scoped, because the Perf tab is unmounted whenever another tab is
@@ -62,6 +65,7 @@ pipeFromSidecar("pipeline_health", store, (m) => {
     lowPowerMode: m.low_power_mode ?? false,
     batteryPercent: m.battery_percent ?? null,
     onBattery: m.on_battery ?? false,
+    speechOnline: m.speech_online ?? null,
   };
 });
 

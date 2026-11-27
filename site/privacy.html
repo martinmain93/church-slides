@@ -58,7 +58,7 @@
 <main>
   <p class="small"><a href="./">← Church Slides</a></p>
   <h1>Privacy</h1>
-  <p class="small">Last updated 24 November 2026</p>
+  <p class="small">Last updated 27 November 2026</p>
 
   <p>
     Church Slides is made by Martin Main, an individual developer in Nova Scotia, Canada. This page
@@ -70,7 +70,7 @@
   <div class="summary">
     <ul>
       <li>Your songs, setlists, logs and any service recordings stay on your computer. The exceptions are the short log extract in an error report, and anything your church chooses to share through a Church Slides account (see below).</li>
-      <li>Audio from the microphone or sound desk is never sent to us.</li>
+      <li>Audio from the microphone or sound desk is never sent to us, unless your organization offers listening online and you turn it on. Then it’s turned into words and not kept (see below).</li>
       <li>The app doesn’t record services unless you turn recording on.</li>
       <li>No advertising, no selling of data, and no cookies or tracking on this website.</li>
       <li>The app asks before it sends us anything automatically, and you can change your mind in Settings &rarr; Privacy.</li>
@@ -167,7 +167,7 @@
       service (such as Groq), the text the AI heard goes to that service under your
       account and its terms. So, in the song editor, do the words and chords of the song you’re
       charting when you ask for chord suggestions, and your recording when you use Voice. A
-      service’s live audio stays on your computer: the AI recognises speech only there. Keys are
+      service’s live audio stays on your computer, unless you choose to listen online (below). Keys are
       stored unencrypted in the app’s folder on your computer.</li>
     <li><strong>AI assistants.</strong> If you connect Claude or another assistant to your library
       (this computer’s, or your organization’s through our server), the songs and setlists it reads go
@@ -209,11 +209,19 @@
       and the web app sends us nothing beyond signing in and the changes you make.</li>
     <li><strong>AI through your organization.</strong> A computer signed in to an organization can
       use its AI allowance instead of an AI account of its own, for spoken requests, finding Bible
-      verses, and chord suggestions and Voice in the song editor (a service’s live audio never goes;
-      it stays on your computer). Then the audio or text for each request goes through
-      our server to Groq, which runs the AI for us, and the answer comes back the same way. We don’t
-      keep the audio, the text or the answers: only how much was used each day (requests and seconds
-      of audio), for a week. A key of your own, if you enter one, is used instead.</li>
+      verses, and chord suggestions and Voice in the song editor. Then the audio or text for each
+      request goes through our server to Groq, which runs the AI for us, and the answer comes back the
+      same way. We don’t keep the audio, the text or the answers. We keep a record of each request:
+      when, who made it, what it was for, how much it used (words in and out, or seconds of audio) and
+      what it cost us. A key of your own, if you enter one, is used instead.</li>
+    <li><strong>Listening online.</strong> On a computer without Apple silicon, signed in to an
+      organization whose plan includes it, the AI can listen online, which follows songs better than
+      that computer can on its own. The app asks first, and you can turn it off in Settings &rarr; AI.
+      While the AI is on, the service’s audio streams to our speech server, which runs on computers we
+      rent from Modal, in the United States. The server turns the audio into words and sends them back.
+      It doesn’t keep the audio or the words. We keep a record of each stream: when, who started it,
+      how long it ran, the computer time it took and what it cost us. Your church is responsible for
+      telling the people present that the audio leaves the building.</li>
   </ul>
   <p>
     Everyone in an organization can see its library, its live set, and who is in it (names and
@@ -249,7 +257,12 @@
       live set (up to six hours after a service).</li>
     <li><strong>AI through your organization:</strong> passed to
       <a href="https://groq.com/privacy-policy/">Groq</a>, in the United States, which runs it for us
-      under its terms. We keep only daily usage counts, for a week.</li>
+      under its terms.</li>
+    <li><strong>Listening online:</strong> our speech server on
+      <a href="https://modal.com/legal/privacy-policy">Modal</a>, in the United States. Nothing said is
+      kept.</li>
+    <li><strong>Records of AI use</strong> (requests and streams, with who, how much and the cost):
+      our own server on Cloudflare, kept for about 13 months, then deleted automatically.</li>
   </ul>
   <p>
     This means some data is stored outside Canada, where it can be accessed by courts and
@@ -258,7 +271,7 @@
   <p>
     Only people working on Church Slides have access to this data. Sentry, Google and Cloudflare store it for us
     under their data processing terms and don’t use it for themselves; Groq runs AI requests for us
-    under its terms. It’s used to fix problems
+    under its terms, and Modal runs our speech server. It’s used to fix problems
     and decide what to build next, and never for anything else.
   </p>
 

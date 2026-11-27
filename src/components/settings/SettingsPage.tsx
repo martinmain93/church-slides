@@ -14,6 +14,7 @@ import {
 import {
   getAppIdentity,
   getSettings,
+  hostedAiStatus,
   listSongs,
   openLink,
   updateSettings,
@@ -25,6 +26,7 @@ import { useAudioLevels } from "@/lib/audioLevels";
 import { useTranscriptStream } from "@/lib/transcriptStream";
 import {
   loadAudioInputPrefs,
+  resolveLiveAsr,
   saveAudioInputPrefs,
   type AudioInputPrefs,
 } from "@/lib/audioInputPrefs";
@@ -143,6 +145,10 @@ export function SettingsPage({
                     <AiRequirements />
                     <ModelDownloadProgress />
                   </Section>
+                  <OnlineSpeechField
+                    value={settings.online_speech ?? null}
+                    onChange={(on) => void saveSettings({ online_speech: on })}
+                  />
                   {FEATURES.spokenInstructions && (
                     <Section>
                       <div className="space-y-1.5">
@@ -914,6 +920,49 @@ function SpokenRequestsToggle({
     >
       <Toggle value={on} onChange={onChange} ariaLabel="Act on spoken requests" />
     </Field>
+  );
+}
+
+/** Listen online: shown on a computer without Apple silicon once its
+ * organization's plan has online speech, or once it was asked. */
+function OnlineSpeechField({
+  value,
+  onChange,
+}: {
+  value: boolean | null;
+  onChange: (on: boolean) => void;
+}) {
+  const [offered, setOffered] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    void Promise.all([hostedAiStatus(), resolveLiveAsr(loadAudioInputPrefs())])
+      .then(([status, asr]) => {
+        if (!cancelled) setOffered(asr.backend === "whisper" && (status.speech === true || value !== null));
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [value]);
+  if (!offered) return null;
+  return (
+    <Section>
+      <div className="flex items-center justify-between gap-4">
+        <div className="space-y-0.5">
+          <div className="flex items-center gap-1.5 text-sm font-medium">
+            Listen online
+            <InfoTip>
+              While the AI is on, the service&rsquo;s audio goes to your organization&rsquo;s
+              speech server to be turned into words, and nothing is kept. On this computer the AI
+              follows songs best that way. If the internet drops, this computer listens instead
+              until it&rsquo;s back.
+            </InfoTip>
+          </div>
+          <p className="text-xs text-muted-foreground">The AI follows songs best online.</p>
+        </div>
+        <Toggle value={value === true} onChange={onChange} ariaLabel="Listen online" />
+      </div>
+    </Section>
   );
 }
 

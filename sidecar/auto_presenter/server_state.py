@@ -14,6 +14,7 @@ import asyncio
 import logging
 import os
 from pathlib import Path
+from typing import Any
 
 import websockets
 from pydantic import BaseModel
@@ -132,6 +133,9 @@ class _ServerState:
         #: (`PipelineHealth.lag_seconds`): Assist on a slower computer says
         #: nothing from evidence this late (`server_assist`).
         self.pipeline_lag_s = 0.0
+        #: This session's online speech (`asr.remote_backend`), or None when
+        #: it listens on this computer only.
+        self.remote_speech: Any = None
         #: The session's audio clock at the last health report, and when
         #: (time.monotonic) it arrived: gives an operator's click a time on
         #: the session clock (`audio_now`).

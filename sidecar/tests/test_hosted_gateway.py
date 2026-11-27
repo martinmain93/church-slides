@@ -45,3 +45,25 @@ def test_an_expired_allowance_key_is_ignored(keys):
 def test_only_providers_the_gateway_stands_in_for(keys):
     write(keys, time.time() * 1000 + 60_000)
     assert api_keys.endpoint("gemini", "https://generativelanguage.googleapis.com/v1beta/openai") is None
+
+
+def write_speech(path, speech):
+    path.write_text(json.dumps({"base_url": "https://api.test/ai/v1", "key": "csa_k",
+                                "expires_at": time.time() * 1000 + 60_000, "org_id": "o", "org_name": "O",
+                                **({"speech": speech} if speech is not None else {})}))
+
+
+def test_online_speech_comes_with_the_key_when_the_plan_has_it(keys):
+    write_speech(keys, None)
+    assert api_keys.hosted_speech() is None
+    write_speech(keys, {"url": "wss://speech.test/", "token": "t.sig", "expires_at": time.time() * 1000 + 60_000})
+    assert api_keys.hosted_speech() == ("wss://speech.test", "t.sig")
+
+
+def test_an_expired_or_broken_speech_token_is_ignored(keys):
+    write_speech(keys, {"url": "wss://speech.test", "token": "t.sig", "expires_at": time.time() * 1000 - 1})
+    assert api_keys.hosted_speech() is None
+    write_speech(keys, {"url": "wss://speech.test"})
+    assert api_keys.hosted_speech() is None
+    keys.write_text("not json")
+    assert api_keys.hosted_speech() is None

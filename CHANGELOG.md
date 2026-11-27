@@ -10,6 +10,7 @@ refuses to release a version that has no entry here.
 
 ## Unreleased
 
+- New (preview): **listen online** on Windows and Intel Macs. Signed in to an organization whose plan includes it, the AI follows songs as well as it does on an Apple silicon Mac. The app asks once before any audio goes online; change it in Settings → AI. If the internet drops, the computer listens on its own until it's back.
 - New: **the web song editor shows the slides** as the room will see them, the same cards as on the slides computer. Tap one to pick it and again to change it; split a long one with the scissors. Undo puts back a split or a deleted slide. "Edit as text" still edits the whole song at once.
 - Changed: **a slide's buttons only work once you can see them.** Tap a slide to pick it; Duplicate and Delete are under "⋯". The song editor's "Raw text" button is now "Edit as text".
 - Fixed: the section menu on a slide is no longer cut off, and long lines wrap while you type instead of running off the slide.
