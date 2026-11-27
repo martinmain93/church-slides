@@ -262,11 +262,11 @@ describe("interactive word-click chord placement in SongPreview", () => {
 
     const projectorCards = screen.getAllByTestId("preview-slide");
     expect(projectorCards).toHaveLength(2);
-    expect(projectorCards[0]!.className).toContain("aspect-video");
+    expect(projectorCards[0]!.querySelector(".aspect-video")).not.toBeNull();
 
-    // Duplicate the first slide in 16:9 Projector mode
-    const dupBtns = screen.getAllByRole("button", { name: /duplicate slide/i });
-    fireEvent.click(dupBtns[0]!);
+    // Duplicate the first slide in 16:9 Projector mode (behind its "⋯" menu)
+    fireEvent.click(screen.getAllByRole("button", { name: /more slide actions/i })[0]!);
+    fireEvent.click(screen.getByRole("menuitem", { name: /duplicate/i }));
     expect(onChangeBody).toHaveBeenCalledWith(
       expect.stringContaining("[verse 1]\n\nAmazing grace\n\nAmazing grace"),
     );

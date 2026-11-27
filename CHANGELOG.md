@@ -10,6 +10,11 @@ refuses to release a version that has no entry here.
 
 ## Unreleased
 
+- New: **the web song editor shows the slides** as the room will see them, the same cards as on the slides computer. Tap one to pick it and again to change it; split a long one with the scissors. Undo puts back a split or a deleted slide. "Edit as text" still edits the whole song at once.
+- Changed: **a slide's buttons only work once you can see them.** Tap a slide to pick it; Duplicate and Delete are under "⋯". The song editor's "Raw text" button is now "Edit as text".
+- Fixed: the section menu on a slide is no longer cut off, and long lines wrap while you type instead of running off the slide.
+- New (preview): **Settings → Account says how to join** while accounts are being tried with a few churches.
+
 ## 0.3.1 — 26 November 2026
 
 - New (preview): **Church Slides on the web.** At app.churchslides.app, from a phone or any computer, see your organization's songs with their chords, edit words, order and credits, and plan services (songs, keys, Bible passages, text slides). Changes show up on the slides computer, and theirs show up there. Presenting and chord editing stay in the app.

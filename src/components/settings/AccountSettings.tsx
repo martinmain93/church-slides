@@ -14,7 +14,8 @@ import {
   type AccountStatus,
 } from "@/lib/account";
 import { useConfirm } from "@/lib/confirm";
-import { canMoveLibrary, moveLibraryInto } from "@/lib/tauri";
+import { canMoveLibrary, moveLibraryInto, openLink } from "@/lib/tauri";
+import { PRIVACY_EMAIL } from "@/lib/usage";
 import { useToast } from "@/lib/toast";
 
 /** A one-line form that opens from a text button: "New organization",
@@ -225,6 +226,18 @@ export function AccountSettings() {
             {busy === "in" ? "Waiting…" : "Sign in"}
           </Button>
         </div>
+        {/* Sign-in asks for a pilot passcode: say how to get one. */}
+        <p className="text-xs text-muted-foreground" data-testid="account-pilot-hint">
+          Accounts are being tried with a few churches.{" "}
+          <button
+            type="button"
+            className="underline underline-offset-2 hover:text-foreground"
+            onClick={() => void openLink(`mailto:${PRIVACY_EMAIL}?subject=${encodeURIComponent("Church Slides accounts")}`).catch(() => undefined)}
+          >
+            Ask us to join
+          </button>
+          , or use an invite from your team.
+        </p>
         {joinForm}
         {server}
       </div>

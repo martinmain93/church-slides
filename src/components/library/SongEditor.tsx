@@ -39,6 +39,7 @@ import { parseSong, sectionLabel, sectionLabelClass, type ParsedSection } from "
 import { formatSlideOrder, parseSlideOrder } from "@/lib/slideSequence";
 import { useConfirm } from "@/lib/confirm";
 import { useToast } from "@/lib/toast";
+import { useDisplayLook } from "@/lib/displayLook";
 import { deleteSongMessage } from "@/lib/deleteSongText";
 import {
   alignSlides,
@@ -120,6 +121,7 @@ const TIME_SIGNATURES = ["4/4", "3/4", "6/8", "12/8", "2/4", "2/2", "5/4", "9/8"
 
 export function SongEditor({ songId, onClose, backLabel = "Library" }: Props) {
   const toast = useToast();
+  const look = useDisplayLook();
   const confirm = useConfirm();
   // Earlier words are kept for an organization's library (its server keeps them).
   const [inOrgLibrary, setInOrgLibrary] = useState(false);
@@ -1272,7 +1274,7 @@ export function SongEditor({ songId, onClose, backLabel = "Library" }: Props) {
               size="sm"
               data-testid="undo-suggestion-btn"
               onClick={handleRestoreUndoSnapshot}
-              title="Undo the last change (a split or an accepted suggestion)"
+              title="Undo the last change (a split, a deleted slide or an accepted suggestion)"
               className="h-8 gap-1 text-xs text-muted-foreground hover:text-foreground"
             >
               <Undo2 className="size-3.5" />
@@ -1345,11 +1347,11 @@ export function SongEditor({ songId, onClose, backLabel = "Library" }: Props) {
             size="sm"
             data-testid="toggle-raw-text"
             onClick={toggleRawTextMode}
-            title="Edit song & chords as raw text (chords above lyrics or [G] inline)"
+            title="Edit the song and its chords as text (chords above the words, or [G] inline)"
             className="h-8 gap-1.5 text-xs"
           >
             <Code2 className="size-3.5" />
-            Raw text
+            {rawTextMode ? "Edit as slides" : "Edit as text"}
           </Button>
         </div>
       </div>
@@ -1441,10 +1443,11 @@ export function SongEditor({ songId, onClose, backLabel = "Library" }: Props) {
             />
             <SongPreview
               body={body}
+              look={look}
               slideOrder={slideOrder}
               chart={showChords ? chart : null}
               hasChords={!!chart && chartHasChords(chart)}
-              onBeforeSplit={() => setUndoSnapshot(captureUndoSnapshot())}
+              onBeforeChange={() => setUndoSnapshot(captureUndoSnapshot())}
               chartKey={chart?.key ?? null}
               preferFlats={preferFlats}
               displayMode={displayMode}

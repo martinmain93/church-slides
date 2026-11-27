@@ -108,14 +108,14 @@ Order, smallest risk first:
 
 | Piece | Data through `useLibrary()` | Browser-safe | Used by the web |
 | --- | --- | --- | --- |
-| Slide cards (`MiniSlide`, `ProjectorSlideCard`, `SetlistSlideCard`, `StageSurface`) | needs none | **done**: the look's style is `src/lib/look.ts` | next |
+| Slide cards (`MiniSlide`, `ProjectorSlideCard`, `SetlistSlideCard`, `StageSurface`) | the look: `getLook()` | **done**: the look's style is `src/lib/look.ts` | **done**, through `SongPreview` |
 | Home's service list | **done** | band and peer-sync parts are desktop-only | later |
 | Service builder (`SetlistBuilder`) | **done** | Bibles, band, AI-ready and start-service parts are desktop-only | after the slide cards |
 | Song slides in a service (`SetlistSongSlides`) | to do: item looks, saving a song | | |
-| Song editor (`SongEditor`, `SongPreview`) | to do: chart import and removal, lead sheets, libraries | `SongPreview` takes its look from `displayLook` | |
+| Song editor (`SongEditor`, `SongPreview`) | to do: chart import and removal, lead sheets, libraries | `SongPreview` **done** (takes its look as a prop) | `SongPreview` **done**: the web editor's Words, with "Edit as text" |
 | Library list (`LibraryView`) | to do: sorted lists, chart metadata for search | export and import stay desktop-only | |
 
-Done so far: the interface gained `listSongs(sort)`, `listChartKeys()` and
+Done so far: the interface gained `getLook()`, `listSongs(sort)`, `listChartKeys()` and
 `addServiceItem(…, { afterItemId, slidesOverride })`; `desktopLibrary` looks
 each command up when it's called, so tests that replace a command
 (`vi.spyOn(tauri, …)`) reach it through the interface too.

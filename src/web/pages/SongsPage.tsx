@@ -126,8 +126,8 @@ export function SongsPage({ canEdit }: { canEdit: boolean }) {
       {error && <ErrorLine>{error}</ErrorLine>}
       {!songs ? null : songs.length === 0 ? (
         <Empty>
-          No songs here yet. To bring in the songs on your slides computer, open Settings → Account there and choose “Use this computer’s
-          songs”.
+          No songs here yet. The organization&apos;s owner can bring in their slides computer&apos;s songs: Settings → Account there,
+          “Use this computer’s songs”.
         </Empty>
       ) : shown.length === 0 ? (
         <Empty>No song matches “{query}”.</Empty>

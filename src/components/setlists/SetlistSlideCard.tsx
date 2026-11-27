@@ -164,7 +164,7 @@ export function SetlistSlideCard({
       <div
         style={stageThumbnailStyle(look)}
         data-expanded={expanded ? "true" : undefined}
-        className={`relative ${expanded ? "grid" : "aspect-video"} w-full overflow-hidden rounded-md border shadow-xs transition-[border-color,box-shadow] duration-250 ease-out ${
+        className={`relative ${expanded ? "grid grid-cols-1" : "aspect-video"} w-full overflow-hidden rounded-md border shadow-xs transition-[border-color,box-shadow] duration-250 ease-out ${
           selected ? "border-primary ring-2 ring-primary" : idleClassName
         }`}
       >
@@ -221,8 +221,9 @@ export function SetlistSlideCard({
 
         {!editing && (
           <div
-            className={`absolute right-1.5 top-1.5 z-30 flex items-center gap-1 transition-opacity duration-200 ease-out focus-within:opacity-100 group-hover:opacity-100 ${
-              selected ? "opacity-100" : "opacity-0"
+            // Hidden, the buttons take no taps: one stray tap mustn't open a menu or edit.
+            className={`absolute right-1.5 top-1.5 z-30 flex items-center gap-1 transition-[opacity,visibility] duration-200 ease-out group-focus-within:visible group-focus-within:opacity-100 [@media(hover:hover)]:group-hover:visible [@media(hover:hover)]:group-hover:opacity-100 ${
+              selected ? "visible opacity-100" : "invisible opacity-0"
             }`}
           >
             <ActionButton label="Edit slide text" className="hover:border-white/40 hover:bg-zinc-700" onClick={onStartEdit}>

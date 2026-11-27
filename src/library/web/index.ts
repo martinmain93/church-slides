@@ -18,6 +18,7 @@ import {
   type Fields,
 } from "@/core/records";
 import { itemTitle, readingSlides, textSlides } from "@/lib/serviceItemContent";
+import { DEFAULT_LOOK, parseLook } from "@/lib/look";
 import { isoDate } from "@/lib/setlistName";
 import type { LibrarySource, ServiceItemKind } from "@/library/source";
 import type { RecordStore } from "@/library/web/store";
@@ -97,11 +98,12 @@ export function webLibrary(
         .sort(byTitle);
       if (sort === "recently_edited") return songs.sort((a, b) => b.updated_at - a.updated_at);
       if (sort === "popular") {
-        // As the desktop counts use: the services a song is in.
+        // As the desktop counts use: every time a song is in a service, so
+        // a song sung twice in one service counts twice. Ties stay A to Z.
         const uses = new Map<string, number>();
         for (const [id, f] of store.all("setlist")) {
-          for (const i of new Set(setlistFromRecord(id, f).items.map((i) => i.song_id))) {
-            if (i) uses.set(i, (uses.get(i) ?? 0) + 1);
+          for (const { song_id } of setlistFromRecord(id, f).items) {
+            if (song_id) uses.set(song_id, (uses.get(song_id) ?? 0) + 1);
           }
         }
         return songs.sort((a, b) => (uses.get(b.id) ?? 0) - (uses.get(a.id) ?? 0));
@@ -240,9 +242,11 @@ export function webLibrary(
         song_id: null,
         position: 0,
         ...itemContent(kind, content),
-        ...(slidesOverride ? { slides_override: slidesOverride } : {}),
+        ...(slidesOverride != null ? { slides_override: slidesOverride } : {}),
       };
       await editItems(setlistId, (items) => {
+        // An item removed on another computer meanwhile: add at the end
+        // rather than fail (the desktop's own list can't go stale like that).
         const at = afterItemId ? items.findIndex((i) => i.id === afterItemId) : -1;
         if (at < 0) return [...items, item];
         return [...items.slice(0, at + 1), item, ...items.slice(at + 1)];
@@ -279,6 +283,13 @@ export function webLibrary(
             : i,
         ),
       );
+    },
+
+    // --- Look ---------------------------------------------------------------------
+
+    async getLook() {
+      const display = store.get("look", "default")?.display;
+      return parseLook(typeof display === "string" ? display : null) ?? DEFAULT_LOOK;
     },
 
     // --- Readings -----------------------------------------------------------------

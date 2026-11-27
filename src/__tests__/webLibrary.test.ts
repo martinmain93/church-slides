@@ -164,6 +164,11 @@ describe("the web app's library", () => {
     const sang = (await a.lib.listSongs("popular")).map((s) => s.id);
     expect(sang).toEqual([doxology, grace]);
     expect((await a.lib.listSongs()).map((s) => s.title)).toEqual(["Amazing Grace", "Doxology"]);
+    // Like the desktop: each time in a service counts, so three times in
+    // one service beats once each in two.
+    const third = await a.lib.createSetlist("Carols");
+    for (let n = 0; n < 3; n++) await a.lib.addSong(third, grace);
+    expect((await a.lib.listSongs("popular")).map((s) => s.id)).toEqual([grace, doxology]);
 
     server.records.set(`song/song_c`, {
       type: "song",
@@ -182,6 +187,8 @@ describe("the web app's library", () => {
     const id = await a.lib.createSetlist("Sunday");
     const item = await a.lib.addServiceItem(id, "scripture", { reference: "John 3:16" }, { slidesOverride: "For God so loved the world" });
     expect((await a.lib.getSetlist(id))?.items.find((i) => i.id === item)?.slides_override).toBe("For God so loved the world");
+    const empty = await a.lib.addServiceItem(id, "scripture", { reference: "Psalm 23:1" }, { slidesOverride: "" });
+    expect((await a.lib.getSetlist(id))?.items.find((i) => i.id === empty)?.slides_override).toBe("");
   });
 
   it("an edit to the words keeps the song's chords and other data", async () => {
