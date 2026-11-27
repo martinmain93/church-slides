@@ -127,7 +127,8 @@ async def run_file(wav: Path, items, args, log_path: Path) -> dict:
             add_song_library(db, args.song_library)
         (tmp / "recordings").mkdir()
         proc = subprocess.Popen(
-            [sys.executable, "-m", "auto_presenter", "--port", str(args.port), "--db-path", str(db), "--dev-tools"],
+            [sys.executable, "-m", "auto_presenter", "--port", str(args.port), "--db-path", str(db), "--dev-tools",
+             "--log-level", args.log_level],
             cwd=REPO / "sidecar", stdout=subprocess.PIPE, stderr=open(tmp / "sidecar.log", "w"), text=True,
         )
         try:
@@ -155,6 +156,7 @@ def main() -> int:
     ap.add_argument("--model", default="small.en")
     ap.add_argument("--backend", default="mlx")
     ap.add_argument("--port", type=int, default=8794)
+    ap.add_argument("--log-level", default="INFO", help="the engine's (DEBUG says which rule moved a slide)")
     ap.add_argument("--out", type=Path, default=Path("speech_negatives.json"))
     ap.add_argument("--song-library", type=Path,
                     help="a library.db whose songs the engine may import (default: none, so off-setlist import never runs)")

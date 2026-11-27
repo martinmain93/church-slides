@@ -79,6 +79,9 @@ class UsageReporter:
             headers={
                 "Content-Type": "application/json",
                 "X-Speech-Signature": tokens.sign(self.secret, body.decode()),
+                # Cloudflare refuses urllib's own "Python-urllib/3.x" (403,
+                # 2026-11-27): every report failed until this was set
+                "User-Agent": "church-slides-speech-server",
             },
         )
         try:

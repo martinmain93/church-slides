@@ -212,6 +212,7 @@ def test_reports_are_signed_as_the_server_checks():
 
     def fake_urlopen(req, timeout):
         sent["sig"] = req.headers["X-speech-signature"]
+        sent["ua"] = req.headers["User-agent"]
         sent["body"] = req.data
         return Resp()
 
@@ -227,6 +228,7 @@ def test_reports_are_signed_as_the_server_checks():
         urllib.request.urlopen = real
     assert ok is True
     assert sent["sig"] == tokens.sign(SECRET, sent["body"].decode())
+    assert not sent["ua"].startswith("Python-urllib")  # Cloudflare refuses it
 
 
 def test_a_wake_up_with_no_audio_isnt_reported():

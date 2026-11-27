@@ -38,7 +38,13 @@ print(s().web.get_web_url())")"
 [[ "$url" == https://* ]] || { echo "no web URL for $env" >&2; exit 1; }
 
 echo "waking $url"
-health="$(curl -fsS -m 180 "$url/health")"
+# A container of the previous build can stay warm and answer for a while
+# after a deploy (Modal drains it), so wait for the new one.
+for _ in $(seq 1 30); do
+  health="$(curl -fsS -m 180 "$url/health" || true)"
+  grep -q "\"build\":\"$build\"" <<<"$health" && break
+  sleep 10
+done
 echo "$health"
-grep -q "\"build\":\"$build\"" <<<"$health" || { echo "health reports another build" >&2; exit 1; }
+grep -q "\"build\":\"$build\"" <<<"$health" || { echo "health still reports another build" >&2; exit 1; }
 echo "speech server $build is live on $env: ${url/https:/wss:}"
