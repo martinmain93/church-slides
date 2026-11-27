@@ -27,6 +27,11 @@ def _sign(secret: str, payload: str) -> str:
     return _b64(hmac.new(secret.encode(), payload.encode(), hashlib.sha256).digest())
 
 
+def sign(secret: str, text: str) -> str:
+    """HMAC-SHA256 of `text`, base64url: how usage reports are signed too."""
+    return _sign(secret, text)
+
+
 def mint(secret: str, seconds: float, org: str | None = None, *, now: float | None = None) -> str:
     claims: dict = {"exp": int((time.time() if now is None else now) + seconds)}
     if org is not None:

@@ -221,7 +221,7 @@ class Speech:
     @modal.asgi_app()
     def web(self):
         sys.path.insert(0, "/root/speech")
-        from server import make_api
+        from server import UsageReporter, make_api
 
         from auto_presenter.follower import next_line
 
@@ -232,6 +232,9 @@ class Speech:
             load_s=self.load_s,
             build=os.environ.get("SPEECH_BUILD", "dev"),
             phone_head=next_line.PhoneHead.load(Path(PHONE_HEAD)),
+            # the Church Slides server's /internal/speech/usage, in the same
+            # Modal Secret: each stream's usage, and whether it may go on
+            reporter=UsageReporter(os.environ["SPEECH_TOKEN_SECRET"], os.environ.get("USAGE_URL")),
         )
 
 

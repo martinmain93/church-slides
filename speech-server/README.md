@@ -36,7 +36,8 @@ Each Modal environment needs, once:
 
 ```sh
 modal environment create <env>
-modal secret create --env <env> church-slides-speech SPEECH_TOKEN_SECRET=<random>
+modal secret create --env <env> church-slides-speech SPEECH_TOKEN_SECRET=<random> \
+    USAGE_URL=https://<church slides server>/internal/speech/usage
 ```
 
 The Church Slides server for that environment holds the same secret.
@@ -70,10 +71,32 @@ signature is HMAC-SHA256 of the payload text with the shared secret
 
 Word times are on the audio clock the client set with `t0`.
 
+A stream the Church Slides server says to stop (the plan ended, or today's
+allowance is used up) is closed with code 4402, and that organization's new
+streams are refused (HTTP 403) for 15 minutes. The app's own engine takes
+over either way.
+
+## Usage reports
+
+Every 60 s and when a stream closes, the server posts that stream's totals
+to `USAGE_URL` (the Church Slides server's `/internal/speech/usage`):
+
+```json
+{"stream": "<id>", "org": "...", "user": "...", "audio_seconds": 600.0,
+ "wall_seconds": 610.2, "gpu_seconds": 118.4, "gpu": "NVIDIA L4, 8.9",
+ "build": "...", "final": false}
+```
+
+signed in `X-Speech-Signature` (HMAC-SHA256 of the body, base64url, with
+the shared secret). `gpu_seconds` is the time the stream's steps and checks
+held the GPU. The answer is `{"continue": bool}`. When the server can't be
+reached, the stream goes on and the next report carries the totals.
+
 ## What it keeps
 
 Nothing. It logs connections (organization id, duration, seconds of
-audio), timings and failures, never words or audio.
+audio, GPU seconds), timings and failures, never words or audio, and
+reports the same counts to the Church Slides server.
 
 ## Failures
 

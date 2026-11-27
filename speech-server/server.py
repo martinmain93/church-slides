@@ -46,6 +46,65 @@ class StepWatch(logging.Handler):
         self.failed = 0
 
 
+#: How often a stream's totals go to the Church Slides server, which answers
+#: whether it may go on (docs/PLANS_AND_USAGE.md in the server repo).
+REPORT_EVERY_S = 60.0
+#: After a "stop", that organization's new streams are refused this long
+#: (as long as a token lasts).
+REFUSE_FOR_S = 15 * 60.0
+
+
+class UsageReporter:
+    """Posts a stream's cumulative totals, signed with the shared secret.
+    `post(body) -> bool | None`: whether the stream may go on, or None when
+    the server couldn't be reached (the stream goes on: the service never
+    stops, and the next report carries the totals)."""
+
+    def __init__(self, secret: str, url: str | None, post=None) -> None:
+        self.secret = secret
+        self.url = url
+        self._post = post or self._http
+        self._refused: dict[str, float] = {}
+
+    def _http(self, body: bytes) -> bool | None:
+        import json
+        import urllib.request
+
+        if not self.url:
+            return None
+        req = urllib.request.Request(
+            self.url,
+            data=body,
+            method="POST",
+            headers={
+                "Content-Type": "application/json",
+                "X-Speech-Signature": tokens.sign(self.secret, body.decode()),
+            },
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=10) as r:
+                return bool(json.loads(r.read()).get("continue", True))
+        except Exception as exc:
+            log.warning("usage report failed: %s", exc)
+            return None
+
+    def report(self, totals: dict) -> bool | None:
+        import json
+
+        ok = self._post(json.dumps(totals, separators=(",", ":")).encode())
+        if ok is False:
+            import time
+
+            self._refused[totals["org"]] = time.monotonic() + REFUSE_FOR_S
+        return ok
+
+    def refused(self, org: str) -> bool:
+        import time
+
+        until = self._refused.get(org)
+        return until is not None and until > time.monotonic()
+
+
 def make_api(
     backend,
     *,
@@ -56,19 +115,23 @@ def make_api(
     phone_head=None,
     encode=None,
     watch: StepWatch | None = None,
+    reporter: UsageReporter | None = None,
+    report_every_s: float = REPORT_EVERY_S,
 ):
     """`backend`: a loaded `QwenStreamingBackend`. `phone_head`: the Qwen
     next-line phone model (`next_line.PhoneHead`); with it, a stream that
     starts with `"phones": true` also gets the check's phones: every
     `next_line.TICK_S` of audio, the trailing `WINDOW_S` through Qwen's audio
     tower (`encode`, by default `next_line.qwen_encoder(backend)`) and the
-    head, as on the Mac."""
+    head, as on the Mac. `reporter`: where each stream's usage goes (none:
+    not reported)."""
     import asyncio
     import base64
     import json
     import queue
     import threading
     import time
+    import uuid
 
     import numpy as np
     from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -97,10 +160,16 @@ def make_api(
         if claims is None:
             await ws.close(code=4401)
             return
+        org = claims.get("org", "-")
+        if reporter is not None and reporter.refused(org):
+            await ws.close(code=4402)
+            return
         await ws.accept()
         opened = time.monotonic()
-        org = claims.get("org", "-")
-        log.info("stream open org=%s", org)
+        stream_id = uuid.uuid4().hex
+        #: GPU time this stream's steps and checks took (the ledger's gpu_seconds)
+        gpu_s = [0.0]
+        log.info("stream open org=%s stream=%s", org, stream_id)
         await ws.send_text(json.dumps(ready))
         loop = asyncio.get_running_loop()
         frames: queue.Queue = queue.Queue()
@@ -115,6 +184,7 @@ def make_api(
 
                 def __exit__(self, *a):
                     last_pass[0] = time.monotonic() - self.t
+                    gpu_s[0] += last_pass[0]
 
             def gen():
                 while (f := frames.get()) is not None:
@@ -146,6 +216,8 @@ def make_api(
 
         def on_logits(t_end: float, logits) -> None:
             ms = phones.ms[-1] if phones is not None and phones.ms else None
+            if ms is not None:
+                gpu_s[0] += ms / 1000.0
             msg = {
                 "type": "phones",
                 "t_end": round(t_end, 3),
@@ -159,6 +231,31 @@ def make_api(
         send_task = asyncio.create_task(sender())
         t = t0 = 0.0
         started = False
+
+        def totals(final: bool) -> dict:
+            return {
+                "stream": stream_id,
+                "org": org,
+                "user": claims.get("user"),
+                "audio_seconds": round(t - t0, 1),
+                "wall_seconds": round(time.monotonic() - opened, 1),
+                "gpu_seconds": round(gpu_s[0], 2),
+                "gpu": gpu,
+                "build": build,
+                "final": final,
+            }
+
+        async def lease() -> None:
+            """Report every `report_every_s`; a "stop" closes the stream (the
+            app's own engine takes over)."""
+            while True:
+                await asyncio.sleep(report_every_s)
+                if await asyncio.to_thread(reporter.report, totals(False)) is False:
+                    log.info("stream stopped by the server org=%s stream=%s", org, stream_id)
+                    await ws.close(code=4402)
+                    return
+
+        lease_task = asyncio.create_task(lease()) if reporter is not None else None
         try:
             while True:
                 msg = await ws.receive()
@@ -184,7 +281,11 @@ def make_api(
                         phones.feed(pcm, t)
         except WebSocketDisconnect:
             pass
+        except RuntimeError:
+            pass  # closed by the lease
         finally:
+            if lease_task is not None:
+                lease_task.cancel()
             frames.put(None)
             if phones is not None:
                 phones.stop()
@@ -195,11 +296,15 @@ def make_api(
             await ws.close()
         except Exception:
             pass
+        if reporter is not None:
+            await asyncio.to_thread(reporter.report, totals(True))
         log.info(
-            "stream closed org=%s after %.0f s, %.0f s of audio",
+            "stream closed org=%s stream=%s after %.0f s, %.0f s of audio, %.1f GPU s",
             org,
+            stream_id,
             time.monotonic() - opened,
             t - t0,
+            gpu_s[0],
         )
 
     return api

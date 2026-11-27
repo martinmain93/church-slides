@@ -131,3 +131,99 @@ def test_watchdog_exits_after_failures_in_a_row():
     assert exits == []
     lg.warning("qwen step failed: boom")
     assert exits == [3]
+
+
+class Reports:
+    """A stand-in for the Church Slides server's usage endpoint."""
+
+    def __init__(self, answer=True):
+        self.answer = answer
+        self.got: list[dict] = []
+
+    def __call__(self, body: bytes):
+        self.got.append(json.loads(body))
+        return self.answer
+
+
+def test_usage_is_reported_when_a_stream_closes():
+    got = Reports()
+    rep = server.UsageReporter(SECRET, None, post=got)
+    c = client(reporter=rep, report_every_s=3600)
+    with c.websocket_connect(f"/stream?token={tokens.mint(SECRET, 60, 'org_1')}") as ws:
+        ws.receive_text()
+        ws.send_text(json.dumps({"type": "start", "t0": 0.0}))
+        for _ in range(5):
+            ws.send_bytes(pcm())
+        for _ in range(5):
+            ws.receive_text()
+        ws.send_text(json.dumps({"type": "end"}))
+    assert len(got.got) == 1
+    final = got.got[0]
+    assert final["org"] == "org_1" and final["final"] is True
+    assert final["audio_seconds"] == pytest.approx(0.5)
+    assert final["gpu"] == "fake" and final["build"] == "abc"
+
+
+def test_a_stop_closes_the_stream_and_refuses_the_org_for_a_while():
+    got = Reports(answer=False)
+    rep = server.UsageReporter(SECRET, None, post=got)
+    c = client(reporter=rep, report_every_s=0.05)
+    token = tokens.mint(SECRET, 60, "org_2")
+    with pytest.raises(WebSocketDisconnect) as e:
+        with c.websocket_connect(f"/stream?token={token}") as ws:
+            ws.receive_text()
+            ws.send_text(json.dumps({"type": "start", "t0": 0.0}))
+            while True:
+                ws.send_bytes(pcm())
+                ws.receive_text()
+    assert e.value.code == 4402
+    assert rep.refused("org_2") and not rep.refused("org_3")
+    with pytest.raises(WebSocketDisconnect) as e:
+        with c.websocket_connect(f"/stream?token={token}") as ws:
+            ws.receive_text()
+    assert e.value.code == 4402
+
+
+def test_an_unreachable_server_doesnt_stop_the_stream():
+    rep = server.UsageReporter(SECRET, None, post=lambda body: None)
+    c = client(reporter=rep, report_every_s=0.01)
+    with c.websocket_connect(f"/stream?token={tokens.mint(SECRET, 60, 'org_4')}") as ws:
+        ws.receive_text()
+        ws.send_text(json.dumps({"type": "start", "t0": 0.0}))
+        for _ in range(20):
+            ws.send_bytes(pcm())
+            assert json.loads(ws.receive_text())["type"] == "words"
+        ws.send_text(json.dumps({"type": "end"}))
+    assert not rep.refused("org_4")
+
+
+def test_reports_are_signed_as_the_server_checks():
+    sent = {}
+
+    class Resp:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            pass
+
+        def read(self):
+            return b'{"continue": true}'
+
+    def fake_urlopen(req, timeout):
+        sent["sig"] = req.headers["X-speech-signature"]
+        sent["body"] = req.data
+        return Resp()
+
+    import urllib.request
+
+    real = urllib.request.urlopen
+    urllib.request.urlopen = fake_urlopen
+    try:
+        ok = server.UsageReporter(SECRET, "https://api.test/internal/speech/usage").report(
+            {"stream": "s", "org": "o"}
+        )
+    finally:
+        urllib.request.urlopen = real
+    assert ok is True
+    assert sent["sig"] == tokens.sign(SECRET, sent["body"].decode())
