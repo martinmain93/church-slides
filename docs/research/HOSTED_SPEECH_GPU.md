@@ -11,9 +11,8 @@ Candidate A in `docs/roadmap/HOSTED_SPEECH.md`.
     thread never waits on the network.
   - While the server is away or still waking, Whisper on the computer takes
     over after 3 s, and the app reconnects with backoff.
-- **Server:** `research/spikes/qwen_gpu/` (`modal_app.py`, `speech_server.py`,
-  `serve_local.py` to run it on a Mac). The protocol is documented in
-  `modal_app.py`.
+- **Server:** `speech-server/` (moved out of `research/spikes/qwen_gpu/`
+  on 2026-11-27; the protocol is in its README).
 - **Auth:** tokens are signed with a shared secret (HMAC) and expire. Our
   server would mint them as it mints AI keys.
 
@@ -132,6 +131,29 @@ MLX's cache is keyed by kernel name only. Fixes:
 - **The container exits after 8 failed steps in a row**, so Modal replaces
   it. A server that answers without words keeps the app off its fallback.
 
+### Lead time across a fallback switch (2026-11-27)
+
+Recording 20261002-185523 (12 min) on the hosted path. The Modal app was
+stopped at 204 s of audio and redeployed at 400 s
+(`work/hosted_speech/outage.sh`).
+
+| | Audio time | Measured delay (median, last 200 words) |
+|---|---|---|
+| On the server | 0–204 s | 2.0–2.2 s |
+| Server stopped; Whisper takes over 18 s later | 204 s | 2.24 s |
+| Whisper, settled | 267 s on | 2.7–2.97 s |
+| Server back (22 s after the redeploy) | about 420 s | 2.7 s |
+| On the server, settled | about 610 s on | 2.0 s |
+
+- **The switch works both ways** with no error: words drop for about 18 s
+  while Modal is still shutting the container (HTTP 500, then 404), and the
+  app reconnects 22 s after the redeploy (backoff).
+- **The lead follows in about 1 minute** going to Whisper, and **about
+  3 minutes** coming back, since the median of 200 words moves only when
+  half of them are new. The two engines differ by only about 0.6 s, so for
+  those minutes slides are at most 0.6 s late, then up to 0.6 s early.
+- **A cheap fix if it matters:** reset the delay window on a switch.
+
 ## Streams per GPU
 
 One song (HILA), N copies streamed at once to one container:
@@ -144,7 +166,7 @@ One song (HILA), N copies streamed at once to one container:
 
 Steps run one at a time per container (`GPU_LOCK`), with no batching. So an
 L4 carries **about 4 churches** before words come late. Accuracy doesn't
-change. `modal_app.py` now takes 4 per container, and Modal starts more
+change. `speech-server/app.py` takes 4 per container, and Modal starts more
 containers beyond that. Batching steps across streams is the obvious way to
 raise this.
 
@@ -173,9 +195,7 @@ container, as configured, so the cost estimate below stands.
 
 - **Measuring cost with the check:** done (above), 4 per GPU holds.
 - **Talk-only negatives** (the speech-negatives bench) on this path.
-- **The lead time across a switch:** it follows the measured delay, but
-  it isn't checked how fast it settles when the server drops and Whisper
-  takes over, or the reverse.
+- **The lead time across a switch:** done (above).
 - **Batching steps** across streams on one GPU.
 - **Waking in the app:** under 10 s, so the GPU is woken when the AI starts,
   with no warm-up message. Whisper covers the first seconds, and any wait

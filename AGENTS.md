@@ -26,6 +26,7 @@ pnpm test                       # interface tests
 (cd src-tauri && cargo test --lib)
 pnpm lint
 pnpm codegen                    # after changing sidecar/auto_presenter/protocol.py
+scripts/deploy_speech.sh staging  # the speech server (speech-server/README.md)
 ```
 
 ## Rules

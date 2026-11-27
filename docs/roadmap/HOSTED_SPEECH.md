@@ -102,22 +102,22 @@ production environments.
 - **Lead time across a switch:** the lead follows the median delay of the
   last 200 words, so after a switch it may lag about a minute behind.
 
-### 2. Speech server out of research
+### 2. Speech server out of research (done 2026-11-27)
 
-- `speech-server/` at the repo root, from `research/spikes/qwen_gpu/`:
-  `app.py` (Modal), `server.py` (websocket), `serve_local.py`, tests for
-  the token check, the protocol and the watchdog.
-- **Pinned image:** exact versions of MLX (CUDA), the models by revision,
-  the phone head by hash. The engine code is copied from `sidecar/` at
-  build, so a deploy is tied to one app commit.
-- **Environments:** `modal deploy --env staging|production`. The token
-  secret is a Modal Secret per environment, never a file.
-- **Deploy from the Mac** (`scripts/deploy_speech.sh staging|production`),
-  like the release pipeline, with no CI minutes.
-- **Logs** say connections, GPU, step failures and timings, never words or
-  audio.
-- **Spend:** a workspace spend limit in Modal's dashboard (yours to set),
-  and `max_containers` in the app.
+- **`speech-server/`** at the repo root: `app.py` (Modal), `server.py`
+  (websocket), `tokens.py`, `serve_local.py`, tests (tokens, words, phones,
+  the watchdog). The protocol is in its README.
+- **Pinned:** every image package (`requirements.txt`), the models by
+  revision, the phone model by SHA-256 from the app's own release, and
+  public-domain warm-up audio in the repo. Nothing comes from this Mac.
+- **Environments:** `staging` (live, checked end to end: WER 0.239, final
+  words p50 1.69 s, every phone tick) and `production` in the existing
+  workspace, each with its own token secret as a Modal Secret.
+- **`scripts/deploy_speech.sh staging|production`:** production needs a
+  clean tree at a pushed commit; it checks `/health` reports the build.
+- **Logs:** connections (organization id, duration, seconds of audio),
+  timings and failures, never words or audio.
+- **Still yours:** a spend limit in Modal's dashboard.
 
 ### 3. Server (church-slides-server)
 

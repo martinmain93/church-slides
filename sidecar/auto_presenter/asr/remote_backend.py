@@ -3,8 +3,8 @@
 The server runs the same streaming Qwen3-ASR engine as Apple silicon
 (`asr.qwen_backend.QwenStreamer`) on a rented GPU; this end sends the room's
 audio over one websocket and hands the words that come back to the session,
-as `QwenStreamer` would. Prototype server: research/spikes/qwen_gpu/modal_app.py,
-which also documents the wire protocol.
+as `QwenStreamer` would. The server and its wire protocol: speech-server/
+(README.md).
 
 Nothing here waits on the network in the audio path: audio goes out through
 a sender thread, words come in on a receiver thread, and the session's

@@ -417,7 +417,7 @@ async def run_clip(clip: Clip, providers: list[str], keys: dict, variants: list[
             threads.append(threading.Thread(target=run_wrapper, args=(label, be, clip, t0, outdir / f"{label}.jsonl", float(window))))
     if "remote" in providers:
         # REMOTE_SPEECH_URL + REMOTE_SPEECH_TOKEN: the streaming Qwen engine on a
-        # server (research/spikes/qwen_gpu), asr.remote_backend.
+        # server (speech-server/), asr.remote_backend.
         from auto_presenter.asr.remote_backend import RemoteStreamingBackend
 
         token = os.environ["REMOTE_SPEECH_TOKEN"]
