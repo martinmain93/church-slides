@@ -98,7 +98,7 @@ production environments.
 - **GPU load with the check on:** done. 4 streams per GPU still hold
   (final words p50 1.7–1.8 s, phones 0.11 s late, a check 39 ms with 4 at
   once); beyond 4, Modal starts another container.
-- **Talk-only false moves** (speech-negatives bench, public recordings).
+- **Talk-only false moves:** done, and fixed (below).
 - **Lead time across a switch:** the lead follows the median delay of the
   last 200 words, so after a switch it may lag about a minute behind.
 
@@ -148,13 +148,36 @@ production environments.
   (no fallback there, so they'd need the blank-and-retry path), and
   removing the DeepInfra code.
 
-### Blocking: false moves during talk
+### False moves during talk (fixed 2026-11-27, 2d3d52d)
 
 The talk-only bench on the hosted path made **4 false moves in 265 min**
-(0.9/h; the Mac's path: 0). The processor-only control on the same
-recordings: 0 on the two finished so far, where hosted made 3. So hosted
-speech causes them: in-song advances while nobody sings. To fix before
-shipping (likely the Qwen next-line check, or Qwen's words, on talk).
+(the Mac's path and the processor-only control: 0). All four were the score
+follower's in-song advances, let through the plan gate. Two causes:
+
+- **Common-word phrases released the follower's talk hold.** Its talk
+  latch let go after 3 words in phrases that are also in the song, and
+  "the same", "have a", "for all" are in most songs. Qwen hears talk
+  more completely than Whisper does, so it met them more often. Now only a
+  phrase with a content word releases the hold, or counts as the song's
+  first line.
+- **Meeting-room tone read as a band.** The 6 s harmony mean passes the
+  bar on some talk (one meeting reads as a band 25–30% of the time), and a
+  band makes the gate treat the room as not talking. The gate now needs
+  the band held for 45 s (`BandPresence.sustained`). In the goldens, none
+  of the 198 sung in-song moves needed the band for that exemption at
+  under 45 s.
+
+Measured in real time after the fix:
+
+| | before | after |
+|---|---|---|
+| Hosted talk bench, the 3 recordings that moved (146 min) | 4 moves | **0** |
+| Hosted sung gate (9 church goldens) | 0.243 | 0.240 |
+| Mac MLX sung gate | 0.277 (2026-11-19) | 0.244 |
+
+The other 5 talk recordings (120 min) made no moves before and the change
+only holds more, so they weren't rerun. The Mac run was in Low Power Mode;
+its "before" is on older code, so it shows no regression, not a gain.
 
 ### 5. Privacy, terms and release
 

@@ -194,7 +194,8 @@ container, as configured, so the cost estimate below stands.
 ## Not yet done
 
 - **Measuring cost with the check:** done (above), 4 per GPU holds.
-- **Talk-only negatives** (the speech-negatives bench) on this path.
+- **Talk-only negatives:** done. 4 false moves in 265 min, fixed to 0
+  (2d3d52d; see `docs/roadmap/HOSTED_SPEECH.md`).
 - **The lead time across a switch:** done (above).
 - **Batching steps** across streams on one GPU.
 - **Waking in the app:** under 10 s, so the GPU is woken when the AI starts,
