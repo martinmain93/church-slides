@@ -32,7 +32,6 @@ from auto_presenter.api_keys import (
 )
 from auto_presenter.asr.backend import ASRBackend
 from auto_presenter.asr.groq_backend import GroqWhisperBackend
-from auto_presenter.asr.hosted_backend import HostedCredentials, HostedSpeechBackend
 from auto_presenter.asr.junk import DoubtfulWordFilter
 from auto_presenter.asr.machine_check import ASSIST_TRANSCRIBE_EVERY_S
 from auto_presenter.asr.mlx_backend import MLXWhisperBackend
@@ -262,17 +261,6 @@ def _whisper_load_lock(model_size: str) -> threading.Lock:
 
 def _env(name: str) -> str | None:
     return os.environ.get(name) or None
-
-
-def _env_hosted_credentials() -> HostedCredentials | None:
-    """Research only (`asr_hosted`): online speech's endpoint, model and token
-    from the environment, until the app hands over a server-issued key."""
-    url = os.environ.get("AUTO_PRESENTER_HOSTED_SPEECH_URL")
-    model = os.environ.get("AUTO_PRESENTER_HOSTED_SPEECH_MODEL")
-    token = os.environ.get("AUTO_PRESENTER_HOSTED_SPEECH_TOKEN")
-    if not (url and model and token):
-        return None
-    return HostedCredentials(base_url=url, model=model, token=token)
 
 
 async def _load_whisper_backend_async(
@@ -927,9 +915,7 @@ async def _start_audio_session(
             else None
         )
         backend.min_step_seconds = ASSIST_TRANSCRIBE_EVERY_S if assist else 0.0
-        if tun is not None and tun.asr_hosted:
-            backend = HostedSpeechBackend(_env_hosted_credentials, fallback=backend)
-        elif tun is not None and tun.asr_remote and _env("AUTO_PRESENTER_REMOTE_SPEECH_URL"):
+        if tun is not None and tun.asr_remote and _env("AUTO_PRESENTER_REMOTE_SPEECH_URL"):
             from auto_presenter.asr.remote_backend import RemoteStreamingBackend
 
             backend = RemoteStreamingBackend(

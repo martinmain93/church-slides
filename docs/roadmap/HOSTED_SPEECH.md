@@ -145,8 +145,9 @@ production environments.
   a service), Settings → AI → Listen online, and "on this computer" on the
   AI pill while Whisper stands in (`pipeline_health.speech_online`).
 - **Not covered yet:** computers too slow for Whisper on the processor
-  (no fallback there, so they'd need the blank-and-retry path), and
-  removing the DeepInfra code.
+  (no fallback there, so they'd need the blank-and-retry path). The
+  DeepInfra per-call backend (`asr_hosted`) was removed 2026-11-28; its
+  numbers stay in `docs/research/HOSTED_SPEECH_DEEPINFRA.md`.
 
 ### False moves during talk (fixed 2026-11-27, 2d3d52d)
 

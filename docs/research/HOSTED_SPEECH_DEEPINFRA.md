@@ -1,7 +1,8 @@
 # Online speech on DeepInfra: first real-time gate (2026-11-25)
 
 Design: `docs/roadmap/HOSTED_SPEECH.md`. Backend: `asr/hosted_backend.py`
-(`asr_hosted` research tunable).
+(`asr_hosted` research tunable), removed 2026-11-28 once our own GPU server
+won (`docs/research/HOSTED_SPEECH_GPU.md`); it is in git history before then.
 
 ## Set-up
 

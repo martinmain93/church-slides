@@ -11,7 +11,7 @@ a sender thread, words come in on a receiver thread, and the session's
 thread only queues frames and drains words. A dropped connection is retried
 with backoff; while it's down, no words arrive (the fallback to the
 computer's own engine, `fallback`, listens until the server answers again:
-the same ladder as `hosted_backend` — a few seconds of silent retrying, then
+a few seconds of silent retrying, then
 the fallback, with backoff on the reconnects. That also covers the minute a
 cold GPU takes to wake.
 """

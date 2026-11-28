@@ -760,12 +760,6 @@ class ParticleFilterTunables(BaseModel):
     #: it beat Whisper on the real-time gold eval, 0.249 vs 0.272 wrong-slide
     #: (docs/research/QWEN3_ASR_IMPROVEMENTS.md). The kill switch; not shown.
     asr_qwen_streaming: bool = True
-    #: Research: with `backend="whisper"`, send speech to an online
-    #: OpenAI-compatible endpoint (`asr.hosted_backend`), with Whisper on the
-    #: processor as the fallback. The endpoint, model and token come from
-    #: AUTO_PRESENTER_HOSTED_SPEECH_{URL,MODEL,TOKEN} until the app hands
-    #: them over (docs/roadmap/HOSTED_SPEECH.md). Not shown.
-    asr_hosted: bool = False
     #: Research: with `backend="whisper"`, stream speech to the streaming Qwen
     #: engine on a GPU server (`asr.remote_backend`, speech-server/),
     #: Whisper on the processor as the fallback.
