@@ -1954,7 +1954,7 @@ async def _observe_singing(matcher: MatchingEngine, event) -> None:
     scheduler = getattr(matcher, "scheduler", None)
     if scheduler is not None:
         scheduler.talking_score = _state.singing.score
-        scheduler.band_playing = _state.band.playing
+        scheduler.band_playing = _state.band.sustained
     await _report_singing(was)
 
 

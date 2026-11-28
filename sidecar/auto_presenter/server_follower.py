@@ -524,10 +524,17 @@ async def apply_follower_decision(decision: MatcherDecision) -> None:
             (decision.item_idx, decision.slide_idx),
             decision.t_seconds,
             matcher.scheduler.talking_score,
-            _state.band.playing,
+            _state.band.sustained,
         )
     ):
         held = True
+    log.debug(
+        "follower move %s -> (%d, %d) conf %.2f: talking %.2f band %s blank-hold %s -> %s",
+        matcher._screen, decision.item_idx, decision.slide_idx, decision.confidence,
+        matcher.scheduler.talking_score, _state.band.sustained,
+        _state.blank_when_idle and _state.blank_on_talking and _state.singing.off_book,
+        "held" if held else "allowed",
+    )
     # Same rule as a transcript decision: while nobody is singing these words,
     # hold the display (see `server._make_transcript_handler`). Held or stale,
     # the follower is told what is really up so it re-issues the change later.

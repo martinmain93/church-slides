@@ -36,7 +36,9 @@ captured transcripts, the gate cost wrong-slide 0.306 -> 0.347 (0.380 -> 0.391,
 0.178 -> 0.214, 0.475 -> 0.499 on single-song recordings); with the band
 exemption every single-song recording is unchanged. None of the 21 false moves
 on talk happened with the band signal reading "playing" (harmony 0.36 at most
-against a 0.5 bar), so they are all still held.
+against a 0.5 bar), so they are all still held. Later (2026-11-27, hosted
+speech) a meeting's room tone did read as a band at two false moves, so the
+exemption now needs the band held over 45 s (`music.band`, `sustained`).
 """
 
 from __future__ import annotations

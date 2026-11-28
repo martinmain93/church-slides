@@ -25,6 +25,15 @@ in lyric phrases: flagged 75% of the talk; 0-1.5% of single songs' singing,
 missed is its pauses, which is why talk *latches*: the screen holds until
 this song's words are heard again (`RELEASE_WORDS` words in lyric phrases),
 not merely until the talk pauses.
+
+Releasing the latch, and the first lyric heard off a blank, need a phrase
+with a word that means something (`decision.plan_gate`'s `content_word`):
+"the same", "have a", "all that" are in many lyrics and in every
+conversation. On the hosted-speech talk bench (2026-11-27, 146 min of
+meetings and a sermon) three of four false slide changes came right after
+such pairs released the latch. Noticing talk still counts every lyric pair:
+asking a content word there too latched 8.4% of sung readouts on the
+goldens' transcripts instead of 5.6%.
 """
 
 from __future__ import annotations
@@ -32,6 +41,8 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable, Sequence
 from itertools import pairwise
+
+from auto_presenter.decision.plan_gate import content_word
 
 #: Words too common to make a phrase on their own (`eval.visible.STOP_WORDS`).
 STOP_WORDS = frozenset(
@@ -69,12 +80,17 @@ def lyric_pairs(slides: Iterable[Sequence[str]]) -> frozenset[tuple[str, str]]:
     return frozenset(out)
 
 
+def telling(a: str, b: str) -> bool:
+    """A lyric pair that says which song this is: one of its words means something."""
+    return bool(content_word(a) or content_word(b))
+
+
 class TalkGate:
     """Words in, `talking(wall)` out: True while the screen should hold."""
 
     def __init__(self, pairs: frozenset[tuple[str, str]]):
         self.pairs = pairs
-        #: [t_audio, t_arrival, word, in a lyric phrase]
+        #: [t_audio, t_arrival, word, in a lyric phrase, in a telling one]
         self._words: list[list] = []
         self.latched = False
         self._latched_at = 0.0
@@ -85,12 +101,14 @@ class TalkGate:
         w = norm(text)
         if not w:
             return
-        row = [t_audio, t_arrival, w, False]
+        row = [t_audio, t_arrival, w, False, False]
         prev = self._words[-1] if self._words else None
         if prev is not None and 0 <= t_audio - prev[0] <= PAIR_GAP_S and (prev[2], w) in self.pairs:
             prev[3] = row[3] = True
-            if self._ever_lyric is None or t_arrival < self._ever_lyric:
-                self._ever_lyric = t_arrival
+            if telling(prev[2], w):
+                prev[4] = row[4] = True
+                if self._ever_lyric is None or t_arrival < self._ever_lyric:
+                    self._ever_lyric = t_arrival
         self._words.append(row)
 
     def note_lyrics(self, t_arrival: float) -> None:
@@ -111,7 +129,7 @@ class TalkGate:
         if len(distinct) >= MIN_DISTINCT and lyric < MAX_LYRIC_SHARE * len(recent):
             self.latched, self._latched_at = True, wall
         elif self.latched:
-            heard = sum(1 for r in self._words if r[3] and self._latched_at < r[1] <= wall)
+            heard = sum(1 for r in self._words if r[4] and self._latched_at < r[1] <= wall)
             if heard >= RELEASE_WORDS:
                 self.latched = False
         return self.latched

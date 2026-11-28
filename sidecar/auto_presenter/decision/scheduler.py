@@ -531,8 +531,9 @@ class LeadTimeScheduler:
     #: `cross_song_max_talking_score`. 0.0 until something reports one, so
     #: harnesses without a detector behave as before.
     talking_score: float = 0.0
-    #: Whether a band is playing (`music.band`), set by the server: the plan
-    #: gate then treats the room as singing whatever `talking_score` says.
+    #: Whether a band has been playing for a while (`music.band`'s
+    #: `sustained`), set by the server: the plan gate then treats the room as
+    #: singing whatever `talking_score` says.
     band_playing: bool = False
     #: Moves the service plan does not predict must be backed by the target
     #: slide's own words (`decision.plan_gate`). Fed words by the server;

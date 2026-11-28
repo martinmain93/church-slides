@@ -82,3 +82,22 @@ def test_straight_back_to_the_slide_just_left_needs_a_clear_majority(monkeypatch
     assert f.readout(2.5).slide == 1  # ... a clear one is
     monkeypatch.setattr(f, "_choose", lambda m, wall: (1, 0.6))
     assert f.readout(1.5 + online.FLIP_BACK_S + 0.5).slide == 1  # and later, as usual
+
+
+def test_common_word_phrases_neither_release_the_latch_nor_start_the_song():
+    # in many lyrics and in every meeting: these released the latch on talk
+    gate = TalkGate(lyric_pairs([["the", "same", "for", "all", "that", "we", "have", "a", "home"]]))
+    t = 0.0
+    for i, w in enumerate("people work on different projects every single week here now".split()):
+        t = i * 0.3
+        gate.push(t, t + 1.0, w)
+    assert gate.talking(t + 1.0)
+    for i, w in enumerate("in the same office for all that we have a".split()):
+        gate.push(t + 1 + i * 0.3, t + 2 + i * 0.3, w)
+    wall = t + 2 + 3.0
+    assert gate.talking(wall)
+    assert not gate.lyrics_heard(wall)
+    for i, w in enumerate("have a home have a home".split()):
+        gate.push(wall + i * 0.3, wall + 1 + i * 0.3, w)
+    assert not gate.talking(wall + 3.0)
+    assert gate.lyrics_heard(wall + 3.0)
